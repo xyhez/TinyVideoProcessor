@@ -38,6 +38,8 @@ public:
                        std::shared_ptr<QVector<AVFrame*>> frameQueue,
                        std::shared_ptr<syncmanager> syncManager);
 
+
+
     /**
      * @brief start
      */

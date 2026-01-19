@@ -1,6 +1,7 @@
 ﻿#ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+///< 这是Condition-Variable分支
 #include <QMainWindow>
 #include <QDebug>
 #include <QKeyEvent>
