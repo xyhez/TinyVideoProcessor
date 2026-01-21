@@ -50,8 +50,8 @@ set(PROJECT_SOURCES
         videorender.cpp
         AudioPlayer.h
         AudioPlayer.cpp
-        # commonmodule.h
-        # commonmodule.cpp
+        global.h
+        global.cpp
         开发文档.txt
 
 )

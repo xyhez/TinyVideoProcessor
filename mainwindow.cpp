@@ -1,7 +1,6 @@
 ﻿#include "mainwindow.h"
 #include "ui_mainwindow.h"
 
-// mainwindow.cpp
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 
@@ -143,42 +142,8 @@ void MainWindow::closeEvent(QCloseEvent *event)
     m_videoRender->stopRendering();
 }
 
-// void MainWindow::keyPressEvent(QKeyEvent *ev)
-// {
-//     qDebug() << "press" << ev->key();
-
-//     if (ev->key() == Qt::Key_Space) {
-//         if(pause_flag == false) {
-//             pause();
-//             pause_flag = true;
-//         }else {
-//             start();
-//             pause_flag = false;
-//         }
-//         ev->accept();
-//     } else if(ev->key() == Qt::Key_Up) {
-//         // emit e_volumeUp();
-//         m_audioplay->volumeUp();
-//     } else if(ev->key() == Qt::Key_Down) {
-
-//         // emit e_volumeDown();
-//         m_audioplay->volumeDown();
-//     } else if(ev->key() == Qt::Key_Left) {
-//         emit e_Rewind();
-//     } else if(ev->key() == Qt::Key_Right) {
-//         pause();
-//         m_syncManager->Forword();
-//         emit e_Forward();
-//         start();
-//     }
-
-//     QMainWindow::keyPressEvent(ev);
-// }
-
 void MainWindow::keyReleaseEvent(QKeyEvent *ev)
 {
-    // qDebug() << "release" << ev->key();
-
     if (ev->key() == Qt::Key_Space) {
         if(pause_flag == false) {
             pause();

@@ -42,8 +42,7 @@ void AudioPlayer::initAudioPlay(AVCodecParameters* codecPar,
     qDebug() << "AudioPlayer initialized: Rate =" << m_dstRate
              << "Hz, Channels =" << m_dstChannels;
 
-    ///< 获取音量
-    m_volume = m_audioSink->volume();
+
 }
 
 void AudioPlayer::initResampler() {
@@ -111,6 +110,10 @@ void AudioPlayer::startAudioPlay()
             qCritical() << "AudioPlayer: Failed to start audio sink!";
             return;
         }
+        ///< 获取音量
+        m_volume = m_audioSink->volume();
+        qDebug()<<"音量:"<<m_volume;
+        volumeDown();
     }
 
     run();

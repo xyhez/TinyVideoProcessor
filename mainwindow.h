@@ -44,11 +44,6 @@ public:
      * @param event
      */
     void closeEvent(QCloseEvent *event) override;
-    /**
-     * @brief keyPressEvent
-     * @param ev
-     */
-    // void keyPressEvent(QKeyEvent *ev)   override;
 
     /**
      * @brief keyReleaseEvent 重写键盘事件

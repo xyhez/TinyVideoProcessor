@@ -120,7 +120,7 @@ private:
     QMutex m_mutex;
     QWaitCondition m_queueNotEmpty;
 
-    qreal m_volume = 0.0;
+    qreal m_volume = 1.0;
 
 private:
     void initResampler();
