@@ -1,10 +1,10 @@
 ﻿#include "demuxer.h"
 
-demuxer::demuxer(std::shared_ptr<QVector<AVPacket*>> APacket
-                     ,std::shared_ptr<QVector<AVPacket*>> VPacket
-                     ,std::shared_ptr<QVector<AVFrame*>>  AFrame
-                     ,std::shared_ptr<QVector<AVFrame*>>  VFrame
-                     ,QObject *parent)
+demuxer::demuxer(std::shared_ptr<std::deque<AVPacket*>> APacket
+                 ,std::shared_ptr<std::deque<AVPacket*>> VPacket
+                 ,std::shared_ptr<std::deque<AVFrame*>>  AFrame
+                 ,std::shared_ptr<std::deque<AVFrame*>>  VFrame
+                 ,QObject *parent)
     : QObject{parent}
     , m_APacket(APacket)
     , m_VPacket(VPacket)
@@ -57,6 +57,10 @@ int demuxer::initDemuxer(QString filename) {
             m_videoStreamIndex = i;
             m_V_coderPar = ic->streams[i]->codecpar;
             m_V_time_base = ic->streams[i]->time_base;
+            g_videoinfo.videoname = m_videoFileName.toStdString();
+            g_videoinfo.FrameRate = av_q2d(ic->streams[i]->avg_frame_rate);
+            g_videoinfo.V_timeBase = av_q2d(ic->streams[i]->time_base);
+            g_videoinfo.duration = ic->duration/1000000;
         }else
 
         ///< 找到音频流
@@ -71,11 +75,12 @@ int demuxer::initDemuxer(QString filename) {
             m_audioStreamIndex = i;
             m_A_coderPar = ic->streams[i]->codecpar;
             m_A_time_base = ic->streams[i]->time_base;
+            g_videoinfo.A_timeBase = av_q2d(ic->streams[i]->time_base);
         }else
-        ///< 找到字幕流
-        if(ic->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_SUBTITLE) {
-            qDebug()<<"找到字幕流";
-        }
+            ///< 找到字幕流
+            if(ic->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_SUBTITLE) {
+                qDebug()<<"找到字幕流";
+            }
     }
 
     return 0;
@@ -98,75 +103,80 @@ AVRational demuxer::reVtimebase() {
 }
 
 int demuxer::startDemuxer() {
+    qDebug() << "开始解复用";
 
-    qDebug()<<"开始解复用";
-
-    ///< 检查ic是否初始化
-    if(ic==nullptr) {
-        qDebug()<<"上下文初始化...";
+    if (!ic) {
+        qDebug() << "上下文未初始化";
         return -1;
     }
 
-    while(true) {
-        if(stop_flag == true) {
-            break;
-        }
-        if(pause_flag == true) {
-            QThread::msleep(10);
-            continue;
-        }
+    while (true) {
+        AVPacket* packet = av_packet_alloc();
+        int ret = av_read_frame(ic, packet);
 
-        ///< 包队列满了,因为是以音频为主，所以这里只考虑音频
-        if(m_APacket->size()>=30) {
-            QThread::msleep(100);
-            continue;
-        }
-
-        packet = av_packet_alloc();             ///< 初始化
-
-        int ret = av_read_frame(ic,packet);     ///< 从文件中读取包
-
-        if(ret<0) {
+        if (ret < 0) {
             av_packet_free(&packet);
-            if(ret == AVERROR_EOF) {
-                ///< 文件解复用结束
+            if (ret == AVERROR_EOF) {
                 qDebug() << "Demuxing finished (EOF)";
                 break;
-            }else {
-                ///< 文件读取出错
-                qDebug()<<"文件读取出错!等待继续尝试";
-                QThread::msleep(20);
+            }
+            qDebug() << "读取错误，重试...";
+            QThread::msleep(20);
+            continue;
+        }
+
+        // 提前过滤非音视频流
+        if (packet->stream_index != m_audioStreamIndex &&
+            packet->stream_index != m_videoStreamIndex) {
+            av_packet_free(&packet);
+            continue;
+        }
+
+        // ========== 音频流 ==========
+        if (packet->stream_index == m_audioStreamIndex) {
+            std::unique_lock<std::mutex> lock(mtx_A_packet);
+
+            cv_A_packet_NotFull.wait(lock, [this]{
+                return m_APacket->size() < A_PACKETMAXSIZE || g_pause || g_stop;
+            });
+
+            if (g_pause) {
+                av_packet_free(&packet);
                 continue;
             }
-            break;
-        }
-
-
-        ///< 处理音频流
-        AVPacket* packetRet = nullptr;
-        if(packet->stream_index == m_videoStreamIndex) {
-            mutex.lock();
-            packetRet = m_VPacket->emplace_back(packet);
-            m_VcurrentPTS = packet->pts;
-            mutex.unlock();
-            if(packetRet == nullptr) {
-                qDebug()<<"视频帧入队失败!";
+            if (g_stop) {
+                av_packet_free(&packet);
+                break;
             }
 
-        }else
-        ///< 处理音频流
-        if(packet->stream_index == m_audioStreamIndex) {
-            mutex.lock();
-            packetRet = m_APacket->emplace_back(packet);
+            m_APacket->emplace_back(packet);
             m_AcurrentPTS = packet->pts;
-            mutex.unlock();
-            if(packetRet == nullptr) {
-                qDebug()<<"音频帧入队失败!";
-            }
+            lock.unlock();
+            cv_A_packet_NotEmpty.notify_one();
         }
-        packet = nullptr;
+        // ========== 视频流 ==========
+        else {
+            std::unique_lock<std::mutex> lock(mtx_V_packet);
+
+            // cv_V_packet_NotFull.wait(lock, [this]{
+            //     return m_VPacket->size() < MAXSIZE || g_pause || g_stop;
+            // });
+
+            // if (g_pause) {
+            //     av_packet_free(&packet);
+            //     continue;
+            // }
+            // if (g_stop) {
+            //     av_packet_free(&packet);
+            //     break;
+            // }
+
+            m_VPacket->emplace_back(packet);
+            m_VcurrentPTS = packet->pts;
+            lock.unlock();
+            cv_V_packet_NotEmpty.notify_one();
+        }
     }
-    ///< 这里不可以释放packet指针，因为指针所指向的对象已经存入到vector容器中，需要在析构时释放，这时释放会导致进程崩溃
 
     return 0;
 }
@@ -210,5 +220,3 @@ int demuxer::pause(){
 
     return 0;
 }
-
-

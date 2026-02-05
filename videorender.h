@@ -7,12 +7,11 @@
 #include <QOpenGLTexture>
 #include <QTimer>
 #include <QMutex>
-#include <QElapsedTimer>
-#include <QSizePolicy>
 #include <memory>
+#include <deque>  // 添加 deque 支持
 
-// 修改：包含项目中的头文件
 #include "syncmanager.h"
+#include "global.h"
 
 extern "C" {
 #include <libavutil/frame.h>
@@ -20,84 +19,58 @@ extern "C" {
 }
 
 /**
- * @brief 视频渲染器（严格同步版）- 修复黑闪问题
- * @details 同步策略：视频提前(>30ms)则显示上一帧，落后(<-30ms)则丢帧追赶
- *          修复：避免不必要的清屏，确保总有一帧可显示
+ * @brief 视频渲染器 - 极简事件驱动版
+ * @details 核心逻辑：Timer按视频帧率触发 → 取帧 → 同步判断 → 渲染/等待/丢帧
  */
 class VideoRender : public QOpenGLWidget, protected QOpenGLFunctions
 {
     Q_OBJECT
 
 public:
-    // 修改：适配项目的构造函数
-    VideoRender(QWidget* parent = nullptr);
+    explicit VideoRender(QWidget* parent = nullptr);
     ~VideoRender();
 
-    // 修改：使用QVector<AVFrame*>作为帧队列
-    void initvideoRender(std::shared_ptr<QVector<AVFrame*>> Vframeq,
-                         std::shared_ptr<syncmanager> c,
-                         AVRational time_base);
+    // 初始化：传入帧队列、同步管理器、视频帧率（关键！）
+    void initvideoRender(std::shared_ptr<std::deque<AVFrame*>> frameQueue,
+                         std::shared_ptr<syncmanager> syncManager);
 
-    void setVideoTimeBase(AVRational tb) { m_videoTimeBase = tb; }
     void startRendering();
     void stopRendering();
-    void pause() { stopRendering(); }  // 适配项目的pause接口
+    void pause() { stopRendering(); }
 
-    // 获取渲染统计
-    int getFramesRendered() const { return m_framesRendered; }
-    int getFramesDropped() const { return m_framesDropped; }
+private slots:
+    void renderFrame();
 
 protected:
     void initializeGL() override;
     void resizeGL(int w, int h) override;
     void paintGL() override;
 
-private slots:
-    void onRenderTimeout();
-
 private:
     void uploadTexture(AVFrame* frame);
-    void renderFrame(AVFrame* frame);
+    void drawFrame();
     void calcRect(float& x, float& y, float& w, float& h);
     void freeTextures();
-    bool ensureFirstFrame();  // 确保第一帧可用
-    bool syncAndGetNextFrame(AVFrame*& outFrame);  // 同步并获取下一帧
 
-    // 修改：适配项目的帧队列类型
-    std::shared_ptr<QVector<AVFrame*>> m_videoFrameQueue;
+    std::shared_ptr<std::deque<AVFrame*>> m_frameQueue;
     std::shared_ptr<syncmanager> m_syncManager;
-    AVRational m_videoTimeBase;
-    int m_framesDropped = 0;
-    int m_framesRendered = 0;
 
-    // OpenGL资源
-    QOpenGLShaderProgram m_prog;
-    QOpenGLTexture* m_texY = nullptr;
-    QOpenGLTexture* m_texU = nullptr;
-    QOpenGLTexture* m_texV = nullptr;
-    bool m_texInited = false;
+    QOpenGLShaderProgram m_shader;
+    QOpenGLTexture *m_texY = nullptr, *m_texU = nullptr, *m_texV = nullptr;
+    bool m_glInited = false;
 
-    // 帧数据（m_last始终保存最新有效帧）
-    AVFrame* m_last = nullptr;          ///< 上一帧（始终有效）
-    bool m_lastValid = false;           ///< m_last是否可渲染
+    AVFrame* m_displayFrame = nullptr;
     QMutex m_frameMutex;
-    int m_videoW = 0;
-    int m_videoH = 0;
-    AVRational m_videoSar = {1, 1};
 
-    // 渲染控制
-    QTimer* m_renderTimer = nullptr;
-    int m_surfaceW = 0;
-    int m_surfaceH = 0;
+    QTimer* m_timer = nullptr;
+    int m_frameInterval = 33;
+    bool m_hasFrame = false;
 
-    // 同步计时器
-    QElapsedTimer m_clockTimer;
-    double m_lastPts = 0.0;
-    double m_lastFrameDuration = 33.0;  // 默认33ms（30fps）
+    int m_videoW = 0, m_videoH = 0;
+    AVRational m_sar = {1, 1};
 
-    // 调试统计
-    int m_consecutiveBlacks = 0;
-    bool m_wasCleared = false;
+    int m_rendered = 0;
+    int m_dropped = 0;
 };
 
 #endif // VIDEORENDER_H

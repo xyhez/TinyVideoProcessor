@@ -6,7 +6,7 @@ AudioPlayer::AudioPlayer(QObject *p)
 {
     initResampler();
     m_statusTimer.start();
-    m_latencyUpdateTimer.start();  // 初始化延迟更新定时器
+    m_latencyUpdateTimer.start();
 }
 
 AudioPlayer::~AudioPlayer() {
@@ -24,25 +24,21 @@ AudioPlayer::~AudioPlayer() {
 }
 
 void AudioPlayer::initAudioPlay(AVCodecParameters* codecPar,
-                                std::shared_ptr<QVector<AVFrame*>> frameQueue,
+                                std::shared_ptr<std::deque<AVFrame*>> frameQueue,
                                 std::shared_ptr<syncmanager> syncManager)
 {
     m_audioFrameQueue = frameQueue;
     m_syncManager = syncManager;
 
-    ///< 设置音频参数
     if (codecPar) {
         m_dstRate = codecPar->sample_rate;
         m_dstChannels = codecPar->ch_layout.nb_channels;
     }
 
-    ///< 初始化音频输出
     initAudioOutput();
 
     qDebug() << "AudioPlayer initialized: Rate =" << m_dstRate
              << "Hz, Channels =" << m_dstChannels;
-
-
 }
 
 void AudioPlayer::initResampler() {
@@ -70,28 +66,20 @@ void AudioPlayer::initAudioOutput()
              << m_dstRate << "Hz," << m_dstChannels << "channels";
 }
 
-/**
- * @brief 计算音频硬件缓冲区延迟（单位：秒）
- *
- * 优化：使用QAudioSink的内部状态，更准确的延迟估算
- */
 double AudioPlayer::calculateHardwareLatency()
 {
     if (!m_audioSink || !m_ioDevice) {
-        return m_lastHardwareLatency;  // 返回上次的平滑值
+        return m_lastHardwareLatency;
     }
 
-    // 方法1：使用processedUSecs()（推荐，跨平台）
-    qint64 processedUs = m_audioSink->processedUSecs(); // 返回自调用以来处理的音频数据量（微秒）
-    double processedSeconds = processedUs / 1000000.0;  // 转换成 秒
+    qint64 processedUs = m_audioSink->processedUSecs();
+    double processedSeconds = processedUs / 1000000.0;
 
-    int bytesPerSecond = m_dstRate * m_dstChannels * m_bytesPerSample; // 每秒的字节数
-    double expectedSeconds = (double)m_totalBytesWritten / bytesPerSecond; // 已经写入音频硬件的数据量（秒）
+    int bytesPerSecond = m_dstRate * m_dstChannels * m_bytesPerSample;
+    double expectedSeconds = (double)m_totalBytesWritten / bytesPerSecond;
 
-    double latency = expectedSeconds - processedSeconds;    // 已写入但是没有播放的数据量（秒）---差值
+    double latency = expectedSeconds - processedSeconds;
 
-    // ==================== 延迟平滑（核心修复点3） ====================
-    // 硬件延迟可能抖动，需要低通滤波
     const double SMOOTH_ALPHA = 0.1;
     if (m_lastHardwareLatency > 0) {
         latency = m_lastHardwareLatency * (1.0 - SMOOTH_ALPHA) + latency * SMOOTH_ALPHA;
@@ -103,17 +91,12 @@ double AudioPlayer::calculateHardwareLatency()
 
 void AudioPlayer::startAudioPlay()
 {
-    // 启动音频设备
     if (m_audioSink) {
         m_ioDevice = m_audioSink->start();
         if (!m_ioDevice) {
             qCritical() << "AudioPlayer: Failed to start audio sink!";
             return;
         }
-        ///< 获取音量
-        m_volume = m_audioSink->volume();
-        qDebug()<<"音量:"<<m_volume;
-        volumeDown();
     }
 
     run();
@@ -121,61 +104,68 @@ void AudioPlayer::startAudioPlay()
 
 void AudioPlayer::run()
 {
-    QMutexLocker locker(&m_mutex);
     m_stopFlag = false;
     m_pauseFlag = false;
-    locker.unlock();
 
     if (!m_frame) {
         m_frame = av_frame_alloc();
     }
 
-    const int statusInterval = 5000;  // 5秒打印一次状态
+    const int statusInterval = 5000;
 
     while (true) {
-        ///< 检查音量
-        if(m_volume!=m_audioSink->volume()) {
-            m_audioSink->setVolume(m_volume);
-        }
-        ///< 检查停止标志
-        locker.relock();
         if (m_stopFlag) {
-            locker.unlock();
             break;
         }
 
-        ///< 检查暂停标志
         if (m_pauseFlag) {
-            locker.unlock();
-            m_audioSink->suspend(); ///< 排空硬件缓存
-            continue;
-        }
-        locker.unlock();
-
-        ///< 检查帧队列
-        if (m_audioFrameQueue->isEmpty()) {
-            QThread::msleep(100);
+            m_audioSink->suspend();
+            while (m_pauseFlag && !m_stopFlag) {
+                QThread::msleep(10);
+            }
+            if (!m_stopFlag) {
+                m_audioSink->resume();
+            }
             continue;
         }
 
-        ///< 获取一帧
         AVFrame *tmp = nullptr;
-        locker.relock();
-        if (!m_audioFrameQueue->isEmpty()) {
-            tmp = m_audioFrameQueue->takeFirst();
+        {
+            std::unique_lock<std::mutex> lock(mtx_A_frame);
+
+            cv_A_frame_NotEmpty.wait(lock, [this] {
+                return (m_audioFrameQueue && !m_audioFrameQueue->empty())
+                || m_stopFlag || m_pauseFlag;
+            });
+
+            if (m_stopFlag) {
+                lock.unlock();
+                break;
+            }
+
+            if (m_pauseFlag) {
+                lock.unlock();
+                continue;
+            }
+
+            if (!m_audioFrameQueue->empty()) {
+                tmp = m_audioFrameQueue->front();
+                m_audioFrameQueue->pop_front();
+            }
+
+            lock.unlock();
+            cv_A_frame_NotFull.notify_one();
         }
-        locker.unlock();
 
         if (!tmp) {
             continue;
         }
-        ///< 快进直接修改主时钟，所以需要校验一下
-        if((tmp->pts * av_q2d(tmp->time_base) * 1000) < m_syncManager->getClock()) {
-            av_frame_free(&tmp);
-            continue;
-        }
 
-        // ==================== 首次初始化 ====================
+        // if((tmp->pts * av_q2d(tmp->time_base) * 1000) < m_syncManager->getClock()) {
+        //     av_frame_free(&tmp);
+        //     continue;
+        // }
+
         if (m_first) {
             m_audioTimeBase = tmp->time_base;
 
@@ -197,7 +187,6 @@ void AudioPlayer::run()
             qDebug() << "AudioPlayer: Resampler initialized - Input:" << inRate << "Hz -> Output:" << outRate << "Hz";
         }
 
-        // ==================== 重采样 ====================
         int dstSamples = av_rescale_rnd(tmp->nb_samples,
                                         m_dstRate,
                                         tmp->sample_rate,
@@ -220,24 +209,23 @@ void AudioPlayer::run()
             continue;
         }
 
-        // 更新时钟（毫秒）
-        double audioclock = tmp->pts * av_q2d(tmp->time_base) * 1000;
+        double audioclock = tmp->pts * g_videoinfo.A_timeBase * 1000;
+        // qDebug()<<"audioclock："<<audioclock;
         if (m_syncManager) {
             m_syncManager->refreshClock(audioclock);
         }
 
-        // ==================== 写入音频设备 ====================
         int pcmBytes = converted * m_dstChannels * m_bytesPerSample;
         int pcmIndex = 0;
 
         while (pcmIndex < pcmBytes) {
-            // 检查停止标志
-            locker.relock();
             if (m_stopFlag) {
-                locker.unlock();
                 break;
             }
-            locker.unlock();
+
+            if (m_pauseFlag) {
+                break;
+            }
 
             if (!m_audioSink || m_audioSink->state() == QAudio::StoppedState) {
                 qWarning() << "AudioPlayer: Audio sink stopped unexpectedly!";
@@ -249,7 +237,7 @@ void AudioPlayer::run()
                 int written = m_ioDevice->write(m_pcmBuffer.constData() + pcmIndex, chunk);
                 if (written > 0) {
                     pcmIndex += written;
-                    m_totalBytesWritten += written;  // **核心：累加写入字节数**
+                    m_totalBytesWritten += written;
                     m_bytesWrittenTotal += written;
                 } else if (written < 0) {
                     qWarning() << "AudioPlayer: Write error!";
@@ -263,10 +251,8 @@ void AudioPlayer::run()
         av_frame_unref(tmp);
         av_frame_free(&tmp);
 
-        ///< 每帧更新延迟计算
         double latency = calculateHardwareLatency();
 
-        ///< 定期打印状态
         if (m_statusTimer.elapsed() > statusInterval) {
             qDebug() << "AudioPlayer: Status -"
                      << "Written:" << (m_bytesWrittenTotal / 1024 / 1024) << "MB"
@@ -281,7 +267,6 @@ void AudioPlayer::run()
 
 void AudioPlayer::start()
 {
-    QMutexLocker locker(&m_mutex);
     m_stopFlag = false;
     m_pauseFlag = false;
     qDebug() << "AudioPlayer started";
@@ -289,8 +274,10 @@ void AudioPlayer::start()
 
 void AudioPlayer::stop()
 {
-    QMutexLocker locker(&m_mutex);
     m_stopFlag = true;
+
+    cv_A_frame_NotEmpty.notify_all();
+    cv_A_frame_NotFull.notify_all();
 
     if (m_audioSink) {
         m_audioSink->stop();
@@ -301,37 +288,34 @@ void AudioPlayer::stop()
 
 void AudioPlayer::pause()
 {
-    QMutexLocker locker(&m_mutex);
     m_pauseFlag = true;
+
+    cv_A_frame_NotEmpty.notify_all();
+    cv_A_frame_NotFull.notify_all();
+
     qDebug() << "AudioPlayer paused";
 }
 
 void AudioPlayer::Forward() {
-    m_mutex.lock();
     m_audioSink->suspend();
-    m_mutex.unlock();
 }
 
 void AudioPlayer::volumeUp() {
     qDebug()<<"增大音量";
-    m_mutex.lock();
     if(m_volume>0.95) {
         m_volume = 1.0;
     }else{
         m_volume+=0.05;
     }
-    m_mutex.lock();
     emit e_volume(m_volume);
 }
 
 void AudioPlayer::volumeDown(){
     qDebug()<<"减小音量";
-    m_mutex.lock();
     if(m_volume>0.05){
         m_volume-=0.05;
     }else{
         m_volume = 0.0;
     }
-    m_mutex.lock();
     emit e_volume(m_volume);
 }

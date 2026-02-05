@@ -3,19 +3,38 @@
 
 #include <mutex>
 #include <condition_variable>
+#include <deque>
 
-extern std::condition_variable g_cv_demuxer_audio; ///< 音频解码线程取包之后通过它唤醒解复用线程
-extern std::mutex           g_mtx_demuxer_audio;
-extern std::condition_variable g_cv_demuxer_video;///< 视频解码线程取包之后通过它唤醒解复用线程
-extern std::mutex           g_mtx_demuxer_video;
-extern std::condition_variable g_cv_decoder_audio;///< 解复用线程生产音频包后通过它唤醒音频解码线程
-extern std::mutex           g_mtx_decoder_audio;
-extern std::condition_variable g_cv_decoder_video;///< 解复用线程生产视频包后通过它唤醒视频解码线程
-extern std::mutex           g_mtx_decoder_video;
-extern std::condition_variable g_cv_audioplayer;///< 音频解码线程生产出原始帧后通过它唤醒音频播放线程
-extern std::mutex           g_mtx_audioplayer;
-extern std::condition_variable g_cv_videoRender;///< 视频解码线程生产出原始帧后通过它唤醒视频渲染线程
-extern std::mutex           g_mtx_videorender;
-extern bool                 g_done;///< 暂停标志
+#define MAXSIZE 30
+#define A_PACKETMAXSIZE 30
+
+struct VideoInfo{
+    std::string videoname = "NAN";      ///< 视频文件名
+    double FrameRate = 30;              ///< 刷新率(fps)
+    double A_timeBase;                  ///< 音频时间基
+    double V_timeBase;                  ///< 视频时间基
+    int duration = 0;                   ///< 总时长(s)
+};
+
+extern struct VideoInfo g_videoinfo;
+
+extern std::condition_variable cv_A_packet_NotEmpty;    ///< 判断音频包队列是否为空，音频解码线程使用
+extern std::condition_variable cv_A_packet_NotFull;     ///< 判断音频包队列是否为满，解复用线程使用
+extern std::mutex mtx_A_packet;                         ///< 用于保护音频包队列，解复用和音频解码线程出入包时使用
+
+extern std::condition_variable cv_A_frame_NotEmpty;     ///< 判断音频帧队列是否为空，音频播放器使用
+extern std::condition_variable cv_A_frame_NotFull;      ///< 判断音频帧队列是否为满，音频解码线程使用
+extern std::mutex mtx_A_frame;                          ///< 用于保护音频帧队列，解码线程和音频播放器出入帧时使用
+
+extern std::condition_variable cv_V_packet_NotEmpty;    ///< 判断视频包队列是否为空，视频解码线程使用
+extern std::condition_variable cv_V_packet_NotFull;     ///< 判断视频包队列是否为满，解复用线程使用
+extern std::mutex mtx_V_packet;                         ///< 用于保护视频包队列，解复用和视频解码线程给出入包时使用
+
+extern std::condition_variable cv_V_frame_NotEmpty;     ///< 判断视频帧队列是否为空，渲染器使用
+extern std::condition_variable cv_V_frame_NotFull;      ///< 判断视频帧队列是否为满，视频解码线程使用
+extern std::mutex mtx_V_frame;                          ///< 用于保护视频帧队列，视频解码线程和渲染线程使用
+
+extern bool g_pause; ///< 暂停标志
+extern bool g_stop; ///< 停止标志
 
 #endif // GLOBAL_H
