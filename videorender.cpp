@@ -69,9 +69,9 @@ void VideoRender::renderFrame()
     }
 
     double videoPts = nextFrame->pts * g_videoinfo.V_timeBase * 1000.0;
-    double audioPts = m_syncManager->getClock();
+    double audioPts = m_syncManager->getClock()-20;
     double diff = videoPts - audioPts;
-    qDebug()<<"时钟:"<<audioPts<<"  当前视频帧的时间:"<<videoPts<<" 差距:"<<diff;
+    // qDebug()<<"时钟:"<<audioPts<<"  当前视频帧的时间:"<<videoPts<<" 差距:"<<diff;
 
     if (diff > SYNC_THRESHOLD_MS) {
         int waitMs = qMin(qRound(diff), 30);

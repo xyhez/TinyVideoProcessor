@@ -41,7 +41,7 @@ public:
      */
     int initDecoder(std::shared_ptr<std::deque<AVPacket*>> packetVec
                     ,std::shared_ptr<std::deque<AVFrame*>> frameVec
-                    ,AVCodecParameters*
+                    ,AVCodecParameters *
                     ,AVRational
                     );
 
@@ -91,13 +91,13 @@ private:
      * @param hwFrame 硬件帧
      * @return AVFrame* 转换后的帧，失败返回nullptr
      */
-    AVFrame* transferHWFrame(AVFrame* hwFrame);
+    AVFrame *transferHWFrame(AVFrame *hwFrame);
 
     std::shared_ptr<std::deque<AVPacket*>> m_PacketVec;        ///< 包队列
     std::shared_ptr<std::deque<AVFrame*>> m_FrameVec;          ///< 帧队列
 
 
-    AVCodecContext* Ctx = nullptr;                          ///< 解码器实例
+    AVCodecContext *Ctx = nullptr;                          ///< 解码器实例
 
     AVCodecParameters *par = nullptr;                       ///< 解码器参数---蓝图
 
@@ -113,13 +113,13 @@ private:
 
     QString decoder_type = "";                              ///< 解码器类型
 
-    AVFrame* frame = nullptr;                               ///< 管理解码后的帧
+    AVFrame *frame = nullptr;                               ///< 管理解码后的帧
 
     AVRational m_time_base;                                 ///< 时间基础
 
     // 硬解码相关
     bool m_isHWDecoder = false;                             ///< 是否使用硬件解码
-    AVBufferRef* m_hwDeviceCtx = nullptr;                   ///< 硬件设备上下文
+    AVBufferRef *m_hwDeviceCtx = nullptr;                   ///< 硬件设备上下文
     enum AVPixelFormat m_hwPixFmt = AV_PIX_FMT_NONE;        ///< 硬件像素格式
     enum AVPixelFormat m_swPixFmt = AV_PIX_FMT_NONE;        ///< 软件像素格式
 };

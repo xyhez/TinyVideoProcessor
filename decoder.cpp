@@ -41,13 +41,10 @@ bool decoder::initHWDecoder()
     }
 
     // 按优先级尝试硬件加速器
-    const char* hwDevices[] = {
+    const char *hwDevices[] = {
         "d3d11va",      // Windows 首选
         "dxva2",        // Windows 备选
         "cuda",         // NVIDIA
-        "qsv",          // Intel
-        "videotoolbox", // macOS
-        "vaapi",        // Linux
         nullptr
     };
 
@@ -59,7 +56,7 @@ bool decoder::initHWDecoder()
 
         // 检查解码器是否支持该硬件
         for (int j = 0;; j++) {
-            const AVCodecHWConfig* config = avcodec_get_hw_config(codec, j);
+            const AVCodecHWConfig *config = avcodec_get_hw_config(codec, j);
             if (!config) break;
 
             if ((config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX) &&
@@ -96,14 +93,14 @@ bool decoder::initHWDecoder()
     return false;
 }
 
-AVFrame* decoder::transferHWFrame(AVFrame* hwFrame)
+AVFrame *decoder::transferHWFrame(AVFrame *hwFrame)
 {
     if (!m_isHWDecoder || !hwFrame) {
         return nullptr;
     }
 
 
-    AVFrame* nv12Frame = av_frame_alloc();
+    AVFrame *nv12Frame = av_frame_alloc();
     if (!nv12Frame) {
         qDebug() << "分配 NV12 帧失败";
         return nullptr;
@@ -140,7 +137,7 @@ AVFrame* decoder::transferHWFrame(AVFrame* hwFrame)
     }
 
     // 第二步：NV12 -> YUV420P 转换
-    AVFrame* yuv420pFrame = av_frame_alloc();
+    AVFrame *yuv420pFrame = av_frame_alloc();
     if (!yuv420pFrame) {
         av_frame_free(&nv12Frame);
         return nullptr;
@@ -168,7 +165,7 @@ AVFrame* decoder::transferHWFrame(AVFrame* hwFrame)
     }
 
     // 创建/复用转换上下文
-    static struct SwsContext* sws_ctx = nullptr;
+    static SwsContext *sws_ctx = nullptr;
     sws_ctx = sws_getCachedContext(sws_ctx,
                                    nv12Frame->width, nv12Frame->height,
                                    AV_PIX_FMT_NV12,
@@ -203,7 +200,7 @@ AVFrame* decoder::transferHWFrame(AVFrame* hwFrame)
 
 int decoder::initDecoder(std::shared_ptr<std::deque<AVPacket*>> packetVec
                          ,std::shared_ptr<std::deque<AVFrame*>> framevec
-                         , AVCodecParameters* coderPar
+                         , AVCodecParameters *coderPar
                          , AVRational time_base) {
     m_PacketVec = packetVec;
     m_FrameVec = framevec;
@@ -255,7 +252,7 @@ int decoder::startDecoder() {
 
     while (true) {
         // ========== 取包部分 ==========
-        AVPacket* packet = nullptr;
+        AVPacket *packet = nullptr;
         if (decoder_type == "视频") {
             std::unique_lock<std::mutex> lock(mtx_V_packet);
             cv_V_packet_NotEmpty.wait(lock, [this]{
@@ -309,7 +306,7 @@ int decoder::startDecoder() {
             }
 
             // 处理帧（区分视频硬解/视频软解/音频）
-            AVFrame* outFrame = nullptr;
+            AVFrame *outFrame = nullptr;
 
             if (decoder_type == "视频" && m_isHWDecoder &&
                 frame->format == m_hwPixFmt) {
