@@ -2,3 +2,6 @@
 /动物发现自己被绿.mp4
 *.user
 *.user.*
+/.claude/
+/cmake-build-debug/
+/.idea/
