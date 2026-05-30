@@ -53,7 +53,7 @@ set(PROJECT_SOURCES
         global.h
         global.cpp
         开发文档.txt
-
+        架构指导.md
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
