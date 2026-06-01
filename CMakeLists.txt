@@ -13,7 +13,8 @@ find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets Multimedia OpenGLWidge
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets Multimedia OpenGLWidgets)
 
 
-set(FFMPEG_ROOT "F:/ffmpeg/ffmpeg80")
+# FFmpeg 随项目发布，统一放在 ${PROJECT_SOURCE_DIR}/Lib/ffmpeg
+set(FFMPEG_ROOT        "${CMAKE_CURRENT_SOURCE_DIR}/Lib/ffmpeg")
 set(FFMPEG_INCLUDE_DIR "${FFMPEG_ROOT}/include")
 set(FFMPEG_LIB_DIR     "${FFMPEG_ROOT}/lib")
 set(FFMPEG_BIN_DIR     "${FFMPEG_ROOT}/bin")
@@ -80,6 +81,17 @@ else()
 endif()
 
 target_link_libraries(modernFFplay PRIVATE Qt${QT_VERSION_MAJOR}::Widgets ${FFMPEG_LIBS} Qt${QT_VERSION_MAJOR}::Multimedia Qt${QT_VERSION_MAJOR}::OpenGLWidgets)
+
+# 构建后将 FFmpeg DLL 拷贝到可执行文件目录，免去手动复制
+if(WIN32)
+    file(GLOB FFMPEG_DLLS "${FFMPEG_BIN_DIR}/*.dll")
+    add_custom_command(TARGET modernFFplay POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${FFMPEG_DLLS}
+                $<TARGET_FILE_DIR:modernFFplay>
+        COMMENT "Copying FFmpeg DLLs to output directory"
+    )
+endif()
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
 # If you are developing for iOS or macOS you should consider setting an
