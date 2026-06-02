@@ -55,6 +55,7 @@ set(PROJECT_SOURCES
         global.cpp
         开发文档.txt
         架构指导.md
+        src/core/queue.h
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
