@@ -8,6 +8,7 @@
 #include <mutex>
 
 #include "global.h"
+#include "core/queue.h"
 
 extern "C" {
 #include <libavcodec/avcodec.h>

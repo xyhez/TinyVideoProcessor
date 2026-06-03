@@ -8,11 +8,11 @@
 #include <QLabel>
 #include <deque>  // 添加 deque 支持
 
-#include "decoder.h"
-#include "demuxer.h"
-#include "audioplayer.h"
-#include "videorender.h"
-#include "syncmanager.h"
+#include "infrastructure/decoder.h"
+#include "infrastructure/demuxer.h"
+#include "infrastructure/audioplayer.h"
+#include "infrastructure/videorender.h"
+#include "infrastructure/syncmanager.h"
 #include "global.h"
 
 QT_BEGIN_NAMESPACE

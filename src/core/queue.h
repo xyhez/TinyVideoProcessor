@@ -3,6 +3,9 @@
 // #include <memory>
 #include <mutex>
 #include <deque>
+#include <condition_variable>
+#include <atomic>
+#include <functional>
 
 /**
  * @brief 线程同步队列
@@ -14,20 +17,39 @@
 template<typename T>
 class SyncQueue {
 private:
-    std::deque<T*> raw_queue_;
-    std::mutex mutex_;
-    std::condition_variable cv_not_empty_;
-    std::condition_variable cv_not_full_;
-    size_t max_size_;
-    bool stop_flag_;
+    std::deque<T> raw_queue_;                       ///< 数据队列
+    std::mutex mutex_;                              ///< 锁
+    std::condition_variable cv_not_empty_;          ///< 空队列条件变量
+    std::condition_variable cv_not_full_;           ///< 满队列条件变量
+    size_t max_size_;                               ///< 队列最大容量
+    std::atomic<bool> stop_flag_;                   ///< 停止标志
+    std::atomic<bool> pause_flag_;                  ///< 暂停标志
+    std::function<void(T)> deleter_ = nullptr;      ///< 数据析构器
 public:
 // 核心接口
+    SyncQueue(size_t max_size ,std::function<void(T)> deleter = nullptr)
+    : max_size_(max_size)
+    , stop_flag_(false)
+    , pause_flag_(false)
+    , deleter_(deleter){
+
+    }
+
     /**
      * @brief 阻塞入队，队列满则等待
      * @param item
      */
     void Push(T item) {
-
+        {
+            std::unique_lock<std::mutex> lock(mutex_);
+            cv_not_full_.wait(lock, [this]{ return
+                    raw_queue_.size() < max_size_ || stop_flag_ || pause_flag_;
+            });
+            if (stop_flag_) return;
+            if(pause_flag_) return;
+            raw_queue_.push_back(item);
+            cv_not_empty_.notify_one();
+        }
     }
 
     /**
@@ -35,8 +57,20 @@ public:
      * @param item
      * @return
      */
-    bool Pop(T*& item) {
+    bool Pop(T& item) {
+        {
+            std::unique_lock<std::mutex> lock(mutex_);
+            cv_not_empty_.wait(lock, [this]{ return
+                !raw_queue_.empty() || stop_flag_ || pause_flag_;
+            });
 
+            if (stop_flag_) return false;
+            if (pause_flag_) return false;
+            item = raw_queue_.front();
+            raw_queue_.pop_front();
+        }
+        cv_not_full_.notify_one();
+        return item != nullptr;
     }
 
     /**
@@ -44,22 +78,59 @@ public:
      * @param item
      * @return
      */
-    bool tryPop(T*& item) {
+    bool TryPop(T& item) {
+        {
+            std::unique_lock<std::mutex> lock(mutex_);
+            if(raw_queue_.empty()) return false;
+            item = raw_queue_.front();
+            raw_queue_.pop_front();
+        }
+        cv_not_full_.notify_one();
+        return item != nullptr;
+    }
 
+    /**
+     * @brief 只拿到数据，但是不从队列里取出来
+     * @param item
+     * @return
+     */
+    bool Front(T& item) {
+        {
+            std::unique_lock<std::mutex> lock(mutex_);
+            if(raw_queue_.empty()) return false;
+            item = raw_queue_.front();
+        }
+        return item != nullptr;
+    }
+
+    void Popfront() {
+        {
+            std::unique_lock<std::mutex> lock(mutex_);
+            if(raw_queue_.empty()) return;
+            raw_queue_.pop_front();
+        }
+        cv_not_full_.notify_one();
     }
 
 // 辅助接口
-    size_t size() const {
+    size_t size() {
+        std::lock_guard<std::mutex> lock(mutex_);
         return raw_queue_.size();
     }
 
-    bool empty() const {
+    bool empty() {
+        std::lock_guard<std::mutex> lock(mutex_);
         return raw_queue_.empty();
     }
 
     void clear() {
-        std::lock_guard<std::mutex> lock(mutex_);
-        raw_queue_.clear();
+        std::unique_lock<std::mutex> lock(mutex_);
+        while (!raw_queue_.empty()) {
+            if (deleter_)
+                deleter_(raw_queue_.front());
+            raw_queue_.pop_front();
+        }
+        cv_not_full_.notify_all();
     }
 
     void SetMaxSize(size_t max_size) {
@@ -74,7 +145,4 @@ public:
     void SetStopFlag(bool flag) {
         stop_flag_ = flag;
     }
-
-
-
 };

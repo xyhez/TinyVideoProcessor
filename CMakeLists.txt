@@ -20,7 +20,7 @@ set(FFMPEG_LIB_DIR     "${FFMPEG_ROOT}/lib")
 set(FFMPEG_BIN_DIR     "${FFMPEG_ROOT}/bin")
 
 # 让编译器找得到头文件（-I）
-include_directories(${FFMPEG_INCLUDE_DIR})
+include_directories(${FFMPEG_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/src)
 # 让链接器找得到 .lib（-L）
 link_directories(${FFMPEG_LIB_DIR})
 
@@ -37,25 +37,26 @@ set(FFMPEG_LIBS
 
 
 set(PROJECT_SOURCES
-        main.cpp
-        mainwindow.cpp
-        mainwindow.h
-        mainwindow.ui
-        decoder.h
-        decoder.cpp
-        demuxer.h
-        demuxer.cpp
-        syncmanager.h
-        syncmanager.cpp
-        videorender.h
-        videorender.cpp
-        AudioPlayer.h
-        AudioPlayer.cpp
-        global.h
-        global.cpp
-        开发文档.txt
-        架构指导.md
+        src/ui/main.cpp
+        src/ui/mainwindow.cpp
+        src/ui/mainwindow.h
+        src/ui/mainwindow.ui
+        src/infrastructure/decoder.h
+        src/infrastructure/decoder.cpp
+        src/infrastructure/demuxer.h
+        src/infrastructure/demuxer.cpp
+        src/infrastructure/syncmanager.h
+        src/infrastructure/syncmanager.cpp
+        src/infrastructure/videorender.h
+        src/infrastructure/videorender.cpp
+        src/infrastructure/audioplayer.h
+        src/infrastructure/audioplayer.cpp
+        src/global.h
+        src/global.cpp
         src/core/queue.h
+        doc/架构指导.md
+        doc/README.md
+        doc/Phase0_重构计划.md
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)

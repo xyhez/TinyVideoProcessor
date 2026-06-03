@@ -4,6 +4,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <deque>
+#include <string>
 
 #define MAXSIZE 30
 #define A_PACKETMAXSIZE 30

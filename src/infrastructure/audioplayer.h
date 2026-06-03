@@ -16,7 +16,7 @@
 #include <QWaitCondition>
 #include <deque>  // 添加 deque 支持
 
-#include "syncmanager.h"
+#include "infrastructure/syncmanager.h"
 #include "global.h"
 
 extern "C" {
