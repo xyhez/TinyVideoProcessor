@@ -23,16 +23,17 @@ private:
     std::condition_variable cv_not_full_;           ///< 满队列条件变量
     size_t max_size_;                               ///< 队列最大容量
     std::atomic<bool> stop_flag_;                   ///< 停止标志
-    std::atomic<bool> pause_flag_;                  ///< 暂停标志
     std::function<void(T)> deleter_ = nullptr;      ///< 数据析构器
 public:
 // 核心接口
     SyncQueue(size_t max_size ,std::function<void(T)> deleter = nullptr)
     : max_size_(max_size)
     , stop_flag_(false)
-    , pause_flag_(false)
     , deleter_(deleter){
 
+    }
+    ~SyncQueue() {
+        clear();
     }
 
     /**
@@ -43,10 +44,8 @@ public:
         {
             std::unique_lock<std::mutex> lock(mutex_);
             cv_not_full_.wait(lock, [this]{ return
-                    raw_queue_.size() < max_size_ || stop_flag_ || pause_flag_;
+                    raw_queue_.size() < max_size_ || stop_flag_;
             });
-            if (stop_flag_) return;
-            if(pause_flag_) return;
             raw_queue_.push_back(item);
             cv_not_empty_.notify_one();
         }
@@ -61,11 +60,10 @@ public:
         {
             std::unique_lock<std::mutex> lock(mutex_);
             cv_not_empty_.wait(lock, [this]{ return
-                !raw_queue_.empty() || stop_flag_ || pause_flag_;
+                !raw_queue_.empty() || stop_flag_;
             });
 
-            if (stop_flag_) return false;
-            if (pause_flag_) return false;
+            if (raw_queue_.empty()) return false;
             item = raw_queue_.front();
             raw_queue_.pop_front();
         }
@@ -144,9 +142,5 @@ public:
 
     void SetStopFlag(bool flag) {
         stop_flag_ = flag;
-    }
-
-    void SetPauseFlag(bool flag) {
-        pause_flag_ = flag;
     }
 };
