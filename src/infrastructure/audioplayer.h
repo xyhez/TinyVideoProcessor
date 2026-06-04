@@ -14,9 +14,9 @@
 #include <QVector>
 #include <memory>
 #include <QWaitCondition>
-#include <deque>  // 添加 deque 支持
 
 #include "infrastructure/syncmanager.h"
+#include "core/queue.h"
 #include "global.h"
 
 extern "C" {
@@ -35,7 +35,7 @@ public:
     ~AudioPlayer();
 
     void initAudioPlay(AVCodecParameters* codecPar,
-                       std::shared_ptr<std::deque<AVFrame*>> frameQueue,
+                       std::shared_ptr<SyncQueue<AVFrame*>> frameQueue,
                        std::shared_ptr<syncmanager> syncManager);
 
     /**
@@ -79,7 +79,7 @@ signals:
     void e_volume(qreal);
 
 private:
-    std::shared_ptr<std::deque<AVFrame*>> m_audioFrameQueue;
+    std::shared_ptr<SyncQueue<AVFrame*>> m_audioFrameQueue;
     std::shared_ptr<syncmanager> m_syncManager;
     AVRational m_audioTimeBase;
     bool m_first = true;

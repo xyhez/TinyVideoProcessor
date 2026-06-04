@@ -1,13 +1,21 @@
-﻿#include "ui/mainwindow.h"
+#include "ui/mainwindow.h"
 #include "ui_mainwindow.h"
+
+namespace {
+constexpr size_t kPacketQueueMax = 30;
+constexpr size_t kFrameQueueMax  = 30;
+
+auto packetDeleter = [](AVPacket* p) { if (p) av_packet_free(&p); };
+auto frameDeleter  = [](AVFrame*  f) { if (f) av_frame_free(&f);  };
+}
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
-    , m_APacket(std::make_shared<std::deque<AVPacket*>>())
-    , m_VPacket(std::make_shared<std::deque<AVPacket*>>())
-    , m_AFrame(std::make_shared<std::deque<AVFrame*>>())
-    , m_VFrame(std::make_shared<std::deque<AVFrame*>>())
+    , m_APacket(std::make_shared<SyncQueue<AVPacket*>>(kPacketQueueMax, packetDeleter))
+    , m_VPacket(std::make_shared<SyncQueue<AVPacket*>>(kPacketQueueMax, packetDeleter))
+    , m_AFrame (std::make_shared<SyncQueue<AVFrame*>>(kFrameQueueMax,  frameDeleter))
+    , m_VFrame (std::make_shared<SyncQueue<AVFrame*>>(kFrameQueueMax,  frameDeleter))
     , m_A_decoder(new decoder)
     , m_V_decoder(new decoder)
     , m_demuxer(new demuxer(m_APacket, m_VPacket, m_AFrame, m_VFrame))
@@ -49,18 +57,6 @@ MainWindow::MainWindow(QWidget *parent)
                                    m_syncManager);
 
     createConnect();
-
-
-    // 在 start() 中添加诊断定时器
-    // QTimer *diagTimer = new QTimer(this);
-    // connect(diagTimer, &QTimer::timeout, [this]() {
-    //     qDebug() << "=== Queue Status ===";
-    //     qDebug() << "VPacket:" << m_VPacket->size()
-    //              << "VFrame:" << m_VFrame->size()
-    //              << "APacket:" << m_APacket->size()
-    //              << "AFrame:" << m_AFrame->size();
-    // });
-    // diagTimer->start(1000);
 }
 
 void MainWindow::createConnect() {
@@ -116,16 +112,17 @@ void MainWindow::noticeWindow(QString message)
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
-    g_stop = true;
+    Q_UNUSED(event);
 
-    cv_A_packet_NotFull.notify_all();
-    cv_A_packet_NotEmpty.notify_all();
-    cv_A_frame_NotFull.notify_all();
-    cv_A_frame_NotEmpty.notify_all();
-    cv_V_packet_NotFull.notify_all();
-    cv_V_packet_NotEmpty.notify_all();
-    cv_V_frame_NotFull.notify_all();
-    cv_V_frame_NotEmpty.notify_all();
+    m_APacket->SetStopFlag(true);
+    m_VPacket->SetStopFlag(true);
+    m_AFrame->SetStopFlag(true);
+    m_VFrame->SetStopFlag(true);
+
+    m_APacket->WakeAll();
+    m_VPacket->WakeAll();
+    m_AFrame->WakeAll();
+    m_VFrame->WakeAll();
 
     m_demuxer->stop();
     m_A_decoder->stop();
@@ -164,7 +161,6 @@ MainWindow::~MainWindow()
 {
     delete ui;
     freeRsources();
-    freeVec();
 }
 
 void MainWindow::start() {
@@ -221,41 +217,6 @@ void MainWindow::freeRsources() {
     delete m_V_decoder;
     delete m_demuxer;
     delete m_audioplay;
-}
-
-void MainWindow::freeVec() {
-    freePacketVec();
-    freeFrameVec();
-}
-
-void MainWindow::freePacketVec() {
-    mutex.lock();
-    for(AVPacket* packet : *m_APacket) {
-        if(packet)
-            av_packet_free(&packet);
-    }
-    for(AVPacket* packet : *m_VPacket) {
-        if(packet)
-            av_packet_free(&packet);
-    }
-    mutex.unlock();
-}
-
-void MainWindow::freeFrameVec() {
-    mutex.lock();
-    if(!m_AFrame->empty()) {
-        for(AVFrame* frame: *m_AFrame) {
-            if(frame)
-                av_frame_free(&frame);
-        }
-    }
-    if(!m_VFrame->empty()) {
-        for(AVFrame* frame: *m_VFrame) {
-            if(frame)
-                av_frame_free(&frame);
-        }
-    }
-    mutex.unlock();
 }
 
 void MainWindow::on_pushButton_play_clicked()

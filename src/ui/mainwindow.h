@@ -1,4 +1,4 @@
-﻿#ifndef MAINWINDOW_H
+#ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
 #include <QMainWindow>
@@ -6,13 +6,13 @@
 #include <QKeyEvent>
 #include <QPropertyAnimation>
 #include <QLabel>
-#include <deque>  // 添加 deque 支持
 
 #include "infrastructure/decoder.h"
 #include "infrastructure/demuxer.h"
 #include "infrastructure/audioplayer.h"
 #include "infrastructure/videorender.h"
 #include "infrastructure/syncmanager.h"
+#include "core/queue.h"
 #include "global.h"
 
 QT_BEGIN_NAMESPACE
@@ -38,9 +38,6 @@ public:
     void pause();
     void VolumeUp();
     void VolumeDown();
-    void freeVec();
-    void freePacketVec();
-    void freeFrameVec();
     void freeRsources();
 
 signals:
@@ -57,12 +54,13 @@ private slots:
 private:
     Ui::MainWindow *ui;
 
-    QString m_videoFileName = "F:/desk/图/VID_20260116_151539.mp4";
+    QString m_videoFileName = "D:\\githubProject\\TinyVideoProcessor\\video.mp4";
 
-    std::shared_ptr<std::deque<AVPacket*>> m_APacket = nullptr;
-    std::shared_ptr<std::deque<AVPacket*>> m_VPacket = nullptr;
-    std::shared_ptr<std::deque<AVFrame*>> m_AFrame = nullptr;
-    std::shared_ptr<std::deque<AVFrame*>> m_VFrame = nullptr;
+    ///< 队列（SyncQueue 自带 mutex/cv，自动释放队内元素）
+    std::shared_ptr<SyncQueue<AVPacket*>> m_APacket;
+    std::shared_ptr<SyncQueue<AVPacket*>> m_VPacket;
+    std::shared_ptr<SyncQueue<AVFrame*>>  m_AFrame;
+    std::shared_ptr<SyncQueue<AVFrame*>>  m_VFrame;
 
     decoder* m_A_decoder = nullptr;
     decoder* m_V_decoder = nullptr;

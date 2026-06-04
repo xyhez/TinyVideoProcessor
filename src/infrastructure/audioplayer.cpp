@@ -24,7 +24,7 @@ AudioPlayer::~AudioPlayer() {
 }
 
 void AudioPlayer::initAudioPlay(AVCodecParameters* codecPar,
-                                std::shared_ptr<std::deque<AVFrame*>> frameQueue,
+                                std::shared_ptr<SyncQueue<AVFrame*>> frameQueue,
                                 std::shared_ptr<syncmanager> syncManager)
 {
     m_audioFrameQueue = frameQueue;
@@ -130,31 +130,12 @@ void AudioPlayer::run()
         }
 
         AVFrame *tmp = nullptr;
-        {
-            std::unique_lock<std::mutex> lock(mtx_A_frame);
-
-            cv_A_frame_NotEmpty.wait(lock, [this] {
-                return (m_audioFrameQueue && !m_audioFrameQueue->empty())
-                || m_stopFlag || m_pauseFlag;
-            });
-
-            if (m_stopFlag) {
-                lock.unlock();
-                break;
-            }
-
-            if (m_pauseFlag) {
-                lock.unlock();
-                continue;
-            }
-
-            if (!m_audioFrameQueue->empty()) {
-                tmp = m_audioFrameQueue->front();
-                m_audioFrameQueue->pop_front();
-            }
-
-            lock.unlock();
-            cv_A_frame_NotFull.notify_one();
+        if (!m_audioFrameQueue) {
+            break;
+        }
+        if (!m_audioFrameQueue->Pop(tmp)) {
+            // 队列被停止
+            break;
         }
 
         if (!tmp) {
@@ -276,8 +257,10 @@ void AudioPlayer::stop()
 {
     m_stopFlag = true;
 
-    cv_A_frame_NotEmpty.notify_all();
-    cv_A_frame_NotFull.notify_all();
+    if (m_audioFrameQueue) {
+        m_audioFrameQueue->SetStopFlag(true);
+        m_audioFrameQueue->WakeAll();
+    }
 
     if (m_audioSink) {
         m_audioSink->stop();
@@ -290,8 +273,9 @@ void AudioPlayer::pause()
 {
     m_pauseFlag = true;
 
-    cv_A_frame_NotEmpty.notify_all();
-    cv_A_frame_NotFull.notify_all();
+    if (m_audioFrameQueue) {
+        m_audioFrameQueue->WakeAll();
+    }
 
     qDebug() << "AudioPlayer paused";
 }

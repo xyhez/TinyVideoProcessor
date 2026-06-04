@@ -5,9 +5,10 @@
 #include <QMutex>
 #include <QDebug>
 #include <QThread>
+#include <memory>
 
-#include "global.h"
 #include "core/queue.h"
+#include "global.h"
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -27,10 +28,10 @@ class demuxer : public QObject
 {
     Q_OBJECT
 public:
-    explicit demuxer(std::shared_ptr<std::deque<AVPacket*>> = nullptr
-                     ,std::shared_ptr<std::deque<AVPacket*>> = nullptr
-                     ,std::shared_ptr<std::deque<AVFrame*>> = nullptr
-                     ,std::shared_ptr<std::deque<AVFrame*>> = nullptr
+    explicit demuxer(std::shared_ptr<SyncQueue<AVPacket*>> APacket = nullptr
+                     ,std::shared_ptr<SyncQueue<AVPacket*>> VPacket = nullptr
+                     ,std::shared_ptr<SyncQueue<AVFrame*>>  AFrame  = nullptr
+                     ,std::shared_ptr<SyncQueue<AVFrame*>>  VFrame  = nullptr
                      ,QObject *parent = nullptr);
     ~demuxer();
 
@@ -116,10 +117,10 @@ signals:
 
 
 private:
-    std::shared_ptr<std::deque<AVPacket*>> m_APacket;       ///< 音频包队列
-    std::shared_ptr<std::deque<AVPacket*>> m_VPacket;       ///< 视频包队列
-    std::shared_ptr<std::deque<AVFrame*>> m_AFrame;         ///< 音频帧队列
-    std::shared_ptr<std::deque<AVFrame*>> m_VFrame;         ///< 视频帧队列
+    std::shared_ptr<SyncQueue<AVPacket*>> m_APacket;       ///< 音频包队列
+    std::shared_ptr<SyncQueue<AVPacket*>> m_VPacket;       ///< 视频包队列
+    std::shared_ptr<SyncQueue<AVFrame*>>  m_AFrame;        ///< 音频帧队列
+    std::shared_ptr<SyncQueue<AVFrame*>>  m_VFrame;        ///< 视频帧队列
 
     QString m_videoFileName;                            ///< 视频的文件名
 

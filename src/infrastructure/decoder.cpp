@@ -198,8 +198,8 @@ AVFrame *decoder::transferHWFrame(AVFrame *hwFrame)
     return yuv420pFrame;
 }
 
-int decoder::initDecoder(std::shared_ptr<std::deque<AVPacket*>> packetVec
-                         ,std::shared_ptr<std::deque<AVFrame*>> framevec
+int decoder::initDecoder(std::shared_ptr<SyncQueue<AVPacket*>> packetVec
+                         ,std::shared_ptr<SyncQueue<AVFrame*>> framevec
                          , AVCodecParameters *coderPar
                          , AVRational time_base) {
     m_PacketVec = packetVec;
@@ -253,28 +253,8 @@ int decoder::startDecoder() {
     while (true) {
         // ========== 取包部分 ==========
         AVPacket *packet = nullptr;
-        if (decoder_type == "视频") {
-            std::unique_lock<std::mutex> lock(mtx_V_packet);
-            cv_V_packet_NotEmpty.wait(lock, [this]{
-                return !m_PacketVec->empty() || g_pause || g_stop;
-            });
-            if (g_pause) continue;
-            if (g_stop) break;
-            packet = m_PacketVec->front();
-            m_PacketVec->pop_front();
-            lock.unlock();
-            cv_V_packet_NotFull.notify_one();
-        } else {
-            std::unique_lock<std::mutex> lock(mtx_A_packet);
-            cv_A_packet_NotEmpty.wait(lock, [this]{
-                return !m_PacketVec->empty() || g_pause || g_stop;
-            });
-            if (g_pause) continue;
-            if (g_stop) break;
-            packet = m_PacketVec->front();
-            m_PacketVec->pop_front();
-            lock.unlock();
-            cv_A_packet_NotFull.notify_one();
+        if (!m_PacketVec->Pop(packet)) {
+            break;
         }
 
         if (!packet) continue;
@@ -344,37 +324,7 @@ int decoder::startDecoder() {
             }
 
             // ========== 入队 ==========
-            if (decoder_type == "视频") {
-                std::unique_lock<std::mutex> lock(mtx_V_frame);
-                cv_V_frame_NotFull.wait(lock, [this]{
-                    return m_FrameVec->size() < MAXSIZE || g_pause || g_stop;
-                });
-
-                if (g_pause || g_stop) {
-                    av_frame_free(&outFrame);
-                    if (g_pause) continue;
-                    if (g_stop) break;
-                }
-
-                m_FrameVec->emplace_back(outFrame);
-                lock.unlock();
-                cv_V_frame_NotEmpty.notify_one();
-            } else {
-                std::unique_lock<std::mutex> lock(mtx_A_frame);
-                cv_A_frame_NotFull.wait(lock, [this]{
-                    return m_FrameVec->size() < MAXSIZE || g_pause || g_stop;
-                });
-
-                if (g_pause || g_stop) {
-                    av_frame_free(&outFrame);
-                    if (g_pause) continue;
-                    if (g_stop) break;
-                }
-
-                m_FrameVec->emplace_back(outFrame);
-                lock.unlock();
-                cv_A_frame_NotEmpty.notify_one();
-            }
+            m_FrameVec->Push(outFrame);
 
             av_frame_unref(frame);  // 释放 codec 的引用，复用 frame
         }

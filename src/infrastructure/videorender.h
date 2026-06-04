@@ -8,9 +8,9 @@
 #include <QTimer>
 #include <QMutex>
 #include <memory>
-#include <deque>  // 添加 deque 支持
 
 #include "infrastructure/syncmanager.h"
+#include "core/queue.h"
 #include "global.h"
 
 extern "C" {
@@ -31,7 +31,7 @@ public:
     ~VideoRender();
 
     // 初始化：传入帧队列、同步管理器、视频帧率（关键！）
-    void initvideoRender(std::shared_ptr<std::deque<AVFrame*>> frameQueue,
+    void initvideoRender(std::shared_ptr<SyncQueue<AVFrame*>> frameQueue,
                          std::shared_ptr<syncmanager> syncManager);
 
     void startRendering();
@@ -52,7 +52,7 @@ private:
     void calcRect(float& x, float& y, float& w, float& h);
     void freeTextures();
 
-    std::shared_ptr<std::deque<AVFrame*>> m_frameQueue;
+    std::shared_ptr<SyncQueue<AVFrame*>> m_frameQueue;
     std::shared_ptr<syncmanager> m_syncManager;
 
     QOpenGLShaderProgram m_shader;

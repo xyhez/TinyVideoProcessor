@@ -1,9 +1,9 @@
 ﻿#include "demuxer.h"
 
-demuxer::demuxer(std::shared_ptr<std::deque<AVPacket*>> APacket
-                 ,std::shared_ptr<std::deque<AVPacket*>> VPacket
-                 ,std::shared_ptr<std::deque<AVFrame*>>  AFrame
-                 ,std::shared_ptr<std::deque<AVFrame*>>  VFrame
+demuxer::demuxer(std::shared_ptr<SyncQueue<AVPacket*>> APacket
+                 ,std::shared_ptr<SyncQueue<AVPacket*>> VPacket
+                 ,std::shared_ptr<SyncQueue<AVFrame*>>  AFrame
+                 ,std::shared_ptr<SyncQueue<AVFrame*>>  VFrame
                  ,QObject *parent)
     : QObject{parent}
     , m_APacket(APacket)
@@ -134,47 +134,21 @@ int demuxer::startDemuxer() {
 
         // ========== 音频流 ==========
         if (packet->stream_index == m_audioStreamIndex) {
-            std::unique_lock<std::mutex> lock(mtx_A_packet);
-
-            cv_A_packet_NotFull.wait(lock, [this]{
-                return m_APacket->size() < A_PACKETMAXSIZE || g_pause || g_stop;
-            });
-
-            if (g_pause) {
-                av_packet_free(&packet);
-                continue;
-            }
-            if (g_stop) {
+            if (stop_flag) {
                 av_packet_free(&packet);
                 break;
             }
-
-            m_APacket->emplace_back(packet);
             m_AcurrentPTS = packet->pts;
-            lock.unlock();
-            cv_A_packet_NotEmpty.notify_one();
+            m_APacket->Push(packet);
         }
         // ========== 视频流 ==========
         else {
-            std::unique_lock<std::mutex> lock(mtx_V_packet);
-
-            // cv_V_packet_NotFull.wait(lock, [this]{
-            //     return m_VPacket->size() < MAXSIZE || g_pause || g_stop;
-            // });
-
-            // if (g_pause) {
-            //     av_packet_free(&packet);
-            //     continue;
-            // }
-            // if (g_stop) {
-            //     av_packet_free(&packet);
-            //     break;
-            // }
-
-            m_VPacket->emplace_back(packet);
+            if (stop_flag) {
+                av_packet_free(&packet);
+                break;
+            }
             m_VcurrentPTS = packet->pts;
-            lock.unlock();
-            cv_V_packet_NotEmpty.notify_one();
+            m_VPacket->Push(packet);
         }
     }
 

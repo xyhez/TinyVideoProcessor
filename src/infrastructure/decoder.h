@@ -5,10 +5,10 @@
 #include <QMutex>
 #include <QDebug>
 #include <QThread>
-#include <mutex>
+#include <memory>
 
-#include "global.h"
 #include "core/queue.h"
+#include "global.h"
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -40,8 +40,8 @@ public:
      * @return 0 初始化解码器成功
      * @return -1 初始化解码器失败
      */
-    int initDecoder(std::shared_ptr<std::deque<AVPacket*>> packetVec
-                    ,std::shared_ptr<std::deque<AVFrame*>> frameVec
+    int initDecoder(std::shared_ptr<SyncQueue<AVPacket*>> packetVec
+                    ,std::shared_ptr<SyncQueue<AVFrame*>> frameVec
                     ,AVCodecParameters *
                     ,AVRational
                     );
@@ -94,8 +94,8 @@ private:
      */
     AVFrame *transferHWFrame(AVFrame *hwFrame);
 
-    std::shared_ptr<std::deque<AVPacket*>> m_PacketVec;        ///< 包队列
-    std::shared_ptr<std::deque<AVFrame*>> m_FrameVec;          ///< 帧队列
+    std::shared_ptr<SyncQueue<AVPacket*>> m_PacketVec;        ///< 包队列
+    std::shared_ptr<SyncQueue<AVFrame*>>  m_FrameVec;         ///< 帧队列
 
 
     AVCodecContext *Ctx = nullptr;                          ///< 解码器实例

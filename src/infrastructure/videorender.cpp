@@ -22,7 +22,7 @@ VideoRender::~VideoRender()
     doneCurrent();
 }
 
-void VideoRender::initvideoRender(std::shared_ptr<std::deque<AVFrame*>> frameQueue,
+void VideoRender::initvideoRender(std::shared_ptr<SyncQueue<AVFrame*>> frameQueue,
                                   std::shared_ptr<syncmanager> syncManager)
 {
     m_frameQueue = frameQueue;
@@ -49,7 +49,9 @@ void VideoRender::stopRendering()
     if (m_timer) {
         m_timer->stop();
     }
-    cv_V_frame_NotFull.notify_all();
+    if (m_frameQueue) {
+        m_frameQueue->WakeAll();
+    }
 }
 
 void VideoRender::renderFrame()
@@ -57,11 +59,8 @@ void VideoRender::renderFrame()
     if (!m_frameQueue || !m_syncManager) return;
 
     AVFrame* nextFrame = nullptr;
-    {
-        std::lock_guard<std::mutex> lock(mtx_V_frame);
-        if (!m_frameQueue->empty()) {
-            nextFrame = m_frameQueue->front();
-        }
+    if (!m_frameQueue->Front(nextFrame)) {
+        return;
     }
 
     if (!nextFrame) {
@@ -81,32 +80,18 @@ void VideoRender::renderFrame()
 
     if (diff < -SYNC_THRESHOLD_MS) {
         AVFrame* drop = nullptr;
-        {
-            std::lock_guard<std::mutex> lock(mtx_V_frame);
-            if (!m_frameQueue->empty()) {
-                drop = m_frameQueue->front();
-                m_frameQueue->pop_front();
-            }
-        }
-        if (drop) {
+        if (m_frameQueue->TryPop(drop) && drop) {
             av_frame_free(&drop);
             m_dropped++;
-            cv_V_frame_NotFull.notify_one();
         }
         m_timer->setInterval(0);
         return;
     }
 
     AVFrame* newFrame = nullptr;
-    {
-        std::lock_guard<std::mutex> lock(mtx_V_frame);
-        if (!m_frameQueue->empty()) {
-            newFrame = m_frameQueue->front();
-            m_frameQueue->pop_front();
-        }
+    if (!m_frameQueue->TryPop(newFrame) || !newFrame) {
+        return;
     }
-
-    if (!newFrame) return;
 
     m_frameMutex.lock();
     av_frame_free(&m_displayFrame);
@@ -117,7 +102,6 @@ void VideoRender::renderFrame()
     m_hasFrame = true;
     m_frameMutex.unlock();
 
-    cv_V_frame_NotFull.notify_one();
     m_rendered++;
 
     m_timer->setInterval(m_frameInterval);
