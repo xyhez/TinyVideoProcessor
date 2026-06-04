@@ -1,4 +1,4 @@
-#ifndef MAINWINDOW_H
+﻿#ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
 #include <QMainWindow>
@@ -54,7 +54,7 @@ private slots:
 private:
     Ui::MainWindow *ui;
 
-    QString m_videoFileName = "D:\\githubProject\\TinyVideoProcessor\\video.mp4";
+    QString m_videoFileName = "F:\\Qt6project\\modernFFplay\\resource\\动物发现自己被绿.mp4";
 
     ///< 队列（SyncQueue 自带 mutex/cv，自动释放队内元素）
     std::shared_ptr<SyncQueue<AVPacket*>> m_APacket;
