@@ -145,4 +145,8 @@ public:
     void SetStopFlag(bool flag) {
         stop_flag_ = flag;
     }
+
+    void SetPauseFlag(bool flag) {
+        pause_flag_ = flag;
+    }
 };
