@@ -1,0 +1,14 @@
+//
+// Created by adminstrator on 2026/6/5.
+//
+
+#ifndef TINYVIDEOPROCESSOR_MEDIAPLAYCONTROLLER_H
+#define TINYVIDEOPROCESSOR_MEDIAPLAYCONTROLLER_H
+
+
+class MediaPlayController {
+
+};
+
+
+#endif //TINYVIDEOPROCESSOR_MEDIAPLAYCONTROLLER_H
