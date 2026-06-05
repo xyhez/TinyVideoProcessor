@@ -52,7 +52,7 @@ private:
 
     SYNCTYPE currentSYNCTYPE = SYNCTYPE::AUDIO; // 默认同步方式为 音频主时钟
 
-    QMutex mutex;                                   ///< 互斥锁
+    mutable QMutex mutex;                           ///< 互斥锁（mutable 以允许 const 方法加锁）
 };
 
 #endif // SYNCMANAGER_H
