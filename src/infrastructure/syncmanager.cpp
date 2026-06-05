@@ -19,6 +19,7 @@ int syncmanager::refreshClock(double clock) {
 }
 
 double syncmanager::getClock() const {
+    QMutexLocker locker(&mutex);
     return mainclock;
 }
 

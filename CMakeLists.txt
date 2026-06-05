@@ -57,9 +57,9 @@ set(PROJECT_SOURCES
         doc/架构指导.md
         doc/README.md
         doc/Phase0_重构计划.md
-        src/admain/IMediaSource.h
-        src/admain/FileMediaSource.cpp
-        src/admain/FileMediaSource.h
+        src/domain/IMediaSource.h
+        src/domain/FileMediaSource.cpp
+        src/domain/FileMediaSource.h
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)

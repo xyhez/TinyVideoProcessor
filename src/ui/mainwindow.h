@@ -13,8 +13,8 @@
 #include "infrastructure/videorender.h"
 #include "infrastructure/syncmanager.h"
 #include "core/queue.h"
-#include "admain/IMediaSource.h"
-#include "admain/FileMediaSource.h"
+#include "domain/IMediaSource.h"
+#include "domain/FileMediaSource.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
