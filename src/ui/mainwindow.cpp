@@ -18,7 +18,6 @@ MainWindow::MainWindow(QWidget *parent)
     , m_VFrame (std::make_shared<SyncQueue<AVFrame*>>(kFrameQueueMax,  frameDeleter))
     , m_A_decoder(new decoder)
     , m_V_decoder(new decoder)
-    , m_demuxer(new demuxer(m_APacket, m_VPacket, m_AFrame, m_VFrame))
     , m_demuxerTH(new QThread(this))
     , m_A_decoderTH(new QThread(this))
     , m_V_decoderTH(new QThread(this))
@@ -29,7 +28,18 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
     this->setWindowTitle("modernFFplay-V1.0");
 
-    m_demuxer->initDemuxer(m_videoFileName);
+    // 1. 创建并配置媒体源
+    auto mediaSource = std::make_shared<FileMediaSource>();
+    mediaSource->SetInfo("D:\\githubProject\\TinyVideoProcessor\\resource\\动物发现自己被绿.mp4");
+
+    // 2. 打开媒体源（关键步骤）
+    if (!mediaSource->open()) {
+        qCritical() << "媒体源打开失败";
+        return;
+    }
+
+    // 3. 创建 demuxer（传入已打开的媒体源 + 队列）
+    m_demuxer = new demuxer(mediaSource, m_APacket, m_VPacket, m_AFrame, m_VFrame);
     m_demuxer->moveToThread(m_demuxerTH);
 
     m_A_decoder->initDecoder(m_APacket, m_AFrame,

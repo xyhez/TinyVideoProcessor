@@ -8,7 +8,7 @@
 #include <memory>
 
 #include "core/queue.h"
-#include "global.h"
+#include "admain/FileMediaSource.h"
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -28,21 +28,13 @@ class demuxer : public QObject
 {
     Q_OBJECT
 public:
-    explicit demuxer(std::shared_ptr<SyncQueue<AVPacket*>> APacket = nullptr
+    explicit demuxer(std::shared_ptr<IMediaSource> mediaSource
+                     ,std::shared_ptr<SyncQueue<AVPacket*>> APacket = nullptr
                      ,std::shared_ptr<SyncQueue<AVPacket*>> VPacket = nullptr
                      ,std::shared_ptr<SyncQueue<AVFrame*>>  AFrame  = nullptr
                      ,std::shared_ptr<SyncQueue<AVFrame*>>  VFrame  = nullptr
                      ,QObject *parent = nullptr);
     ~demuxer();
-
-    /**
-     * @brief 初始化解复用器
-     *
-     * @param filename 待播放视频的文件名
-     * @return 0 初始化
-     * @return -1 初始化失败
-     */
-    int initDemuxer(QString filename);
 
     /**
      * @brief reAcoderPar
@@ -117,14 +109,11 @@ signals:
 
 
 private:
-    std::shared_ptr<SyncQueue<AVPacket*>> m_APacket;       ///< 音频包队列
-    std::shared_ptr<SyncQueue<AVPacket*>> m_VPacket;       ///< 视频包队列
-    std::shared_ptr<SyncQueue<AVFrame*>>  m_AFrame;        ///< 音频帧队列
-    std::shared_ptr<SyncQueue<AVFrame*>>  m_VFrame;        ///< 视频帧队列
-
-    QString m_videoFileName;                            ///< 视频的文件名
-
-    AVFormatContext* ic = nullptr;                      ///< 文件上下文
+    std::shared_ptr<IMediaSource> m_mediaSource;        ///< 媒体源
+    std::shared_ptr<SyncQueue<AVPacket*>> m_APacket;   ///< 音频包队列
+    std::shared_ptr<SyncQueue<AVPacket*>> m_VPacket;   ///< 视频包队列
+    std::shared_ptr<SyncQueue<AVFrame*>>  m_AFrame;    ///< 音频帧队列
+    std::shared_ptr<SyncQueue<AVFrame*>>  m_VFrame;    ///< 视频帧队列
 
     bool pause_flag = false;                            ///< 暂停标志
 

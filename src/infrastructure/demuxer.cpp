@@ -1,48 +1,37 @@
-﻿#include "demuxer.h"
+#include "demuxer.h"
+#include "global.h"
 
-demuxer::demuxer(std::shared_ptr<SyncQueue<AVPacket*>> APacket
+demuxer::demuxer(std::shared_ptr<IMediaSource> mediaSource
+                 ,std::shared_ptr<SyncQueue<AVPacket*>> APacket
                  ,std::shared_ptr<SyncQueue<AVPacket*>> VPacket
                  ,std::shared_ptr<SyncQueue<AVFrame*>>  AFrame
                  ,std::shared_ptr<SyncQueue<AVFrame*>>  VFrame
                  ,QObject *parent)
     : QObject{parent}
+    , m_mediaSource(mediaSource)
     , m_APacket(APacket)
     , m_VPacket(VPacket)
     , m_AFrame(AFrame)
     , m_VFrame(VFrame)
 {
-
-}
-
-
-demuxer::~demuxer(){
-    if (ic) {
-        avformat_close_input(&ic);
-        ic = nullptr;
+    if (!m_mediaSource) {
+        qCritical() << "媒体源为空";
+        return;
     }
 
-    qDebug() << "解复用器资源已清理";
-}
+    // 从媒体源获取 AVFormatContext
+    AVFormatContext* ic = m_mediaSource->GetFormatContect();
 
-int demuxer::initDemuxer(QString filename) {
-    m_videoFileName = filename;
-    qDebug() <<m_videoFileName.toUtf8().constData();
-
-    ///< 初始化ic，获取文件格式
-    if(avformat_open_input(&ic,m_videoFileName.toUtf8().constData(),nullptr,nullptr)) {
-        qDebug()<<"文件打开失败~";
-        return -1;
+    if (!ic) {
+        qCritical() << "AVFormatContext 为空，媒体源未正确打开";
+        return;
     }
 
-    ///< 获取流信息
-    if (avformat_find_stream_info(ic, nullptr) < 0) {
-        qDebug()<<"无法获取流信息";
-        avformat_close_input(&ic);
-        ic = nullptr;
-        return -1;
-    }
+    // 获取媒体源信息的引用
+    Fileinfo& info = m_mediaSource->GetSourceInfo();
 
-    for(int i=0;i<ic->nb_streams;i++) {
+    // 遍历流，找音视频流
+    for(int i = 0; i < ic->nb_streams; i++) {
         ///< 找到视频流
         if(ic->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
             qDebug() << QString("找到视频流 #%1: %2x%3, 编码=%4, 时长=%5秒")
@@ -53,37 +42,53 @@ int demuxer::initDemuxer(QString filename) {
                             .arg(ic->duration/1000000);
             qDebug() << QString("  帧率: %1 fps").arg(av_q2d(ic->streams[i]->avg_frame_rate));
             qDebug() << QString("  帧持续时间: %1 ms").arg(1.0/ av_q2d(ic->streams[i]->avg_frame_rate)*1000);
-            qDebug()<<"视频时间基(time_base):"<<av_q2d(ic->streams[i]->time_base);
+            qDebug() << "视频时间基(time_base):" << av_q2d(ic->streams[i]->time_base);
+
             m_videoStreamIndex = i;
             m_V_coderPar = ic->streams[i]->codecpar;
             m_V_time_base = ic->streams[i]->time_base;
-            g_videoinfo.videoname = m_videoFileName.toStdString();
-            g_videoinfo.FrameRate = av_q2d(ic->streams[i]->avg_frame_rate);
-            g_videoinfo.V_timeBase = av_q2d(ic->streams[i]->time_base);
-            g_videoinfo.duration = ic->duration/1000000;
-        }else
 
-        ///< 找到音频流
-        if(ic->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
+            // 填充媒体源信息
+            info.FrameRate = av_q2d(ic->streams[i]->avg_frame_rate);
+            info.V_timeBase = av_q2d(ic->streams[i]->time_base);
+            info.duration_ = ic->duration/1000000;
+
+            // 同步到全局 g_videoinfo（兼容现有代码）
+            g_videoinfo.videoname = info.filepath_.toStdString();
+            g_videoinfo.FrameRate = info.FrameRate;
+            g_videoinfo.V_timeBase = info.V_timeBase;
+            g_videoinfo.duration = info.duration_;
+        }
+        else if(ic->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
+            ///< 找到音频流
             qDebug() << QString("找到音频流 #%1: %2x%3, 编码=%4, 时长=%5秒")
                             .arg(i)
                             .arg(ic->streams[i]->codecpar->sample_rate)
                             .arg(ic->streams[i]->codecpar->bit_rate)
                             .arg(avcodec_get_name(ic->streams[i]->codecpar->codec_id))
                             .arg(ic->duration/1000000);
-            qDebug()<<"音频时间基(time_base):"<<av_q2d(ic->streams[i]->time_base);
+            qDebug() << "音频时间基(time_base):" << av_q2d(ic->streams[i]->time_base);
+
             m_audioStreamIndex = i;
             m_A_coderPar = ic->streams[i]->codecpar;
             m_A_time_base = ic->streams[i]->time_base;
-            g_videoinfo.A_timeBase = av_q2d(ic->streams[i]->time_base);
-        }else
-            ///< 找到字幕流
-            if(ic->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_SUBTITLE) {
-                qDebug()<<"找到字幕流";
-            }
-    }
 
-    return 0;
+            // 填充媒体源信息
+            info.A_timeBase = av_q2d(ic->streams[i]->time_base);
+
+            // 同步到全局 g_videoinfo（兼容现有代码）
+            g_videoinfo.A_timeBase = info.A_timeBase;
+        }
+        else if(ic->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_SUBTITLE) {
+            ///< 找到字幕流
+            qDebug() << "找到字幕流";
+        }
+    }
+}
+
+demuxer::~demuxer(){
+    // 不再需要关闭 AVFormatContext，由 IMediaSource 管理
+    qDebug() << "解复用器资源已清理";
 }
 
 AVCodecParameters* demuxer::reAcoderPar(){
@@ -104,6 +109,13 @@ AVRational demuxer::reVtimebase() {
 
 int demuxer::startDemuxer() {
     qDebug() << "开始解复用";
+
+    if (!m_mediaSource) {
+        qDebug() << "媒体源未初始化";
+        return -1;
+    }
+
+    AVFormatContext* ic = m_mediaSource->GetFormatContect();
 
     if (!ic) {
         qDebug() << "上下文未初始化";
@@ -156,22 +168,17 @@ int demuxer::startDemuxer() {
 }
 
 int demuxer::Rewind() {
-
-
     return 0;
 }
 
 int demuxer::Forward() {
-
-
-
     return 0;
 }
 
 int demuxer::start() {
     mutex.lock();
     pause_flag = false;
-    qDebug()<<"解复用线程开始运行";
+    qDebug() << "解复用线程开始运行";
     mutex.unlock();
 
     return 0;
@@ -180,7 +187,7 @@ int demuxer::start() {
 int demuxer::stop() {
     mutex.lock();
     stop_flag = true;
-    qDebug()<<"解复用线程被停止";
+    qDebug() << "解复用线程被停止";
     mutex.unlock();
 
     return 0;
@@ -189,7 +196,7 @@ int demuxer::stop() {
 int demuxer::pause(){
     mutex.lock();
     pause_flag = true;
-    qDebug()<<"解复用线程被暂停";
+    qDebug() << "解复用线程被暂停";
     mutex.unlock();
 
     return 0;

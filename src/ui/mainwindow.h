@@ -13,7 +13,8 @@
 #include "infrastructure/videorender.h"
 #include "infrastructure/syncmanager.h"
 #include "core/queue.h"
-#include "global.h"
+#include "admain/IMediaSource.h"
+#include "admain/FileMediaSource.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -54,13 +55,15 @@ private slots:
 private:
     Ui::MainWindow *ui;
 
-    QString m_videoFileName = "F:\\Qt6project\\modernFFplay\\resource\\动物发现自己被绿.mp4";
+    // QString m_videoFileName = "F:\\Qt6project\\modernFFplay\\resource\\动物发现自己被绿.mp4";
 
     ///< 队列（SyncQueue 自带 mutex/cv，自动释放队内元素）
     std::shared_ptr<SyncQueue<AVPacket*>> m_APacket;
     std::shared_ptr<SyncQueue<AVPacket*>> m_VPacket;
     std::shared_ptr<SyncQueue<AVFrame*>>  m_AFrame;
     std::shared_ptr<SyncQueue<AVFrame*>>  m_VFrame;
+
+    std::shared_ptr<IMediaSource> MediaSource_ = nullptr;
 
     decoder* m_A_decoder = nullptr;
     decoder* m_V_decoder = nullptr;
