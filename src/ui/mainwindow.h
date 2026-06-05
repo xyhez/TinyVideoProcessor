@@ -14,7 +14,7 @@
 #include "infrastructure/syncmanager.h"
 #include "core/queue.h"
 #include "domain/IMediaSource.h"
-#include "domain/FileMediaSource.h"
+// #include "domain/FileMediaSource.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {

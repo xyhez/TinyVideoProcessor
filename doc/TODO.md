@@ -1,101 +1,216 @@
-================================================================
-  Phase 0 · Step 2  — 引入 IMediaSource 抽象 + 修复 syncmanager
-================================================================
-
 目标
 ----
-  把 demuxer 与"文件路径"解耦，引入媒体源抽象接口，为后续摄
-  像头/网络流扩展打地基。顺手修一下 syncmanager 的线程安全 bug。
+  从 MainWindow 中分离播放控制逻辑，建立应用层（Application
+  Layer）。MainWindow 只负责 UI 交互，Controller 负责协调播放
+  管线（demuxer/decoder/player/render/syncmanager）的生命周期。
+
+  最终验收：MainWindow.cpp 行数 < 150。
+
+
+设计决策（已确认）
+------------------
+  1. VideoRender 嵌入方式：
+     Controller 接收 MainWindow 提供的容器 QWidget*，
+     由 Controller 内部创建并嵌入 VideoRender。
+
+  2. syncmanager 归属：
+     由 Controller 创建并管理（属于播放管线）。
+
+  3. MediaSource 归属：
+     由 MainWindow 创建（涉及 UI 交互如选文件），
+     通过 initialize() 传给 Controller。
 
 
 --------------------------------------------------------------------
-任务 1   新建 src/domain/IMediaSource.h
+任务 1   新建 src/application/MediaPlayerController.h / .cpp
 --------------------------------------------------------------------
 
-  定义抽象接口，至少包含以下方法：
+  定义 Controller 类，接管 MainWindow 的播放管线：
 
-    enum class MediaSourceType { File, Camera, Network };
-
-    class IMediaSource {
+    class MediaPlayerController : public QObject {
+        Q_OBJECT
     public:
-        virtual ~IMediaSource() = default;
-        virtual bool open() = 0;
-        virtual void close() = 0;
-        virtual AVFormatContext* getFormatContext() = 0;
-        virtual MediaSourceType  getType() const = 0;
-        virtual QString          getSourceInfo() const = 0;
+        explicit MediaPlayerController(QObject *parent = nullptr);
+        ~MediaPlayerController();
+
+        // 初始化：传入媒体源 + 渲染容器
+        bool initialize(std::shared_ptr<IMediaSource> source,
+                        QWidget* renderContainer);
+
+        // 播放控制
+        void start();
+        void pause();
+        void stop();
+
+        // 音量控制
+        void volumeUp();
+        void volumeDown();
+
+        // Seek
+        void rewind();
+        void forward();
+
+    signals:
+        void errorOccurred(QString msg);
+
+    private:
+        // 队列
+        std::shared_ptr<SyncQueue<AVPacket*>> m_APacket;
+        std::shared_ptr<SyncQueue<AVPacket*>> m_VPacket;
+        std::shared_ptr<SyncQueue<AVFrame*>>  m_AFrame;
+        std::shared_ptr<SyncQueue<AVFrame*>>  m_VFrame;
+
+        // 媒体源
+        std::shared_ptr<IMediaSource> m_mediaSource;
+
+        // 同步
+        std::shared_ptr<syncmanager> m_syncManager;
+
+        // 组件
+        demuxer*     m_demuxer     = nullptr;
+        decoder*     m_A_decoder   = nullptr;
+        decoder*     m_V_decoder   = nullptr;
+        AudioPlayer* m_audioplay   = nullptr;
+        VideoRender* m_videoRender = nullptr;
+
+        // 线程
+        QThread* m_demuxerTH    = nullptr;
+        QThread* m_A_decoderTH  = nullptr;
+        QThread* m_V_decoderTH  = nullptr;
+        QThread* m_audioplayTH  = nullptr;
+
+        bool m_pauseFlag = false;
+
+        void createConnections();
+        void releaseResources();
     };
 
 
 --------------------------------------------------------------------
-任务 2   新建 src/domain/FileMediaSource.h / .cpp
+任务 2   迁移成员变量
 --------------------------------------------------------------------
 
-  实现 IMediaSource，把 demuxer 现有的 avformat_open_input
-  + 流信息发现逻辑搬过来：
+  从 MainWindow 移除以下成员，全部移到 Controller：
 
-    - 构造时接收 QString filePath
-    - open()  内调用 avformat_open_input、avformat_find_stream_info
-    - close() 内调用 avformat_close_input
-    - 持有 AVFormatContext* m_ic
-    - getFormatContext() 返回 m_ic
-    - getType() 返回 MediaSourceType::File
+    [-]  m_APacket / m_VPacket / m_AFrame / m_VFrame
+    [-]  m_demuxer / m_A_decoder / m_V_decoder
+    [-]  m_demuxerTH / m_A_decoderTH / m_V_decoderTH
+    [-]  m_syncManager
+    [-]  m_audioplay / m_audioplayTH
+    [-]  m_videoRender
+    [-]  pause_flag
+    [-]  mutex (未使用)
 
-
---------------------------------------------------------------------
-任务 3   改造 demuxer
---------------------------------------------------------------------
-
-  让 demuxer 不再自己 open 文件，改为持有一个 IMediaSource：
-
-    [+]  构造函数加参数  std::shared_ptr<IMediaSource>
-    [-]  删除  initDemuxer(QString filename)  方法
-    [-]  删除  m_videoFileName 成员
-    [-]  删除  avformat_open_input 等所有打开/关闭文件的代码
-    [~]  startDemuxer() 里 ic 改为 m_source->getFormatContext()
-    [~]  析构里不要再 close，让 IMediaSource 自己管
+  MainWindow 新增：
+    [+]  MediaPlayerController* m_controller;
+    [+]  QString m_videoFileName (保留用户选择的路径)
 
 
 --------------------------------------------------------------------
-任务 4   改造 MainWindow
+任务 3   迁移初始化逻辑
 --------------------------------------------------------------------
 
-  之前：
-    m_demuxer = new demuxer(...);
-    m_demuxer->initDemuxer(m_videoFileName);
+  当前 MainWindow 构造函数中的初始化代码：
+    - 创建队列 + 创建组件 + 创建线程 + initDecoder + initAudioPlay
+    - 创建 VideoRender 并嵌入 ui->openGLWidget
+    - createConnect()
 
-  之后：
-    auto source = std::make_shared<FileMediaSource>(m_videoFileName);
-    source->open();
-    m_demuxer = new demuxer(source,
-                            m_APacket, m_VPacket,
-                            m_AFrame, m_VFrame);
+  全部迁移到 MediaPlayerController::initialize()，
+  MainWindow 构造函数只剩：
 
+    MainWindow::MainWindow(QWidget *parent)
+        : QMainWindow(parent), ui(new Ui::MainWindow)
+        , m_controller(new MediaPlayerController(this))
+    {
+        ui->setupUi(this);
+        this->setWindowTitle("modernFFplay-V1.0");
 
---------------------------------------------------------------------
-任务 5   修复 syncmanager::getClock() 线程安全
---------------------------------------------------------------------
-
-  文件:  src/infrastructure/syncmanager.h / .cpp
-
-    [~]  成员  QMutex mutex;     →  mutable QMutex mutex;
-    [~]  getClock() const 内部加锁：
-
-         double syncmanager::getClock() const {
-             QMutexLocker locker(&mutex);
-             return mainclock;
-         }
+        auto source = std::make_shared<FileMediaSource>();
+        source->SetInfo(m_videoFileName);
+        if (!source->open()) {
+            qCritical() << "媒体源打开失败";
+            return;
+        }
+        m_controller->initialize(source, ui->openGLWidget);
+    }
 
 
 --------------------------------------------------------------------
-任务 6   更新 CMakeLists.txt
+任务 4   迁移播放控制方法
+--------------------------------------------------------------------
+
+  从 MainWindow 迁出以下方法，改为转发：
+
+    [~]  start()       →  m_controller->start();
+    [~]  pause()       →  m_controller->pause();
+    [~]  stop()        →  m_controller->stop();
+
+  Controller::start() 启动所有线程：
+    - demuxer / A_decoder / V_decoder / audioplay 的 start()
+      和 thread->start()
+    - videoRender->startRendering()
+
+  Controller::pause() 暂停所有组件。
+  Controller::stop() 停止所有组件 + 队列 SetStopFlag/WakeAll。
+
+
+--------------------------------------------------------------------
+任务 5   迁移键盘事件转发
+--------------------------------------------------------------------
+
+  MainWindow::keyReleaseEvent 保留外壳，内部调用 Controller：
+
+    [~]  Space  →  pause/start (通过 Controller)
+    [~]  Up     →  m_controller->volumeUp();
+    [~]  Down   →  m_controller->volumeDown();
+    [~]  Left   →  m_controller->rewind();
+    [~]  Right  →  m_controller->forward();
+
+  Controller::forward() 内部完成原有的：
+    pause → syncManager->Forword() → emit e_Forward → start
+
+
+--------------------------------------------------------------------
+任务 6   迁移资源清理
+--------------------------------------------------------------------
+
+  MainWindow::closeEvent 简化为：
+
+    void MainWindow::closeEvent(QCloseEvent *event) {
+        Q_UNUSED(event);
+        m_controller->stop();
+    }
+
+  原来的 4 个队列 SetStopFlag/WakeAll 移到 Controller::stop()。
+  原来的 freeRsources() 改名为 Controller::releaseResources()，
+  在 Controller 析构时调用。
+
+
+--------------------------------------------------------------------
+任务 7   信号槽迁移
+--------------------------------------------------------------------
+
+  当前 MainWindow::createConnect() 中的连接：
+
+    connect(m_demuxerTH,    &QThread::started, m_demuxer,    &demuxer::startDemuxer);
+    connect(m_A_decoderTH,  &QThread::started, m_A_decoder,  &decoder::startDecoder);
+    connect(m_V_decoderTH,  &QThread::started, m_V_decoder,  &decoder::startDecoder);
+    connect(m_audioplayTH,  &QThread::started, m_audioplay,  &AudioPlayer::startAudioPlay);
+
+  全部移到 Controller::createConnections()。
+
+  MainWindow 中原有的 signals (e_Rewind/e_Forward 等) 暂时保留，
+  如果 Controller 用不到，再清理。
+
+
+--------------------------------------------------------------------
+任务 8   更新 CMakeLists.txt
 --------------------------------------------------------------------
 
   PROJECT_SOURCES 里追加：
 
-    src/domain/IMediaSource.h
-    src/domain/FileMediaSource.h
-    src/domain/FileMediaSource.cpp
+    src/application/MediaPlayerController.h
+    src/application/MediaPlayerController.cpp
 
 
 ====================================================================
@@ -103,8 +218,12 @@
 ====================================================================
 
   [ ]  编译零警告
-  [ ]  播放功能与 Step 1b 完全一致
-  [ ]  demuxer 里不再出现 avformat_open_input
-  [ ]  Camera / Network 留个枚举值即可，本步不用实现
+  [ ]  播放功能与 Step 2 完全一致
+  [ ]  MainWindow.cpp 行数 < 150
+  [ ]  MainWindow 不再直接持有 demuxer/decoder/audioplay 等组件
+  [ ]  MainWindow 不再 #include 基础设施层头文件
+       （只 include MediaPlayerController + IMediaSource/FileMediaSource）
+  [ ]  closeEvent 一行：m_controller->stop();
 
-  任务 1-4 是核心，5、6 顺手做。改完跑一下播放测试。
+  顺序：先建 Controller 骨架（任务 1），再逐个搬运
+  （任务 2-7）。每搬一块编译一次，确保不破坏播放。
