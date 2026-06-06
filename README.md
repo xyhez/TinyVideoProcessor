@@ -332,14 +332,6 @@ TinyVideoProcessor/
 
 ---
 
-## 📧 联系方式
-
-- **作者**: [Your Name]
-- **邮箱**: [your.email@example.com]
-- **GitHub**: [https://github.com/yourname](https://github.com/yourname)
-
----
-
 ## 🌟 Star History
 
 如果这个项目对你有帮助，请给个 Star ⭐️
@@ -347,5 +339,5 @@ TinyVideoProcessor/
 ---
 
 <p align="center">
-  Made with ❤️ by [Your Name]
+  Made with ❤️ by [Cody]
 </p>
