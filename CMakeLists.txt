@@ -55,7 +55,6 @@ set(PROJECT_SOURCES
         src/global.cpp
         src/core/queue.h
         doc/架构指导.md
-        doc/README.md
         doc/Phase0_重构计划.md
         src/domain/IMediaSource.h
         src/domain/FileMediaSource.cpp

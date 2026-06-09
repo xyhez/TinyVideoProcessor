@@ -11,6 +11,12 @@
 #include "infrastructure/demuxer.h"
 #include "infrastructure/syncmanager.h"
 #include "infrastructure/videorender.h"
+
+constexpr size_t kPacketQueueMax = 30;
+constexpr size_t kFrameQueueMax  = 30;
+
+auto packetDeleter = [](AVPacket* p) { if (p) av_packet_free(&p); };
+auto frameDeleter  = [](AVFrame*  f) { if (f) av_frame_free(&f);  };
 /**
  * @brief
  * MediaPlayController是应用层的协调者，
@@ -44,29 +50,29 @@ public:
 
 private:
     // 队列
-    std::shared_ptr<SyncQueue<AVPacket*>> m_APacket;
-    std::shared_ptr<SyncQueue<AVPacket*>> m_VPacket;
-    std::shared_ptr<SyncQueue<AVFrame*>>  m_AFrame;
-    std::shared_ptr<SyncQueue<AVFrame*>>  m_VFrame;
+    std::shared_ptr<SyncQueue<AVPacket*>> APacket_ = nullptr;
+    std::shared_ptr<SyncQueue<AVPacket*>> VPacket_ = nullptr;
+    std::shared_ptr<SyncQueue<AVFrame*>>  AFrame_ = nullptr;
+    std::shared_ptr<SyncQueue<AVFrame*>>  VFrame_ = nullptr;
 
     // 媒体源
-    std::shared_ptr<IMediaSource> m_mediaSource;
+    std::shared_ptr<IMediaSource> mediaSource_;
 
     // 同步
-    std::shared_ptr<syncmanager> m_syncManager;
+    std::shared_ptr<syncmanager> syncManager_;
 
     // 组件
-    demuxer*     m_demuxer     = nullptr;
-    decoder*     m_A_decoder   = nullptr;
-    decoder*     m_V_decoder   = nullptr;
-    AudioPlayer* m_audioplay   = nullptr;
-    VideoRender* m_videoRender = nullptr;
+    demuxer*     demuxer_     = nullptr;
+    decoder*     Adecoder_   = nullptr;
+    decoder*     Vdecoder_   = nullptr;
+    AudioPlayer* audioplay_   = nullptr;
+    VideoRender* videoRender_ = nullptr;
 
     // 线程
-    QThread* m_demuxerTH    = nullptr;
-    QThread* m_A_decoderTH  = nullptr;
-    QThread* m_V_decoderTH  = nullptr;
-    QThread* m_audioplayTH  = nullptr;
+    QThread* demuxerTH_    = nullptr;
+    QThread* AdecoderTH_  = nullptr;
+    QThread* VdecoderTH_  = nullptr;
+    QThread* audioplayTH_  = nullptr;
 
     bool m_pauseFlag = false;
 

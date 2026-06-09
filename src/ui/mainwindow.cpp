@@ -59,9 +59,9 @@ MainWindow::MainWindow(QWidget *parent)
 
     m_videoRender = new VideoRender(ui->centralwidget);
 
-    if (ui->openGLWidget) {
-        ui->openGLWidget->setLayout(new QVBoxLayout());
-        ui->openGLWidget->layout()->addWidget(m_videoRender);
+    if (ui->video_widget) {
+        ui->video_widget->setLayout(new QVBoxLayout());
+        ui->video_widget->layout()->addWidget(m_videoRender);
     }
     m_videoRender->initvideoRender(m_VFrame,
                                    m_syncManager);
