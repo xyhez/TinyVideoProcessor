@@ -8,7 +8,7 @@ FileMediaSource::~FileMediaSource() {
     }
 }
 
-bool FileMediaSource::open() {
+bool FileMediaSource::Open() {
     ///< 打开文件
     if(avformat_open_input(&ic,FileInfo_.filepath_.toUtf8().constData(),nullptr,nullptr)) {
         qDebug()<<"文件打开失败~";
@@ -26,7 +26,7 @@ bool FileMediaSource::open() {
     return true;
 }
 
-bool FileMediaSource::close() {
+bool FileMediaSource::Close() {
     if (ic) {
         avformat_close_input(&ic);
         ic = nullptr;

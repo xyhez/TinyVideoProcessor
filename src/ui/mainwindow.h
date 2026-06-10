@@ -7,6 +7,7 @@
 #include <QPropertyAnimation>
 #include <QLabel>
 
+#include "application/MediaPlayController.h"
 #include "infrastructure/decoder.h"
 #include "infrastructure/demuxer.h"
 #include "infrastructure/audioplayer.h"
@@ -55,33 +56,10 @@ private slots:
 private:
     Ui::MainWindow *ui;
 
-    // QString m_videoFileName = "F:\\Qt6project\\modernFFplay\\resource\\动物发现自己被绿.mp4";
-
-    ///< 队列（SyncQueue 自带 mutex/cv，自动释放队内元素）
-    std::shared_ptr<SyncQueue<AVPacket*>> m_APacket;
-    std::shared_ptr<SyncQueue<AVPacket*>> m_VPacket;
-    std::shared_ptr<SyncQueue<AVFrame*>>  m_AFrame;
-    std::shared_ptr<SyncQueue<AVFrame*>>  m_VFrame;
-
-    std::shared_ptr<IMediaSource> MediaSource_ = nullptr;
-
-    decoder* m_A_decoder = nullptr;
-    decoder* m_V_decoder = nullptr;
-    demuxer* m_demuxer = nullptr;
-
-    QThread* m_demuxerTH = nullptr;
-    QThread* m_A_decoderTH = nullptr;
-    QThread* m_V_decoderTH = nullptr;
-
-    std::shared_ptr<syncmanager> m_syncManager = nullptr;
-
-    AudioPlayer* m_audioplay = nullptr;
-    VideoRender* m_videoRender = nullptr;
-
-    QThread* m_audioplayTH = nullptr;
+    // MediaPlayController
+    std::unique_ptr<MediaPlayController> mediaPlayController_ = nullptr;
 
     QMutex mutex;
-    bool pause_flag = false;
 };
 
 #endif // MAINWINDOW_H

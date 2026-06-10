@@ -1,81 +1,22 @@
 #include "ui/mainwindow.h"
 #include "ui_mainwindow.h"
 
-namespace {
-constexpr size_t kPacketQueueMax = 30;
-constexpr size_t kFrameQueueMax  = 30;
-
-auto packetDeleter = [](AVPacket* p) { if (p) av_packet_free(&p); };
-auto frameDeleter  = [](AVFrame*  f) { if (f) av_frame_free(&f);  };
-}
-
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
-    , m_APacket(std::make_shared<SyncQueue<AVPacket*>>(kPacketQueueMax, packetDeleter))
-    , m_VPacket(std::make_shared<SyncQueue<AVPacket*>>(kPacketQueueMax, packetDeleter))
-    , m_AFrame (std::make_shared<SyncQueue<AVFrame*>>(kFrameQueueMax,  frameDeleter))
-    , m_VFrame (std::make_shared<SyncQueue<AVFrame*>>(kFrameQueueMax,  frameDeleter))
-    , m_A_decoder(new decoder)
-    , m_V_decoder(new decoder)
-    , m_demuxerTH(new QThread(this))
-    , m_A_decoderTH(new QThread(this))
-    , m_V_decoderTH(new QThread(this))
-    , m_syncManager(std::make_shared<syncmanager>())
-    , m_audioplay(new AudioPlayer)
-    , m_audioplayTH(new QThread(this))
+    , mediaPlayController_(std::make_unique<MediaPlayController>())
 {
     ui->setupUi(this);
-    this->setWindowTitle("modernFFplay-V1.0");
+    this->setWindowTitle("modernFFplay-V2.0");
 
-    // 1. 创建并配置媒体源
-    auto mediaSource = std::make_shared<FileMediaSource>();
-    mediaSource->SetInfo("D:\\githubProject\\TinyVideoProcessor\\resource\\动物发现自己被绿.mp4");
+    //1.应用层初始化
+    QString filepath = "D:\\githubProject\\TinyVideoProcessor\\resource\\动物发现自己被绿.mp4";
+    mediaPlayController_->Initialize(filepath,ui->video_widget);
 
-    // 2. 打开媒体源（关键步骤）
-    if (!mediaSource->open()) {
-        qCritical() << "媒体源打开失败";
-        return;
-    }
-
-    // 3. 创建 demuxer（传入已打开的媒体源 + 队列）
-    m_demuxer = new demuxer(mediaSource, m_APacket, m_VPacket, m_AFrame, m_VFrame);
-    m_demuxer->moveToThread(m_demuxerTH);
-
-    m_A_decoder->initDecoder(m_APacket, m_AFrame,
-                             m_demuxer->reAcoderPar(),
-                             m_demuxer->reAtimebase());
-    m_A_decoder->moveToThread(m_A_decoderTH);
-
-    m_V_decoder->initDecoder(m_VPacket, m_VFrame,
-                             m_demuxer->reVcoderPar(),
-                             m_demuxer->reVtimebase());
-    m_V_decoder->moveToThread(m_V_decoderTH);
-
-    m_audioplay->initAudioPlay(m_demuxer->reAcoderPar(),
-                               m_AFrame,
-                               m_syncManager);
-    m_audioplay->moveToThread(m_audioplayTH);
-
-    m_videoRender = new VideoRender(ui->centralwidget);
-
-    if (ui->video_widget) {
-        ui->video_widget->setLayout(new QVBoxLayout());
-        ui->video_widget->layout()->addWidget(m_videoRender);
-    }
-    m_videoRender->initvideoRender(m_VFrame,
-                                   m_syncManager);
-
-    createConnect();
 }
 
 void MainWindow::createConnect() {
     qDebug()<<"正在连接信号槽...";
-
-    connect(m_demuxerTH,&QThread::started,m_demuxer,&demuxer::startDemuxer);
-    connect(m_A_decoderTH,&QThread::started,m_A_decoder,&decoder::startDecoder);
-    connect(m_V_decoderTH,&QThread::started,m_V_decoder,&decoder::startDecoder);
-    connect(m_audioplayTH,&QThread::started,m_audioplay,&AudioPlayer::startAudioPlay);
 }
 
 void MainWindow::noticeWindow(QString message)
@@ -174,6 +115,8 @@ MainWindow::~MainWindow()
 }
 
 void MainWindow::start() {
+    mediaPlayController_->Start();
+
     qDebug()<<"开始播放";
     m_demuxer->start();
     m_demuxerTH->start();

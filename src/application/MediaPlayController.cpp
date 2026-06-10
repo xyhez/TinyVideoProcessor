@@ -14,7 +14,7 @@ MediaPlayController::~MediaPlayController() {
 
 }
 
-bool MediaPlayController::Initialize(std::shared_ptr<IMediaSource> source, QWidget *rendererContainer) {
+bool MediaPlayController::Initialize(const QString& filePath, QWidget *rendererContainer) {
     // 1.初始化队列
     APacket_ = std::make_shared<SyncQueue<AVPacket*>>(kPacketQueueMax, packetDeleter);
     VPacket_ = std::make_shared<SyncQueue<AVPacket*>>(kPacketQueueMax, packetDeleter);
@@ -50,11 +50,28 @@ bool MediaPlayController::Initialize(std::shared_ptr<IMediaSource> source, QWidg
         rendererContainer->layout()->addWidget(videoRender_);
     }
 
+    //6.初始化播放源
+    mediaSource_ = std::make_shared<FileMediaSource>();
+    mediaSource_->SetInfo(filePath);
+
+    //7.链接信号槽
+    CreateConnects();
+
     return true;
 }
 
-void MediaPlayController::CreateConnections() {
+void MediaPlayController::CreateConnects() {
+    connect(demuxerTH_,  &QThread::started,
+        demuxer_, &demuxer::startDemuxer);
 
+    connect(AdecoderTH_, &QThread::started,
+        Adecoder_, &decoder::startDecoder);
+
+    connect(VdecoderTH_, &QThread::started,
+        Vdecoder_, &decoder::startDecoder);
+
+    connect(audioplayTH_, &QThread::started,
+        audioplay_, &AudioPlayer::startAudioPlay);
 }
 
 void MediaPlayController::ReleaseResources() {
@@ -62,6 +79,21 @@ void MediaPlayController::ReleaseResources() {
 }
 
 void MediaPlayController::Start() {
+    //1.打开媒体源
+    mediaSource_->Open();
+
+    //2.开启子线程
+    demuxerTH_->start();
+    AdecoderTH_->start();
+    VdecoderTH_->start();
+    audioplayTH_->start();
+
+    demuxer_->start();
+    Adecoder_->start();
+    Vdecoder_->start();
+    audioplay_->start();
+    videoRender_->startRendering();
+
 
 }
 

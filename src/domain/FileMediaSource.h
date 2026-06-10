@@ -14,8 +14,8 @@ public:
         FileInfo_.filepath_ = filepath;
     }
     ~FileMediaSource();
-    bool open() override;
-    bool close() override;
+    bool Open() override;
+    bool Close() override;
     AVFormatContext* GetFormatContect() override;
     MediaSourceType GetType() override;
     Fileinfo& GetSourceInfo() override;

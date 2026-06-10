@@ -38,8 +38,8 @@ struct Fileinfo{
 class IMediaSource {
 public:
     virtual ~IMediaSource() = default;
-    virtual bool open() = 0;
-    virtual bool close() = 0;
+    virtual bool Open() = 0;
+    virtual bool Close() = 0;
     virtual AVFormatContext* GetFormatContect() = 0;
     virtual MediaSourceType GetType() = 0;
     virtual void SetInfo(QString) = 0;
