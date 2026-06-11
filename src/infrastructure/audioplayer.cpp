@@ -190,10 +190,7 @@ void AudioPlayer::run()
             continue;
         }
 
-        const double frameTimeBase = tmp->time_base.den > 0
-            ? av_q2d(tmp->time_base)
-            : m_audioTimeBase;
-        double audioclock = tmp->pts * frameTimeBase * 1000;
+        double audioclock = tmp->pts * m_audioTimeBase * 1000;
         // qDebug()<<"audioclock："<<audioclock;
         if (m_syncManager) {
             m_syncManager->refreshClock(audioclock);

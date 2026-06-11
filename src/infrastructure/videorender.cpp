@@ -70,10 +70,7 @@ void VideoRender::renderFrame()
         return;
     }
 
-    const double frameTimeBase = nextFrame->time_base.den > 0
-        ? av_q2d(nextFrame->time_base)
-        : m_videoTimeBase;
-    double videoPts = nextFrame->pts * frameTimeBase * 1000.0;
+    double videoPts = nextFrame->pts * m_videoTimeBase * 1000.0;
     double audioPts = m_syncManager->getClock()-20;
     double diff = videoPts - audioPts;
     // qDebug()<<"时钟:"<<audioPts<<"  当前视频帧的时间:"<<videoPts<<" 差距:"<<diff;
