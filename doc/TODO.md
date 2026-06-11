@@ -1,229 +1,149 @@
-目标
-----
-  从 MainWindow 中分离播放控制逻辑，建立应用层（Application
-  Layer）。MainWindow 只负责 UI 交互，Controller 负责协调播放
-  管线（demuxer/decoder/player/render/syncmanager）的生命周期。
+# TODO: Phase 1.1 播放控制
 
-  最终验收：MainWindow.cpp 行数 < 150。
+## 目标
 
+完善本地播放器的核心播放控制能力。当前优先级是先把快进、快退、停止和 Seek 做成真实功能，而不是只改变状态或调用空实现。
 
-设计决策（已确认）
-------------------
-  1. VideoRender 嵌入方式：
-     Controller 接收 MainWindow 提供的容器 QWidget*，
-     由 Controller 内部创建并嵌入 VideoRender。
+本阶段继续遵循 `doc/架构指导.md`：
 
-  2. syncmanager 归属：
-     由 Controller 创建并管理（属于播放管线）。
+- `MainWindow` 只负责 UI 交互和事件转发。
+- `MediaPlayController` 负责播放控制流程。
+- `demuxer/decoder/audioplayer/videorender/syncmanager` 保持基础设施职责。
+- 不恢复全局变量。
+- 不从 `AVFrame::time_base` 推导同步时间。
 
-  3. MediaSource 归属：
-     由 MainWindow 创建（涉及 UI 交互如选文件），
-     通过 initialize() 传给 Controller。
+## 任务 1: 梳理当前播放控制链路
 
+- [ ] 检查 `MediaPlayController::Start()`、`Pause()`、`Stop()` 当前行为。
+- [ ] 检查 `demuxer::Rewind()`、`demuxer::Forward()` 空实现。
+- [ ] 检查 `syncmanager::Forward()` 是否应该被通用 Seek 时钟重置替代。
+- [ ] 明确当前队列停止标志、唤醒、清空的调用顺序。
+- [ ] 明确 decoder 是否已有 flush 能力，没有则计划新增。
 
---------------------------------------------------------------------
-任务 1   新建 src/application/MediaPlayerController.h / .cpp
---------------------------------------------------------------------
+验收：
 
-  定义 Controller 类，接管 MainWindow 的播放管线：
+- [ ] 写清楚当前 Seek 缺失点。
+- [ ] 确认后续改动不需要让 `MainWindow` 直接依赖基础设施层。
 
-    class MediaPlayerController : public QObject {
-        Q_OBJECT
-    public:
-        explicit MediaPlayerController(QObject *parent = nullptr);
-        ~MediaPlayerController();
+## 任务 2: 为队列补齐 Seek 所需能力
 
-        // 初始化：传入媒体源 + 渲染容器
-        bool initialize(std::shared_ptr<IMediaSource> source,
-                        QWidget* renderContainer);
+- [ ] 确认 `SyncQueue::Clear()` 会正确释放队列内 AVPacket/AVFrame。
+- [ ] 确认清空队列时不会和阻塞中的 Push/Pop 死锁。
+- [ ] 必要时增加“清空并唤醒”的封装方法。
+- [ ] Seek 前后正确设置 `SetStopFlag()`，避免 demux/decode 线程卡住。
 
-        // 播放控制
-        void start();
-        void pause();
-        void stop();
+验收：
 
-        // 音量控制
-        void volumeUp();
-        void volumeDown();
+- [ ] Seek 时四个队列都能被清空。
+- [ ] 队列清空不泄漏 AVPacket/AVFrame。
+- [ ] 队列清空后可以重新接收新数据。
 
-        // Seek
-        void rewind();
-        void forward();
+## 任务 3: demuxer 增加真实 Seek 能力
 
-    signals:
-        void errorOccurred(QString msg);
+- [ ] 在 `demuxer` 中保存可 seek 的 `AVFormatContext` 来源。
+- [ ] 新增 `SeekTo(double seconds)` 或等价接口。
+- [ ] 使用 `av_seek_frame()` 跳转到目标时间。
+- [ ] 处理目标时间边界：小于 0 时归零，大于总时长时限制到总时长。
+- [ ] Seek 后清理 demuxer 内部当前 PTS 状态。
+- [ ] 将 `Rewind()`、`Forward()` 改为调用通用 seek 逻辑。
 
-    private:
-        // 队列
-        std::shared_ptr<SyncQueue<AVPacket*>> m_APacket;
-        std::shared_ptr<SyncQueue<AVPacket*>> m_VPacket;
-        std::shared_ptr<SyncQueue<AVFrame*>>  m_AFrame;
-        std::shared_ptr<SyncQueue<AVFrame*>>  m_VFrame;
+验收：
 
-        // 媒体源
-        std::shared_ptr<IMediaSource> m_mediaSource;
+- [ ] 左右方向键能触发真实位置跳转。
+- [ ] 目标时间不会越界。
+- [ ] seek 失败时能返回失败状态，不静默吞掉错误。
 
-        // 同步
-        std::shared_ptr<syncmanager> m_syncManager;
+## 任务 4: decoder 增加 flush 能力
 
-        // 组件
-        demuxer*     m_demuxer     = nullptr;
-        decoder*     m_A_decoder   = nullptr;
-        decoder*     m_V_decoder   = nullptr;
-        AudioPlayer* m_audioplay   = nullptr;
-        VideoRender* m_videoRender = nullptr;
+- [ ] 为音频 decoder 增加 `Flush()`。
+- [ ] 为视频 decoder 增加 `Flush()`。
+- [ ] 内部调用 `avcodec_flush_buffers()`。
+- [ ] 确保硬解路径 flush 后仍能继续输出有效帧。
 
-        // 线程
-        QThread* m_demuxerTH    = nullptr;
-        QThread* m_A_decoderTH  = nullptr;
-        QThread* m_V_decoderTH  = nullptr;
-        QThread* m_audioplayTH  = nullptr;
+验收：
 
-        bool m_pauseFlag = false;
+- [ ] Seek 后不会继续输出 seek 前缓存帧。
+- [ ] 硬解和软解路径都走同一 flush 入口。
 
-        void createConnections();
-        void releaseResources();
-    };
+## 任务 5: MediaPlayController 编排 Seek 流程
 
+- [ ] 新增 `SeekTo(double seconds)`。
+- [ ] 新增 `SeekRelative(double seconds)`。
+- [ ] `Rewind()` 调用 `SeekRelative(-10)`。
+- [ ] `Forward()` 调用 `SeekRelative(10)`。
+- [ ] Seek 流程中暂停播放管线。
+- [ ] 清空音频包队列、视频包队列、音频帧队列、视频帧队列。
+- [ ] flush 音频 decoder 和视频 decoder。
+- [ ] 重置同步时钟到目标时间。
+- [ ] 恢复播放状态。
 
---------------------------------------------------------------------
-任务 2   迁移成员变量
---------------------------------------------------------------------
+验收：
 
-  从 MainWindow 移除以下成员，全部移到 Controller：
+- [ ] 快进/快退后音视频同步。
+- [ ] Seek 后无旧画面闪回。
+- [ ] Seek 后无旧音频残留。
+- [ ] 暂停状态下 Seek 后仍保持暂停，播放状态下 Seek 后继续播放。
 
-    [-]  m_APacket / m_VPacket / m_AFrame / m_VFrame
-    [-]  m_demuxer / m_A_decoder / m_V_decoder
-    [-]  m_demuxerTH / m_A_decoderTH / m_V_decoderTH
-    [-]  m_syncManager
-    [-]  m_audioplay / m_audioplayTH
-    [-]  m_videoRender
-    [-]  pause_flag
-    [-]  mutex (未使用)
+## 任务 6: Stop 行为回到起始位置
 
-  MainWindow 新增：
-    [+]  MediaPlayerController* m_controller;
-    [+]  QString m_videoFileName (保留用户选择的路径)
+- [ ] 明确 Stop 和 Pause 的状态差异。
+- [ ] Stop 时停止播放管线。
+- [ ] Stop 时清空所有队列。
+- [ ] Stop 时 flush decoder。
+- [ ] Stop 时同步时钟回到 0。
+- [ ] Stop 后再次 Start 从 0 开始播放。
 
+验收：
 
---------------------------------------------------------------------
-任务 3   迁移初始化逻辑
---------------------------------------------------------------------
+- [ ] Stop 后画面和音频都停止。
+- [ ] Stop 后再次播放从开头开始。
+- [ ] Stop 不导致线程无法再次启动。
 
-  当前 MainWindow 构造函数中的初始化代码：
-    - 创建队列 + 创建组件 + 创建线程 + initDecoder + initAudioPlay
-    - 创建 VideoRender 并嵌入 ui->openGLWidget
-    - createConnect()
+## 任务 7: 播放位置和总时长信号
 
-  全部迁移到 MediaPlayerController::initialize()，
-  MainWindow 构造函数只剩：
+- [ ] 从 `Fileinfo` 或媒体源信息中暴露总时长。
+- [ ] `MediaPlayController` 增加 `Duration()`。
+- [ ] `MediaPlayController` 增加 `Position()`。
+- [ ] 增加 `PositionChanged(double seconds)` 信号。
+- [ ] 增加 `DurationChanged(double seconds)` 信号。
+- [ ] 先用定时器或音频主时钟更新当前位置。
 
-    MainWindow::MainWindow(QWidget *parent)
-        : QMainWindow(parent), ui(new Ui::MainWindow)
-        , m_controller(new MediaPlayerController(this))
-    {
-        ui->setupUi(this);
-        this->setWindowTitle("modernFFplay-V1.0");
+验收：
 
-        auto source = std::make_shared<FileMediaSource>();
-        source->SetInfo(m_videoFileName);
-        if (!source->open()) {
-            qCritical() << "媒体源打开失败";
-            return;
-        }
-        m_controller->initialize(source, ui->openGLWidget);
-    }
+- [ ] 播放过程中位置持续更新。
+- [ ] Seek 后位置立即更新到目标附近。
+- [ ] 总时长只由媒体源信息决定，不从 UI 硬编码。
 
+## 任务 8: 为进度条 Seek 做接口准备
 
---------------------------------------------------------------------
-任务 4   迁移播放控制方法
---------------------------------------------------------------------
+- [ ] `MainWindow` 只绑定进度条事件，不直接操作 demuxer。
+- [ ] 拖动进度条时调用 `MediaPlayController::SeekTo()`。
+- [ ] 拖动过程中避免频繁 seek，可以只在释放时 seek。
+- [ ] 播放位置更新时刷新进度条。
 
-  从 MainWindow 迁出以下方法，改为转发：
+验收：
 
-    [~]  start()       →  m_controller->start();
-    [~]  pause()       →  m_controller->pause();
-    [~]  stop()        →  m_controller->stop();
+- [ ] 进度条显示不反向驱动播放状态混乱。
+- [ ] 用户拖动进度条后能跳到对应位置。
+- [ ] 拖动进度条不会破坏音视频同步。
 
-  Controller::start() 启动所有线程：
-    - demuxer / A_decoder / V_decoder / audioplay 的 start()
-      和 thread->start()
-    - videoRender->startRendering()
+## 任务 9: 播放速度控制预研
 
-  Controller::pause() 暂停所有组件。
-  Controller::stop() 停止所有组件 + 队列 SetStopFlag/WakeAll。
+- [ ] 确认 Qt 音频输出侧是否需要重采样/变速支持。
+- [ ] 确认视频渲染定时器如何适配速度。
+- [ ] 确认同步时钟是否以播放速度缩放。
+- [ ] 暂不与 Seek 同时实现，避免风险叠加。
 
+验收：
 
---------------------------------------------------------------------
-任务 5   迁移键盘事件转发
---------------------------------------------------------------------
+- [ ] 形成实现方案后再进入编码。
 
-  MainWindow::keyReleaseEvent 保留外壳，内部调用 Controller：
+## 1.1 完成标准
 
-    [~]  Space  →  pause/start (通过 Controller)
-    [~]  Up     →  m_controller->volumeUp();
-    [~]  Down   →  m_controller->volumeDown();
-    [~]  Left   →  m_controller->rewind();
-    [~]  Right  →  m_controller->forward();
-
-  Controller::forward() 内部完成原有的：
-    pause → syncManager->Forword() → emit e_Forward → start
-
-
---------------------------------------------------------------------
-任务 6   迁移资源清理
---------------------------------------------------------------------
-
-  MainWindow::closeEvent 简化为：
-
-    void MainWindow::closeEvent(QCloseEvent *event) {
-        Q_UNUSED(event);
-        m_controller->stop();
-    }
-
-  原来的 4 个队列 SetStopFlag/WakeAll 移到 Controller::stop()。
-  原来的 freeRsources() 改名为 Controller::releaseResources()，
-  在 Controller 析构时调用。
-
-
---------------------------------------------------------------------
-任务 7   信号槽迁移
---------------------------------------------------------------------
-
-  当前 MainWindow::createConnect() 中的连接：
-
-    connect(m_demuxerTH,    &QThread::started, m_demuxer,    &demuxer::startDemuxer);
-    connect(m_A_decoderTH,  &QThread::started, m_A_decoder,  &decoder::startDecoder);
-    connect(m_V_decoderTH,  &QThread::started, m_V_decoder,  &decoder::startDecoder);
-    connect(m_audioplayTH,  &QThread::started, m_audioplay,  &AudioPlayer::startAudioPlay);
-
-  全部移到 Controller::createConnections()。
-
-  MainWindow 中原有的 signals (e_Rewind/e_Forward 等) 暂时保留，
-  如果 Controller 用不到，再清理。
-
-
---------------------------------------------------------------------
-任务 8   更新 CMakeLists.txt
---------------------------------------------------------------------
-
-  PROJECT_SOURCES 里追加：
-
-    src/application/MediaPlayerController.h
-    src/application/MediaPlayerController.cpp
-
-
-====================================================================
-验收标准
-====================================================================
-
-  [ ]  编译零警告
-  [ ]  播放功能与 Step 2 完全一致
-  [ ]  MainWindow.cpp 行数 < 150
-  [ ]  MainWindow 不再直接持有 demuxer/decoder/audioplay 等组件
-  [ ]  MainWindow 不再 #include 基础设施层头文件
-       （只 include MediaPlayerController + IMediaSource/FileMediaSource）
-  [ ]  closeEvent 一行：m_controller->stop();
-
-  顺序：先建 Controller 骨架（任务 1），再逐个搬运
-  （任务 2-7）。每搬一块编译一次，确保不破坏播放。
+- [ ] 播放、暂停、停止行为边界清晰。
+- [ ] 快进/快退是真实 Seek。
+- [ ] Seek 后音视频同步。
+- [ ] Seek 后无旧包、旧帧、旧音频残留。
+- [ ] 进度信息能用于 UI 进度条。
+- [ ] `MainWindow` 没有新增基础设施层依赖。
+- [ ] 没有新增全局变量。
