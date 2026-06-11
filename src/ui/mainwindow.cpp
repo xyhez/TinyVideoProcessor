@@ -16,6 +16,11 @@ MainWindow::MainWindow(QWidget *parent)
         return;
     }
 
+    connect(mediaPlayController_.get(), &MediaPlayController::stateChanged,
+            this, [](MediaPlayController::PlaybackState state) {
+                Q_UNUSED(state);
+            });
+
 }
 
 void MainWindow::noticeWindow(QString message)
@@ -71,12 +76,10 @@ void MainWindow::closeEvent(QCloseEvent *event)
 void MainWindow::keyReleaseEvent(QKeyEvent *ev)
 {
     if (ev->key() == Qt::Key_Space) {
-        if (!pauseFlag_) {
+        if (mediaPlayController_->state() == MediaPlayController::PlaybackState::Playing) {
             pause();
-            pauseFlag_ = true;
         } else {
             start();
-            pauseFlag_ = false;
         }
         ev->accept();
     } else if (ev->key() == Qt::Key_Up) {
@@ -98,17 +101,14 @@ MainWindow::~MainWindow()
 }
 
 void MainWindow::start() {
-    pauseFlag_ = false;
     mediaPlayController_->Start();
 }
 
 void MainWindow::stop() {
-    pauseFlag_ = false;
     mediaPlayController_->Stop();
 }
 
 void MainWindow::pause() {
-    pauseFlag_ = true;
     mediaPlayController_->Pause();
 }
 

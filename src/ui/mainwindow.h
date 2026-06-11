@@ -40,8 +40,6 @@ private:
     Ui::MainWindow *ui;
 
     std::unique_ptr<MediaPlayController> mediaPlayController_ = nullptr;
-
-    bool pauseFlag_ = false;
 };
 
 #endif // MAINWINDOW_H
