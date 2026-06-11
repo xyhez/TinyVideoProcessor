@@ -1,6 +1,7 @@
 #pragma once
-#include <QString>
+
 #include <QDebug>
+#include <QString>
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -8,31 +9,31 @@ extern "C" {
 #include <libavutil/frame.h>
 }
 
-///< 文件类型枚举
 enum class MediaSourceType {
     File,
     Camera,
     NetWork
 };
 
-///< 视频信息struct
-struct Fileinfo{
+struct Fileinfo {
     QString filepath_ = "NON";
-    int width_;
-    int height_;
-    AVCodecID CodecId_;
-    int duration_;   // 视频时长
-    double FrameRate = 30;              ///< 刷新率(fps)
-    double A_timeBase;                  ///< 音频时间基
-    double V_timeBase;                  ///< 视频时间基
+    int width_ = 0;
+    int height_ = 0;
+    AVCodecID CodecId_ = AV_CODEC_ID_NONE;
+    int duration_ = 0;
+    double FrameRate = 30.0;
+    double A_timeBase = 0.0;
+    double V_timeBase = 0.0;
 
     Fileinfo() = default;
-    Fileinfo(QString filepath,int width,int height,AVCodecID CodecId,int duration)
+    Fileinfo(QString filepath, int width, int height, AVCodecID CodecId, int duration)
         : filepath_(filepath)
         , width_(width)
         , height_(height)
         , CodecId_(CodecId)
-        , duration_(duration){}
+        , duration_(duration)
+    {
+    }
 };
 
 class IMediaSource {

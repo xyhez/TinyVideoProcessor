@@ -15,8 +15,8 @@
 constexpr size_t kPacketQueueMax = 30;
 constexpr size_t kFrameQueueMax  = 30;
 
-auto packetDeleter = [](AVPacket* p) { if (p) av_packet_free(&p); };
-auto frameDeleter  = [](AVFrame*  f) { if (f) av_frame_free(&f);  };
+inline auto packetDeleter = [](AVPacket* p) { if (p) av_packet_free(&p); };
+inline auto frameDeleter  = [](AVFrame*  f) { if (f) av_frame_free(&f);  };
 /**
  * @brief
  * MediaPlayController是应用层的协调者，
@@ -77,9 +77,8 @@ private:
     QThread* VdecoderTH_  = nullptr;
     QThread* audioplayTH_  = nullptr;
 
-    bool m_pauseFlag = false;
+    bool pauseFlag_ = false;
 
-    void CreateConnections();
     void ReleaseResources();
 };
 

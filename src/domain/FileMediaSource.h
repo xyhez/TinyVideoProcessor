@@ -21,7 +21,7 @@ public:
     Fileinfo& GetSourceInfo() override;
     void SetInfo(QString) override;
 private:
-    AVFormatContext* ic;
+    AVFormatContext* ic = nullptr;
     struct Fileinfo FileInfo_;
 };
 

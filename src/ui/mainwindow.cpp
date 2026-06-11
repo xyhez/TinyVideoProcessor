@@ -11,12 +11,11 @@ MainWindow::MainWindow(QWidget *parent)
 
     //1.应用层初始化
     QString filepath = "D:\\githubProject\\TinyVideoProcessor\\resource\\动物发现自己被绿.mp4";
-    mediaPlayController_->Initialize(filepath,ui->video_widget);
+    if (!mediaPlayController_->Initialize(filepath, ui->video_widget)) {
+        qCritical() << "Controller 初始化失败";
+        return;
+    }
 
-}
-
-void MainWindow::createConnect() {
-    qDebug()<<"正在连接信号槽...";
 }
 
 void MainWindow::noticeWindow(QString message)
@@ -65,111 +64,62 @@ void MainWindow::closeEvent(QCloseEvent *event)
 {
     Q_UNUSED(event);
 
-    m_APacket->SetStopFlag(true);
-    m_VPacket->SetStopFlag(true);
-    m_AFrame->SetStopFlag(true);
-    m_VFrame->SetStopFlag(true);
+    mediaPlayController_->Stop();
 
-    m_APacket->WakeAll();
-    m_VPacket->WakeAll();
-    m_AFrame->WakeAll();
-    m_VFrame->WakeAll();
-
-    m_demuxer->stop();
-    m_A_decoder->stop();
-    m_V_decoder->stop();
-    m_audioplay->stop();
-    m_videoRender->stopRendering();
 }
 
 void MainWindow::keyReleaseEvent(QKeyEvent *ev)
 {
     if (ev->key() == Qt::Key_Space) {
-        if(pause_flag == false) {
+        if (!pauseFlag_) {
             pause();
-            pause_flag = true;
-        }else {
+            pauseFlag_ = true;
+        } else {
             start();
-            pause_flag = false;
+            pauseFlag_ = false;
         }
         ev->accept();
-    } else if(ev->key() == Qt::Key_Up) {
-        m_audioplay->volumeUp();
-    } else if(ev->key() == Qt::Key_Down) {
-        m_audioplay->volumeDown();
-    } else if(ev->key() == Qt::Key_Left) {
-        emit e_Rewind();
-    } else if(ev->key() == Qt::Key_Right) {
-        pause();
-        m_syncManager->Forword();
-        emit e_Forward();
-        start();
+    } else if (ev->key() == Qt::Key_Up) {
+        mediaPlayController_->VolumeUp();
+    } else if (ev->key() == Qt::Key_Down) {
+        mediaPlayController_->VolumeDown();
+    } else if (ev->key() == Qt::Key_Left) {
+        mediaPlayController_->Rewind();
+    } else if (ev->key() == Qt::Key_Right) {
+        mediaPlayController_->Forward();
     }
     QMainWindow::keyReleaseEvent(ev);
 }
 
 MainWindow::~MainWindow()
 {
+    mediaPlayController_.reset();
     delete ui;
-    freeRsources();
 }
 
 void MainWindow::start() {
+    pauseFlag_ = false;
     mediaPlayController_->Start();
-
-    qDebug()<<"开始播放";
-    m_demuxer->start();
-    m_demuxerTH->start();
-
-    m_A_decoder->start();
-    m_A_decoderTH->start();
-    m_V_decoder->start();
-    m_V_decoderTH->start();
-
-    m_audioplay->start();
-    m_audioplayTH->start();
-
-    m_videoRender->startRendering();
 }
 
 void MainWindow::stop() {
+    pauseFlag_ = false;
+    mediaPlayController_->Stop();
 }
 
 void MainWindow::pause() {
-    m_demuxer->pause();
-    m_A_decoder->pause();
-    m_V_decoder->pause();
-    m_audioplay->pause();
-    m_videoRender->pause();
+    pauseFlag_ = true;
+    mediaPlayController_->Pause();
 }
 
 void MainWindow::VolumeUp() {
+    mediaPlayController_->VolumeUp();
+
 }
 
 void MainWindow::VolumeDown() {
-}
 
-void MainWindow::freeRsources() {
-    m_A_decoderTH->quit();
-    m_A_decoderTH->wait();
-    delete m_A_decoderTH;
-    m_A_decoderTH = nullptr;
-    m_V_decoderTH->quit();
-    m_V_decoderTH->wait();
-    delete m_V_decoderTH;
-    m_V_decoderTH = nullptr;
-    m_demuxerTH->quit();
-    m_demuxerTH->wait();
-    delete m_demuxerTH;
-    m_demuxerTH = nullptr;
-    m_audioplayTH->quit();
-    m_audioplayTH->wait();
-    delete m_audioplayTH;
-    m_audioplayTH = nullptr;
-    delete m_A_decoder;
-    delete m_V_decoder;
-    delete m_demuxer;
-    delete m_audioplay;
+    mediaPlayController_->VolumeDown();
 }
 
 void MainWindow::on_pushButton_play_clicked()
