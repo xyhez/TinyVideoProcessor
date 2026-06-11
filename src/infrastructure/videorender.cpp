@@ -13,16 +13,16 @@ VideoRender::VideoRender(QWidget* parent)
 
 VideoRender::~VideoRender()
 {
-    stopRendering();
+    StopRendering();
     makeCurrent();
-    freeTextures();
+    FreeTextures();
     m_frameMutex.lock();
     av_frame_free(&m_displayFrame);
     m_frameMutex.unlock();
     doneCurrent();
 }
 
-void VideoRender::initvideoRender(std::shared_ptr<SyncQueue<AVFrame*>> frameQueue,
+void VideoRender::InitVideoRender(std::shared_ptr<SyncQueue<AVFrame*>> frameQueue,
                                   std::shared_ptr<syncmanager> syncManager,
                                   double frameRate,
                                   double videoTimeBase)
@@ -36,18 +36,18 @@ void VideoRender::initvideoRender(std::shared_ptr<SyncQueue<AVFrame*>> frameQueu
     }
 }
 
-void VideoRender::startRendering()
+void VideoRender::StartRendering()
 {
     if (!m_timer) {
         m_timer = new QTimer(this);
-        connect(m_timer, &QTimer::timeout, this, &VideoRender::renderFrame);
+        connect(m_timer, &QTimer::timeout, this, &VideoRender::RenderFrame);
     }
     m_timer->start(m_frameInterval);
     m_rendered = 0;
     m_dropped = 0;
 }
 
-void VideoRender::stopRendering()
+void VideoRender::StopRendering()
 {
     if (m_timer) {
         m_timer->stop();
@@ -57,7 +57,7 @@ void VideoRender::stopRendering()
     }
 }
 
-void VideoRender::renderFrame()
+void VideoRender::RenderFrame()
 {
     if (!m_frameQueue || !m_syncManager) return;
 
@@ -71,7 +71,7 @@ void VideoRender::renderFrame()
     }
 
     double videoPts = nextFrame->pts * m_videoTimeBase * 1000.0;
-    double audioPts = m_syncManager->getClock()-20;
+    double audioPts = m_syncManager->GetClock()-20;
     double diff = videoPts - audioPts;
     // qDebug()<<"时钟:"<<audioPts<<"  当前视频帧的时间:"<<videoPts<<" 差距:"<<diff;
 
@@ -173,16 +173,16 @@ void VideoRender::paintGL()
         return;
     }
 
-    uploadTexture(frame);
-    drawFrame();
+    UploadTexture(frame);
+    DrawFrame();
 }
 
-void VideoRender::uploadTexture(AVFrame* f)
+void VideoRender::UploadTexture(AVFrame* f)
 {
     if (f->format != AV_PIX_FMT_YUV420P) return;
 
     if (m_texY && (m_texY->width() != f->width || m_texY->height() != f->height)) {
-        freeTextures();
+        FreeTextures();
     }
 
     if (!m_texY) {
@@ -212,7 +212,7 @@ void VideoRender::uploadTexture(AVFrame* f)
     m_texV->setData(QOpenGLTexture::Red, QOpenGLTexture::UInt8, f->data[2], &opt);
 }
 
-void VideoRender::drawFrame()
+void VideoRender::DrawFrame()
 {
     if (!m_glInited) return;
 
@@ -222,7 +222,7 @@ void VideoRender::drawFrame()
     m_texV->bind(2);
 
     float x, y, w, h;
-    calcRect(x, y, w, h);
+    CalcRect(x, y, w, h);
 
     GLfloat verts[] = {x,y, x+w,y, x,y+h, x+w,y+h};
     GLfloat texs[] = {0,1, 1,1, 0,0, 1,0};
@@ -239,7 +239,7 @@ void VideoRender::drawFrame()
     m_shader.release();
 }
 
-void VideoRender::calcRect(float& x, float& y, float& w, float& h)
+void VideoRender::CalcRect(float& x, float& y, float& w, float& h)
 {
     int vw = width(), vh = height();
     if (m_videoW <= 0 || m_videoH <= 0 || vw <= 0 || vh <= 0) {
@@ -262,7 +262,7 @@ void VideoRender::calcRect(float& x, float& y, float& w, float& h)
     y = -h / 2;
 }
 
-void VideoRender::freeTextures()
+void VideoRender::FreeTextures()
 {
     delete m_texY; m_texY = nullptr;
     delete m_texU; m_texU = nullptr;

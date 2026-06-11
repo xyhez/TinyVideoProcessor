@@ -22,25 +22,25 @@ public:
     ~syncmanager();
 
     /**
-     * @brief refreshClock
+     * @brief RefreshClock
      * @param double 新的时钟
      * @return 0 成功
      * @return -1 失败
      */
-    int refreshClock(double);
+    int RefreshClock(double);
 
     /**
-     * @brief getClock 获取主时钟
+     * @brief GetClock 获取主时钟
      * @return double 返回主时钟副本
      */
-    double getClock() const;
+    double GetClock() const;
 
     /**
-     * @brief Forword 快进3s
+     * @brief Forward 快进3s
      * @return 0 成功
      * @return -1 失败
      */
-    int Forword();
+    int Forward();
 
 signals:
 

@@ -23,14 +23,16 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
-    void noticeWindow(QString message);
+    void NoticeWindow(QString message);
     void closeEvent(QCloseEvent *event) override;
     void keyReleaseEvent(QKeyEvent *ev) override;
-    void start();
-    void stop();
-    void pause();
+    void Start();
+    void Stop();
+    void Pause();
     void VolumeUp();
     void VolumeDown();
+    void Rewind();
+    void Forward();
 
 private slots:
     void on_pushButton_play_clicked();
@@ -41,7 +43,7 @@ private:
 
     std::unique_ptr<MediaPlayController> mediaPlayController_ = nullptr;
 
-    void updatePlaybackControls(MediaPlayController::PlaybackState state);
+    void UpdatePlaybackControls(MediaPlayController::PlaybackState state);
 };
 
 #endif // MAINWINDOW_H

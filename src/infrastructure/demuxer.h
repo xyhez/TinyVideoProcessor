@@ -37,28 +37,28 @@ public:
     ~demuxer();
 
     /**
-     * @brief reAcoderPar
+     * @brief ReAcoderPar
      * @return 返回音频解码器配置指针
      */
-    AVCodecParameters* reAcoderPar();
+    AVCodecParameters* ReAcoderPar();
 
     /**
-     * @brief reVcoderPar
+     * @brief ReVcoderPar
      * @return 返回视频解码器配置指针
      */
-    AVCodecParameters* reVcoderPar();
+    AVCodecParameters* ReVcoderPar();
 
     /**
-     * @brief reAtimebase
+     * @brief ReAtimebase
      * @return
      */
-    AVRational reAtimebase();
+    AVRational ReAtimebase();
 
     /**
-     * @brief reVtimebase
+     * @brief ReVtimebase
      * @return
      */
-    AVRational reVtimebase();
+    AVRational ReVtimebase();
 
 
     /**
@@ -67,7 +67,7 @@ public:
      * @return 0 解复用正常运行
      * @return -1 解复用异常
      */
-    int startDemuxer();
+    int StartDemuxer();
 
     /**
      * @brief Rewind 倒退3s
@@ -82,28 +82,28 @@ public:
     int Forward();
 
     /**
-     * @brief start
+     * @brief Start
      * @return 0 成功
      * @return -1 失败
      */
-    int start();
+    int Start();
 
     /**
-     * @brief stop
+     * @brief Stop
      * @return 0 成功
      * @return -1 失败
      */
-    int stop();
+    int Stop();
 
 
 
     /**
-     * @brief pause
+     * @brief Pause
      * @return 0 成功
      * @return -1 失败
      */
 
-    int pause();
+    int Pause();
 
 signals:
 

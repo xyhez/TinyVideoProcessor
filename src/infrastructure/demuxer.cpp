@@ -91,23 +91,23 @@ demuxer::~demuxer(){
     qDebug() << "解复用器资源已清理";
 }
 
-AVCodecParameters* demuxer::reAcoderPar(){
+AVCodecParameters* demuxer::ReAcoderPar(){
     return m_A_coderPar;
 }
 
-AVCodecParameters* demuxer::reVcoderPar(){
+AVCodecParameters* demuxer::ReVcoderPar(){
     return m_V_coderPar;
 }
 
-AVRational demuxer::reAtimebase() {
+AVRational demuxer::ReAtimebase() {
     return m_A_time_base;
 }
 
-AVRational demuxer::reVtimebase() {
+AVRational demuxer::ReVtimebase() {
     return m_V_time_base;
 }
 
-int demuxer::startDemuxer() {
+int demuxer::StartDemuxer() {
     qDebug() << "开始解复用";
 
     if (!m_mediaSource) {
@@ -175,7 +175,7 @@ int demuxer::Forward() {
     return 0;
 }
 
-int demuxer::start() {
+int demuxer::Start() {
     mutex.lock();
     pause_flag = false;
     qDebug() << "解复用线程开始运行";
@@ -184,7 +184,7 @@ int demuxer::start() {
     return 0;
 }
 
-int demuxer::stop() {
+int demuxer::Stop() {
     mutex.lock();
     stop_flag = true;
     qDebug() << "解复用线程被停止";
@@ -193,7 +193,7 @@ int demuxer::stop() {
     return 0;
 }
 
-int demuxer::pause(){
+int demuxer::Pause(){
     mutex.lock();
     pause_flag = true;
     qDebug() << "解复用线程被暂停";

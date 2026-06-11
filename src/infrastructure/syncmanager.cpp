@@ -12,19 +12,19 @@ syncmanager::~syncmanager() {
 
 }
 
-int syncmanager::refreshClock(double clock) {
+int syncmanager::RefreshClock(double clock) {
     QMutexLocker locker(&mutex);
     mainclock = clock;
 
     return 0;
 }
 
-double syncmanager::getClock() const {
+double syncmanager::GetClock() const {
     QMutexLocker locker(&mutex);
     return mainclock;
 }
 
-int syncmanager::Forword() {
+int syncmanager::Forward() {
     QMutexLocker locker(&mutex);
     mainclock += 3000;
 

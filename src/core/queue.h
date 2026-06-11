@@ -33,7 +33,7 @@ public:
 
     }
     ~SyncQueue() {
-        clear();
+        Clear();
     }
 
     /**
@@ -107,7 +107,7 @@ public:
         return item != nullptr;
     }
 
-    void Popfront() {
+    void PopFront() {
         {
             std::unique_lock<std::mutex> lock(mutex_);
             if(raw_queue_.empty()) return;
@@ -117,17 +117,17 @@ public:
     }
 
 // 辅助接口
-    size_t size() {
+    size_t Size() {
         std::lock_guard<std::mutex> lock(mutex_);
         return raw_queue_.size();
     }
 
-    bool empty() {
+    bool Empty() {
         std::lock_guard<std::mutex> lock(mutex_);
         return raw_queue_.empty();
     }
 
-    void clear() {
+    void Clear() {
         std::unique_lock<std::mutex> lock(mutex_);
         while (!raw_queue_.empty()) {
             if (deleter_)

@@ -30,17 +30,17 @@ public:
     ~VideoRender();
 
     // 初始化：传入帧队列、同步管理器、视频帧率（关键！）
-    void initvideoRender(std::shared_ptr<SyncQueue<AVFrame*>> frameQueue,
+    void InitVideoRender(std::shared_ptr<SyncQueue<AVFrame*>> frameQueue,
                          std::shared_ptr<syncmanager> syncManager,
                          double frameRate,
                          double videoTimeBase);
 
-    void startRendering();
-    void stopRendering();
-    void pause() { stopRendering(); }
+    void StartRendering();
+    void StopRendering();
+    void Pause() { StopRendering(); }
 
 private slots:
-    void renderFrame();
+    void RenderFrame();
 
 protected:
     void initializeGL() override;
@@ -48,10 +48,10 @@ protected:
     void paintGL() override;
 
 private:
-    void uploadTexture(AVFrame* frame);
-    void drawFrame();
-    void calcRect(float& x, float& y, float& w, float& h);
-    void freeTextures();
+    void UploadTexture(AVFrame* frame);
+    void DrawFrame();
+    void CalcRect(float& x, float& y, float& w, float& h);
+    void FreeTextures();
 
     std::shared_ptr<SyncQueue<AVFrame*>> m_frameQueue;
     std::shared_ptr<syncmanager> m_syncManager;

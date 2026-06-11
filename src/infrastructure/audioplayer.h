@@ -34,25 +34,25 @@ public:
     AudioPlayer(QObject *p = nullptr);
     ~AudioPlayer();
 
-    void initAudioPlay(AVCodecParameters* codecPar,
+    void InitAudioPlay(AVCodecParameters* codecPar,
                        std::shared_ptr<SyncQueue<AVFrame*>> frameQueue,
                        std::shared_ptr<syncmanager> syncManager,
                        double audioTimeBase);
 
     /**
-     * @brief start
+     * @brief Start
      */
-    void start();
+    void Start();
 
     /**
-     * @brief stop
+     * @brief Stop
      */
-    void stop();
+    void Stop();
 
     /**
-     * @brief pause
+     * @brief Pause
      */
-    void pause();
+    void Pause();
 
     /**
      * @brief Forward 快进3秒
@@ -60,24 +60,24 @@ public:
     void Forward();
 
     /**
-     * @brief volumeUp 增大音量5%
+     * @brief VolumeUp 增大音量5%
      */
-    void volumeUp();
+    void VolumeUp();
 
     /**
-     * @brief volumeDown 减小音量5%
+     * @brief VolumeDown 减小音量5%
      */
-    void volumeDown();
+    void VolumeDown();
 
     /**
-     * @brief startAudioPlay
+     * @brief StartAudioPlay
      */
-    void startAudioPlay();
+    void StartAudioPlay();
 signals:
     /**
-     * @brief e_volume 返回当前的音量
+     * @brief VolumeChanged 返回当前的音量
      */
-    void e_volume(qreal);
+    void VolumeChanged(qreal);
 
 private:
     std::shared_ptr<SyncQueue<AVFrame*>> m_audioFrameQueue;
@@ -114,10 +114,10 @@ private:
     qreal m_volume = 1.0;
 
 private:
-    void initResampler();
-    void initAudioOutput();
-    double calculateHardwareLatency();
-    void run();
+    void InitResampler();
+    void InitAudioOutput();
+    double CalculateHardwareLatency();
+    void Run();
 
 signals:
 };

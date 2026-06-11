@@ -20,11 +20,11 @@ decoder::~decoder() {
     qDebug() << decoder_type << "解码器资源已清理";
 }
 
-void decoder::createConnect() {
+void decoder::CreateConnect() {
 
 }
 
-bool decoder::initHWDecoder()
+bool decoder::InitHWDecoder()
 {
     // return false;
     if (par->codec_type != AVMEDIA_TYPE_VIDEO) {
@@ -97,7 +97,7 @@ bool decoder::initHWDecoder()
     return false;
 }
 
-AVFrame *decoder::transferHWFrame(AVFrame *hwFrame)
+AVFrame *decoder::TransferHWFrame(AVFrame *hwFrame)
 {
     if (!m_isHWDecoder || !hwFrame) {
         return nullptr;
@@ -200,7 +200,7 @@ AVFrame *decoder::transferHWFrame(AVFrame *hwFrame)
     return yuv420pFrame;
 }
 
-int decoder::initDecoder(std::shared_ptr<SyncQueue<AVPacket*>> packetVec
+int decoder::InitDecoder(std::shared_ptr<SyncQueue<AVPacket*>> packetVec
                          ,std::shared_ptr<SyncQueue<AVFrame*>> framevec
                          , AVCodecParameters *coderPar
                          , AVRational time_base) {
@@ -220,7 +220,7 @@ int decoder::initDecoder(std::shared_ptr<SyncQueue<AVPacket*>> packetVec
     if (par->codec_type == AVMEDIA_TYPE_VIDEO) {
         decoder_type = "视频";
         // 视频尝试硬解码
-        initHWDecoder();
+        InitHWDecoder();
     } else {
         decoder_type = "音频";
         // 音频强制软解
@@ -242,7 +242,7 @@ int decoder::initDecoder(std::shared_ptr<SyncQueue<AVPacket*>> packetVec
     return 0;
 }
 
-int decoder::startDecoder() {
+int decoder::StartDecoder() {
     qDebug() << decoder_type << "线程开始解码"
              << (m_isHWDecoder ? "[硬解]" : "[软解]");
 
@@ -293,7 +293,7 @@ int decoder::startDecoder() {
             if (decoder_type == "视频" && m_isHWDecoder &&
                 frame->format == m_hwPixFmt) {
                 // 视频硬解帧：需要转换
-                outFrame = transferHWFrame(frame);
+                outFrame = TransferHWFrame(frame);
                 if (!outFrame) {
                     qDebug() << "硬件帧转换失败，跳过此帧";
                     continue;
@@ -336,7 +336,7 @@ int decoder::startDecoder() {
     return 0;
 }
 
-int decoder::start() {
+int decoder::Start() {
     mutex.lock();
     pause_flag = false;
     qDebug() << decoder_type << "解码线程开始运行";
@@ -345,7 +345,7 @@ int decoder::start() {
     return 0;
 }
 
-int decoder::stop() {
+int decoder::Stop() {
     mutex.lock();
     stop_flag = true;
     qDebug() << decoder_type << "解码线程被停止";
@@ -354,7 +354,7 @@ int decoder::stop() {
     return 0;
 }
 
-int decoder::pause(){
+int decoder::Pause(){
     mutex.lock();
     pause_flag = true;
     qDebug() << decoder_type << "解码线程被暂停";

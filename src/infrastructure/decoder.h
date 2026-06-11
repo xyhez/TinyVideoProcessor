@@ -29,69 +29,69 @@ public:
     /**
      * @brief 创建信号槽
      */
-    void createConnect();
+    void CreateConnect();
 
     /**
-     * @brief initDecoder 初始化解码器
+     * @brief InitDecoder 初始化解码器
      * @param packetVec 包队列的共享指针
      * @param frameVec 帧队列的共享指针
      * @param flag 标志位; 0-音频解码器; 1-视频解码器
      * @return 0 初始化解码器成功
      * @return -1 初始化解码器失败
      */
-    int initDecoder(std::shared_ptr<SyncQueue<AVPacket*>> packetVec
+    int InitDecoder(std::shared_ptr<SyncQueue<AVPacket*>> packetVec
                     ,std::shared_ptr<SyncQueue<AVFrame*>> frameVec
                     ,AVCodecParameters *
                     ,AVRational
                     );
 
     /**
-     * @brief startDecoder 从包队列中取包，开始解码，供主线程调用
+     * @brief StartDecoder 从包队列中取包，开始解码，供主线程调用
      * @return 0 解码正常
      * @return -1 解码异常
      */
-    int startDecoder();
+    int StartDecoder();
 
     /**
-     * @brief start
+     * @brief Start
      * @return 0 成功
      * @return -1 失败
      */
-    int start();
+    int Start();
 
     /**
-     * @brief stop
+     * @brief Stop
      * @return 0 成功
      * @return -1 失败
      */
-    int stop();
+    int Stop();
 
 
 
     /**
-     * @brief pause
+     * @brief Pause
      * @return 0 成功
      * @return -1 失败
      */
-    int pause();
+    int Pause();
 
 
 signals:
 
 private:
     /**
-     * @brief initHWDecoder 初始化硬件解码器
+     * @brief InitHWDecoder 初始化硬件解码器
      * @return true 成功
      * @return false 失败
      */
-    bool initHWDecoder();
+    bool InitHWDecoder();
 
     /**
-     * @brief transferHWFrame 将硬件帧转换为系统内存帧
+     * @brief TransferHWFrame 将硬件帧转换为系统内存帧
      * @param hwFrame 硬件帧
      * @return AVFrame* 转换后的帧，失败返回nullptr
      */
-    AVFrame *transferHWFrame(AVFrame *hwFrame);
+    AVFrame *TransferHWFrame(AVFrame *hwFrame);
 
     std::shared_ptr<SyncQueue<AVPacket*>> m_PacketVec;        ///< 包队列
     std::shared_ptr<SyncQueue<AVFrame*>>  m_FrameVec;         ///< 帧队列

@@ -16,13 +16,13 @@ MainWindow::MainWindow(QWidget *parent)
         return;
     }
 
-    connect(mediaPlayController_.get(), &MediaPlayController::stateChanged,
-            this, &MainWindow::updatePlaybackControls);
-    updatePlaybackControls(mediaPlayController_->state());
+    connect(mediaPlayController_.get(), &MediaPlayController::StateChanged,
+            this, &MainWindow::UpdatePlaybackControls);
+    UpdatePlaybackControls(mediaPlayController_->State());
 
 }
 
-void MainWindow::noticeWindow(QString message)
+void MainWindow::NoticeWindow(QString message)
 {
     QLabel *toast = new QLabel(this);
     toast->setText(message);
@@ -75,20 +75,20 @@ void MainWindow::closeEvent(QCloseEvent *event)
 void MainWindow::keyReleaseEvent(QKeyEvent *ev)
 {
     if (ev->key() == Qt::Key_Space) {
-        if (mediaPlayController_->state() == MediaPlayController::PlaybackState::Playing) {
-            pause();
+        if (mediaPlayController_->State() == MediaPlayController::PlaybackState::Playing) {
+            Pause();
         } else {
-            start();
+            Start();
         }
         ev->accept();
     } else if (ev->key() == Qt::Key_Up) {
-        mediaPlayController_->VolumeUp();
+        VolumeUp();
     } else if (ev->key() == Qt::Key_Down) {
-        mediaPlayController_->VolumeDown();
+        VolumeDown();
     } else if (ev->key() == Qt::Key_Left) {
-        mediaPlayController_->Rewind();
+        Rewind();
     } else if (ev->key() == Qt::Key_Right) {
-        mediaPlayController_->Forward();
+        Forward();
     }
     QMainWindow::keyReleaseEvent(ev);
 }
@@ -99,19 +99,19 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
-void MainWindow::start() {
+void MainWindow::Start() {
     mediaPlayController_->Start();
 }
 
-void MainWindow::stop() {
+void MainWindow::Stop() {
     mediaPlayController_->Stop();
 }
 
-void MainWindow::pause() {
+void MainWindow::Pause() {
     mediaPlayController_->Pause();
 }
 
-void MainWindow::updatePlaybackControls(MediaPlayController::PlaybackState state) {
+void MainWindow::UpdatePlaybackControls(MediaPlayController::PlaybackState state) {
     const bool playing = state == MediaPlayController::PlaybackState::Playing;
     ui->pushButton_play->setEnabled(!playing);
     ui->pushButton_pause->setEnabled(playing);
@@ -127,12 +127,20 @@ void MainWindow::VolumeDown() {
     mediaPlayController_->VolumeDown();
 }
 
+void MainWindow::Rewind() {
+    mediaPlayController_->Rewind();
+}
+
+void MainWindow::Forward() {
+    mediaPlayController_->Forward();
+}
+
 void MainWindow::on_pushButton_play_clicked()
 {
-    start();
+    Start();
 }
 
 void MainWindow::on_pushButton_pause_clicked()
 {
-    pause();
+    Pause();
 }

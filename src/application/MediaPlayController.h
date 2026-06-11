@@ -59,10 +59,10 @@ public:
     void Rewind();
     void Forward();
 
-    PlaybackState state() const;
+    PlaybackState State() const;
 
 signals:
-    void stateChanged(PlaybackState state);
+    void StateChanged(PlaybackState state);
 
 private:
     // 队列

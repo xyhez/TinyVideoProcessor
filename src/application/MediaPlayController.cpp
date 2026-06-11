@@ -49,13 +49,13 @@ bool MediaPlayController::Initialize(const QString& filePath, QWidget *rendererC
 
     // 5.将对象初始化并移动到对应的线程
     demuxer_->moveToThread(demuxerTH_.get());
-    Adecoder_->initDecoder(APacket_,AFrame_,demuxer_->reAcoderPar(),demuxer_->reAtimebase());
+    Adecoder_->InitDecoder(APacket_,AFrame_,demuxer_->ReAcoderPar(),demuxer_->ReAtimebase());
     Adecoder_->moveToThread(AdecoderTH_.get());
-    Vdecoder_->initDecoder(VPacket_,VFrame_,demuxer_->reVcoderPar(),demuxer_->reVtimebase());
+    Vdecoder_->InitDecoder(VPacket_,VFrame_,demuxer_->ReVcoderPar(),demuxer_->ReVtimebase());
     Vdecoder_->moveToThread(VdecoderTH_.get());
-    audioplay_->initAudioPlay(demuxer_->reAcoderPar(), AFrame_, syncManager_, sourceInfo.A_timeBase);
+    audioplay_->InitAudioPlay(demuxer_->ReAcoderPar(), AFrame_, syncManager_, sourceInfo.A_timeBase);
     audioplay_->moveToThread(audioplayTH_.get());
-    videoRender_->initvideoRender(VFrame_, syncManager_, sourceInfo.FrameRate, sourceInfo.V_timeBase);
+    videoRender_->InitVideoRender(VFrame_, syncManager_, sourceInfo.FrameRate, sourceInfo.V_timeBase);
 
     //6.设置videorender
     if (rendererContainer) {
@@ -71,16 +71,16 @@ bool MediaPlayController::Initialize(const QString& filePath, QWidget *rendererC
 
 void MediaPlayController::CreateConnects() {
     connect(demuxerTH_.get(),  &QThread::started,
-        demuxer_.get(), &demuxer::startDemuxer);
+        demuxer_.get(), &demuxer::StartDemuxer);
 
     connect(AdecoderTH_.get(), &QThread::started,
-        Adecoder_.get(), &decoder::startDecoder);
+        Adecoder_.get(), &decoder::StartDecoder);
 
     connect(VdecoderTH_.get(), &QThread::started,
-        Vdecoder_.get(), &decoder::startDecoder);
+        Vdecoder_.get(), &decoder::StartDecoder);
 
     connect(audioplayTH_.get(), &QThread::started,
-        audioplay_.get(), &AudioPlayer::startAudioPlay);
+        audioplay_.get(), &AudioPlayer::StartAudioPlay);
 }
 
 void MediaPlayController::ReleaseResources() {
@@ -90,11 +90,11 @@ void MediaPlayController::ReleaseResources() {
     if (AFrame_)  { AFrame_->SetStopFlag(true);  AFrame_->WakeAll();  }
     if (VFrame_)  { VFrame_->SetStopFlag(true);  VFrame_->WakeAll();  }
 
-    if (demuxer_)   demuxer_->stop();
-    if (Adecoder_)  Adecoder_->stop();
-    if (Vdecoder_)  Vdecoder_->stop();
-    if (audioplay_) audioplay_->stop();
-    if (videoRender_) videoRender_->stopRendering();
+    if (demuxer_)   demuxer_->Stop();
+    if (Adecoder_)  Adecoder_->Stop();
+    if (Vdecoder_)  Vdecoder_->Stop();
+    if (audioplay_) audioplay_->Stop();
+    if (videoRender_) videoRender_->StopRendering();
 
     auto stopThread = [](std::unique_ptr<QThread>& th) {
         if (th) {
@@ -122,7 +122,7 @@ void MediaPlayController::ReleaseResources() {
     mediaSource_.reset();
 }
 
-MediaPlayController::PlaybackState MediaPlayController::state() const {
+MediaPlayController::PlaybackState MediaPlayController::State() const {
     return state_;
 }
 
@@ -132,7 +132,7 @@ void MediaPlayController::SetState(PlaybackState state) {
     }
 
     state_ = state;
-    emit stateChanged(state_);
+    emit StateChanged(state_);
 }
 
 void MediaPlayController::Start() {
@@ -143,11 +143,11 @@ void MediaPlayController::Start() {
     VdecoderTH_->start();
     audioplayTH_->start();
 
-    demuxer_->start();
-    Adecoder_->start();
-    Vdecoder_->start();
-    audioplay_->start();
-    videoRender_->startRendering();
+    demuxer_->Start();
+    Adecoder_->Start();
+    Vdecoder_->Start();
+    audioplay_->Start();
+    videoRender_->StartRendering();
 }
 
 void MediaPlayController::Stop() {
@@ -163,28 +163,28 @@ void MediaPlayController::Stop() {
     AFrame_->WakeAll();
     VFrame_->WakeAll();
 
-    demuxer_->stop();
-    Adecoder_->stop();
-    Vdecoder_->stop();
-    audioplay_->stop();
-    videoRender_->stopRendering();
+    demuxer_->Stop();
+    Adecoder_->Stop();
+    Vdecoder_->Stop();
+    audioplay_->Stop();
+    videoRender_->StopRendering();
 }
 
 void MediaPlayController::Pause() {
     SetState(PlaybackState::Paused);
-    demuxer_->pause();
-    Adecoder_->pause();
-    Vdecoder_->pause();
-    audioplay_->pause();
-    videoRender_->pause();
+    demuxer_->Pause();
+    Adecoder_->Pause();
+    Vdecoder_->Pause();
+    audioplay_->Pause();
+    videoRender_->Pause();
 }
 
 void MediaPlayController::VolumeUp() {
-    audioplay_->volumeUp();
+    audioplay_->VolumeUp();
 }
 
 void MediaPlayController::VolumeDown() {
-    audioplay_->volumeDown();
+    audioplay_->VolumeDown();
 }
 
 void MediaPlayController::Rewind() {
@@ -195,7 +195,7 @@ void MediaPlayController::Rewind() {
 
 void MediaPlayController::Forward() {
     Pause();
-    syncManager_->Forword();
+    syncManager_->Forward();
     demuxer_->Forward();
     Start();
 }

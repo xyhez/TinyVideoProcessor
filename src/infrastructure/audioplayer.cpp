@@ -4,7 +4,7 @@ AudioPlayer::AudioPlayer(QObject *p)
     : QObject(p)
     , m_pcmBuffer(192000, 0)
 {
-    initResampler();
+    InitResampler();
     m_statusTimer.start();
     m_latencyUpdateTimer.start();
 }
@@ -23,7 +23,7 @@ AudioPlayer::~AudioPlayer() {
     }
 }
 
-void AudioPlayer::initAudioPlay(AVCodecParameters* codecPar,
+void AudioPlayer::InitAudioPlay(AVCodecParameters* codecPar,
                                 std::shared_ptr<SyncQueue<AVFrame*>> frameQueue,
                                 std::shared_ptr<syncmanager> syncManager,
                                 double audioTimeBase)
@@ -37,17 +37,17 @@ void AudioPlayer::initAudioPlay(AVCodecParameters* codecPar,
         m_dstChannels = codecPar->ch_layout.nb_channels;
     }
 
-    initAudioOutput();
+    InitAudioOutput();
 
     qDebug() << "AudioPlayer initialized: Rate =" << m_dstRate
              << "Hz, Channels =" << m_dstChannels;
 }
 
-void AudioPlayer::initResampler() {
+void AudioPlayer::InitResampler() {
     m_swr = swr_alloc();
 }
 
-void AudioPlayer::initAudioOutput()
+void AudioPlayer::InitAudioOutput()
 {
     QAudioFormat fmt;
     fmt.setSampleRate(m_dstRate);
@@ -68,7 +68,7 @@ void AudioPlayer::initAudioOutput()
              << m_dstRate << "Hz," << m_dstChannels << "channels";
 }
 
-double AudioPlayer::calculateHardwareLatency()
+double AudioPlayer::CalculateHardwareLatency()
 {
     if (!m_audioSink || !m_ioDevice) {
         return m_lastHardwareLatency;
@@ -91,7 +91,7 @@ double AudioPlayer::calculateHardwareLatency()
     return m_lastHardwareLatency;
 }
 
-void AudioPlayer::startAudioPlay()
+void AudioPlayer::StartAudioPlay()
 {
     if (m_audioSink) {
         m_ioDevice = m_audioSink->start();
@@ -101,10 +101,10 @@ void AudioPlayer::startAudioPlay()
         }
     }
 
-    run();
+    Run();
 }
 
-void AudioPlayer::run()
+void AudioPlayer::Run()
 {
     m_stopFlag = false;
     m_pauseFlag = false;
@@ -144,7 +144,7 @@ void AudioPlayer::run()
             continue;
         }
 
-        // if((tmp->pts * av_q2d(tmp->time_base) * 1000) < m_syncManager->getClock()) {
+        // if((tmp->pts * av_q2d(tmp->time_base) * 1000) < m_syncManager->GetClock()) {
         //     av_frame_free(&tmp);
         //     continue;
         // }
@@ -193,7 +193,7 @@ void AudioPlayer::run()
         double audioclock = tmp->pts * m_audioTimeBase * 1000;
         // qDebug()<<"audioclock："<<audioclock;
         if (m_syncManager) {
-            m_syncManager->refreshClock(audioclock);
+            m_syncManager->RefreshClock(audioclock);
         }
 
         int pcmBytes = converted * m_dstChannels * m_bytesPerSample;
@@ -232,12 +232,12 @@ void AudioPlayer::run()
         av_frame_unref(tmp);
         av_frame_free(&tmp);
 
-        double latency = calculateHardwareLatency();
+        double latency = CalculateHardwareLatency();
 
         if (m_statusTimer.elapsed() > statusInterval) {
             qDebug() << "AudioPlayer: Status -"
                      << "Written:" << (m_bytesWrittenTotal / 1024 / 1024) << "MB"
-                     << "Clock:" << (m_syncManager ? m_syncManager->getClock() : 0.0)
+                     << "Clock:" << (m_syncManager ? m_syncManager->GetClock() : 0.0)
                      << "Latency:" << QString::number(m_lastHardwareLatency, 'f', 3) << "s";
             m_statusTimer.restart();
         }
@@ -246,14 +246,14 @@ void AudioPlayer::run()
     qDebug() << "AudioPlayer: Playback thread finished";
 }
 
-void AudioPlayer::start()
+void AudioPlayer::Start()
 {
     m_stopFlag = false;
     m_pauseFlag = false;
     qDebug() << "AudioPlayer started";
 }
 
-void AudioPlayer::stop()
+void AudioPlayer::Stop()
 {
     m_stopFlag = true;
 
@@ -269,7 +269,7 @@ void AudioPlayer::stop()
     qDebug() << "AudioPlayer stopped";
 }
 
-void AudioPlayer::pause()
+void AudioPlayer::Pause()
 {
     m_pauseFlag = true;
 
@@ -284,22 +284,22 @@ void AudioPlayer::Forward() {
     m_audioSink->suspend();
 }
 
-void AudioPlayer::volumeUp() {
+void AudioPlayer::VolumeUp() {
     qDebug()<<"增大音量";
     if(m_volume>0.95) {
         m_volume = 1.0;
     }else{
         m_volume+=0.05;
     }
-    emit e_volume(m_volume);
+    emit VolumeChanged(m_volume);
 }
 
-void AudioPlayer::volumeDown(){
+void AudioPlayer::VolumeDown(){
     qDebug()<<"减小音量";
     if(m_volume>0.05){
         m_volume-=0.05;
     }else{
         m_volume = 0.0;
     }
-    emit e_volume(m_volume);
+    emit VolumeChanged(m_volume);
 }
