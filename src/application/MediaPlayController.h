@@ -30,6 +30,12 @@ inline auto frameDeleter  = [](AVFrame*  f) { if (f) av_frame_free(&f);  };
 class MediaPlayController :public QObject{
     Q_OBJECT
 public:
+    enum class PlaybackState {
+        Stopped,
+        Playing,
+        Paused
+    };
+
     explicit MediaPlayController(QObject* parent = nullptr);
     ~MediaPlayController();
 
@@ -52,6 +58,11 @@ public:
     // seek
     void Rewind();
     void Forward();
+
+    PlaybackState state() const;
+
+signals:
+    void stateChanged(PlaybackState state);
 
 private:
     // 队列
@@ -79,9 +90,10 @@ private:
     std::unique_ptr<QThread> VdecoderTH_;
     std::unique_ptr<QThread> audioplayTH_;
 
-    bool pauseFlag_ = false;
+    PlaybackState state_ = PlaybackState::Stopped;
 
     void ReleaseResources();
+    void SetState(PlaybackState state);
 };
 
 

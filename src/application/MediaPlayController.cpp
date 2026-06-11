@@ -122,8 +122,21 @@ void MediaPlayController::ReleaseResources() {
     mediaSource_.reset();
 }
 
+MediaPlayController::PlaybackState MediaPlayController::state() const {
+    return state_;
+}
+
+void MediaPlayController::SetState(PlaybackState state) {
+    if (state_ == state) {
+        return;
+    }
+
+    state_ = state;
+    emit stateChanged(state_);
+}
+
 void MediaPlayController::Start() {
-    pauseFlag_ = false;
+    SetState(PlaybackState::Playing);
 
     demuxerTH_->start();
     AdecoderTH_->start();
@@ -138,6 +151,7 @@ void MediaPlayController::Start() {
 }
 
 void MediaPlayController::Stop() {
+    SetState(PlaybackState::Stopped);
 
     APacket_->SetStopFlag(true);
     VPacket_->SetStopFlag(true);
@@ -157,7 +171,7 @@ void MediaPlayController::Stop() {
 }
 
 void MediaPlayController::Pause() {
-    pauseFlag_ = true;
+    SetState(PlaybackState::Paused);
     demuxer_->pause();
     Adecoder_->pause();
     Vdecoder_->pause();
