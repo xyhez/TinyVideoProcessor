@@ -25,10 +25,12 @@ AudioPlayer::~AudioPlayer() {
 
 void AudioPlayer::initAudioPlay(AVCodecParameters* codecPar,
                                 std::shared_ptr<SyncQueue<AVFrame*>> frameQueue,
-                                std::shared_ptr<syncmanager> syncManager)
+                                std::shared_ptr<syncmanager> syncManager,
+                                double audioTimeBase)
 {
     m_audioFrameQueue = frameQueue;
     m_syncManager = syncManager;
+    m_audioTimeBase = audioTimeBase;
 
     if (codecPar) {
         m_dstRate = codecPar->sample_rate;
@@ -148,8 +150,6 @@ void AudioPlayer::run()
         // }
 
         if (m_first) {
-            m_audioTimeBase = tmp->time_base;
-
             AVChannelLayout inLayout = tmp->ch_layout;
             int inRate = tmp->sample_rate;
             AVSampleFormat inFmt = (AVSampleFormat)tmp->format;
@@ -190,7 +190,10 @@ void AudioPlayer::run()
             continue;
         }
 
-        double audioclock = tmp->pts * g_videoinfo.A_timeBase * 1000;
+        const double frameTimeBase = tmp->time_base.den > 0
+            ? av_q2d(tmp->time_base)
+            : m_audioTimeBase;
+        double audioclock = tmp->pts * frameTimeBase * 1000;
         // qDebug()<<"audioclock："<<audioclock;
         if (m_syncManager) {
             m_syncManager->refreshClock(audioclock);

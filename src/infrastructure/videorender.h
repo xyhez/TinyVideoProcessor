@@ -11,7 +11,6 @@
 
 #include "infrastructure/syncmanager.h"
 #include "core/queue.h"
-#include "global.h"
 
 extern "C" {
 #include <libavutil/frame.h>
@@ -32,7 +31,9 @@ public:
 
     // 初始化：传入帧队列、同步管理器、视频帧率（关键！）
     void initvideoRender(std::shared_ptr<SyncQueue<AVFrame*>> frameQueue,
-                         std::shared_ptr<syncmanager> syncManager);
+                         std::shared_ptr<syncmanager> syncManager,
+                         double frameRate,
+                         double videoTimeBase);
 
     void startRendering();
     void stopRendering();
@@ -64,6 +65,7 @@ private:
 
     QTimer* m_timer = nullptr;
     int m_frameInterval = 33;
+    double m_videoTimeBase = 0.0;
     bool m_hasFrame = false;
 
     int m_videoW = 0, m_videoH = 0;

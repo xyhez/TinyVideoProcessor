@@ -17,12 +17,12 @@
 
 #include "infrastructure/syncmanager.h"
 #include "core/queue.h"
-#include "global.h"
 
 extern "C" {
 #include <libswresample/swresample.h>
 #include <libavutil/time.h>
 #include <libavutil/frame.h>
+#include <libavutil/rational.h>
 #include <libavcodec/avcodec.h>
 }
 
@@ -36,7 +36,8 @@ public:
 
     void initAudioPlay(AVCodecParameters* codecPar,
                        std::shared_ptr<SyncQueue<AVFrame*>> frameQueue,
-                       std::shared_ptr<syncmanager> syncManager);
+                       std::shared_ptr<syncmanager> syncManager,
+                       double audioTimeBase);
 
     /**
      * @brief start
@@ -81,7 +82,7 @@ signals:
 private:
     std::shared_ptr<SyncQueue<AVFrame*>> m_audioFrameQueue;
     std::shared_ptr<syncmanager> m_syncManager;
-    AVRational m_audioTimeBase;
+    double m_audioTimeBase = 0.0;
     bool m_first = true;
 
     SwrContext *m_swr = nullptr;

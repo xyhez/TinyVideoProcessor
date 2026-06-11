@@ -8,7 +8,7 @@
 #include <memory>
 
 #include "core/queue.h"
-#include "domain/FileMediaSource.h"
+#include "domain/IMediaSource.h"
 
 extern "C" {
 #include <libavcodec/avcodec.h>

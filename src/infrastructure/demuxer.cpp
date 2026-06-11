@@ -1,5 +1,4 @@
 #include "demuxer.h"
-#include "global.h"
 
 demuxer::demuxer(std::shared_ptr<IMediaSource> mediaSource
                  ,std::shared_ptr<SyncQueue<AVPacket*>> APacket
@@ -49,15 +48,18 @@ demuxer::demuxer(std::shared_ptr<IMediaSource> mediaSource
             m_V_time_base = ic->streams[i]->time_base;
 
             // 填充媒体源信息
-            info.FrameRate = av_q2d(ic->streams[i]->avg_frame_rate);
+            info.width_ = ic->streams[i]->codecpar->width;
+            info.height_ = ic->streams[i]->codecpar->height;
+            info.CodecId_ = ic->streams[i]->codecpar->codec_id;
+            const double frameRate = av_q2d(ic->streams[i]->avg_frame_rate);
+            if (frameRate > 0.0) {
+                info.FrameRate = frameRate;
+            }
             info.V_timeBase = av_q2d(ic->streams[i]->time_base);
-            info.duration_ = ic->duration/1000000;
+            if (ic->duration > 0) {
+                info.duration_ = ic->duration/1000000;
+            }
 
-            // 同步到全局 g_videoinfo（兼容现有代码）
-            g_videoinfo.videoname = info.filepath_.toStdString();
-            g_videoinfo.FrameRate = info.FrameRate;
-            g_videoinfo.V_timeBase = info.V_timeBase;
-            g_videoinfo.duration = info.duration_;
         }
         else if(ic->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
             ///< 找到音频流
@@ -76,8 +78,6 @@ demuxer::demuxer(std::shared_ptr<IMediaSource> mediaSource
             // 填充媒体源信息
             info.A_timeBase = av_q2d(ic->streams[i]->time_base);
 
-            // 同步到全局 g_videoinfo（兼容现有代码）
-            g_videoinfo.A_timeBase = info.A_timeBase;
         }
         else if(ic->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_SUBTITLE) {
             ///< 找到字幕流

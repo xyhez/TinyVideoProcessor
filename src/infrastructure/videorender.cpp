@@ -23,13 +23,16 @@ VideoRender::~VideoRender()
 }
 
 void VideoRender::initvideoRender(std::shared_ptr<SyncQueue<AVFrame*>> frameQueue,
-                                  std::shared_ptr<syncmanager> syncManager)
+                                  std::shared_ptr<syncmanager> syncManager,
+                                  double frameRate,
+                                  double videoTimeBase)
 {
     m_frameQueue = frameQueue;
     m_syncManager = syncManager;
+    m_videoTimeBase = videoTimeBase;
 
-    if (g_videoinfo.FrameRate > 0 && g_videoinfo.FrameRate < 120) {
-        m_frameInterval = qRound(1000.0 / g_videoinfo.FrameRate);
+    if (frameRate > 0 && frameRate < 120) {
+        m_frameInterval = qRound(1000.0 / frameRate);
     }
 }
 
@@ -67,7 +70,10 @@ void VideoRender::renderFrame()
         return;
     }
 
-    double videoPts = nextFrame->pts * g_videoinfo.V_timeBase * 1000.0;
+    const double frameTimeBase = nextFrame->time_base.den > 0
+        ? av_q2d(nextFrame->time_base)
+        : m_videoTimeBase;
+    double videoPts = nextFrame->pts * frameTimeBase * 1000.0;
     double audioPts = m_syncManager->getClock()-20;
     double diff = videoPts - audioPts;
     // qDebug()<<"时钟:"<<audioPts<<"  当前视频帧的时间:"<<videoPts<<" 差距:"<<diff;

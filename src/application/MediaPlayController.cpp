@@ -32,6 +32,7 @@ bool MediaPlayController::Initialize(const QString& filePath, QWidget *rendererC
 
     //3.基层对象构造
     demuxer_ = new demuxer(mediaSource_,APacket_,VPacket_,AFrame_,VFrame_);
+    const Fileinfo& sourceInfo = mediaSource_->GetSourceInfo();
     Adecoder_ = new decoder();
     Vdecoder_ = new decoder();
     audioplay_ = new AudioPlayer();
@@ -50,9 +51,9 @@ bool MediaPlayController::Initialize(const QString& filePath, QWidget *rendererC
     Adecoder_->moveToThread(AdecoderTH_);
     Vdecoder_->initDecoder(VPacket_,VFrame_,demuxer_->reVcoderPar(),demuxer_->reVtimebase());
     Vdecoder_->moveToThread(VdecoderTH_);
-    audioplay_->initAudioPlay(demuxer_->reAcoderPar(), AFrame_, syncManager_);
+    audioplay_->initAudioPlay(demuxer_->reAcoderPar(), AFrame_, syncManager_, sourceInfo.A_timeBase);
     audioplay_->moveToThread(audioplayTH_);
-    videoRender_->initvideoRender(VFrame_, syncManager_);
+    videoRender_->initvideoRender(VFrame_, syncManager_, sourceInfo.FrameRate, sourceInfo.V_timeBase);
 
     //6.设置videorender
     if (rendererContainer) {

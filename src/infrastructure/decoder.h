@@ -8,7 +8,6 @@
 #include <memory>
 
 #include "core/queue.h"
-#include "global.h"
 
 extern "C" {
 #include <libavcodec/avcodec.h>
