@@ -14,8 +14,8 @@
 #include "infrastructure/syncmanager.h"
 #include "infrastructure/videorender.h"
 
-constexpr size_t kPacketQueueMax = 30;
-constexpr size_t kFrameQueueMax  = 30;
+constexpr size_t kPacketQueueMax = 300;
+constexpr size_t kFrameQueueMax  = 300;
 
 inline auto packetDeleter = [](AVPacket* p) { if (p) av_packet_free(&p); };
 inline auto frameDeleter  = [](AVFrame*  f) { if (f) av_frame_free(&f);  };

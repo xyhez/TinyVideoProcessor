@@ -13,6 +13,10 @@ decoder::~decoder() {
     if (m_hwDeviceCtx) {
         av_buffer_unref(&m_hwDeviceCtx);
     }
+    if (m_swsCtx) {
+        sws_freeContext(m_swsCtx);
+        m_swsCtx = nullptr;
+    }
     qDebug() << decoder_type << "解码器资源已清理";
 }
 
@@ -164,16 +168,14 @@ AVFrame *decoder::transferHWFrame(AVFrame *hwFrame)
         return nullptr;
     }
 
-    // 创建/复用转换上下文
-    static SwsContext *sws_ctx = nullptr;
-    sws_ctx = sws_getCachedContext(sws_ctx,
+    m_swsCtx = sws_getCachedContext(m_swsCtx,
                                    nv12Frame->width, nv12Frame->height,
                                    AV_PIX_FMT_NV12,
                                    yuv420pFrame->width, yuv420pFrame->height,
                                    AV_PIX_FMT_YUV420P,
                                    SWS_BILINEAR, nullptr, nullptr, nullptr);
 
-    if (!sws_ctx) {
+    if (!m_swsCtx) {
         qDebug() << "创建 sws 上下文失败";
         av_frame_free(&nv12Frame);
         av_frame_free(&yuv420pFrame);
@@ -181,7 +183,7 @@ AVFrame *decoder::transferHWFrame(AVFrame *hwFrame)
     }
 
 
-    sws_scale(sws_ctx,
+    sws_scale(m_swsCtx,
               nv12Frame->data, nv12Frame->linesize,
               0, nv12Frame->height,
               yuv420pFrame->data, yuv420pFrame->linesize);

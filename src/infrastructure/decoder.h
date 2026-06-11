@@ -122,6 +122,7 @@ private:
     AVBufferRef *m_hwDeviceCtx = nullptr;                   ///< 硬件设备上下文
     enum AVPixelFormat m_hwPixFmt = AV_PIX_FMT_NONE;        ///< 硬件像素格式
     enum AVPixelFormat m_swPixFmt = AV_PIX_FMT_NONE;        ///< 软件像素格式
+    SwsContext *m_swsCtx = nullptr;                         ///< 硬解帧格式转换上下文
 };
 
 #endif // DECODER_H

@@ -46,6 +46,12 @@ public:
             cv_not_full_.wait(lock, [this]{ return
                     raw_queue_.size() < max_size_ || stop_flag_;
             });
+            if (stop_flag_) {
+                if (deleter_) {
+                    deleter_(item);
+                }
+                return;
+            }
             raw_queue_.push_back(item);
             cv_not_empty_.notify_one();
         }

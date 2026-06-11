@@ -1,5 +1,7 @@
 ﻿#include "syncmanager.h"
 
+#include <QMutexLocker>
+
 syncmanager::syncmanager(QObject *parent)
     : QObject{parent}
 {
@@ -11,9 +13,8 @@ syncmanager::~syncmanager() {
 }
 
 int syncmanager::refreshClock(double clock) {
-    mutex.lock();
+    QMutexLocker locker(&mutex);
     mainclock = clock;
-    mutex.unlock();
 
     return 0;
 }
@@ -24,9 +25,8 @@ double syncmanager::getClock() const {
 }
 
 int syncmanager::Forword() {
-    mutex.lock();
-    mainclock+=3000;
-    mutex.unlock();
+    QMutexLocker locker(&mutex);
+    mainclock += 3000;
 
     return 0;
 }
