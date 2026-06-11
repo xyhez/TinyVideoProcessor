@@ -3,8 +3,6 @@
 //
 
 #include "MediaPlayController.h"
-#include "domain/FileMediaSource.h"
-
 #include <qlayout.h>
 
 MediaPlayController::MediaPlayController(QObject *parent)
@@ -17,7 +15,7 @@ MediaPlayController::~MediaPlayController() {
     ReleaseResources();
 }
 
-bool MediaPlayController::Initialize(const QString& filePath, QWidget *rendererContainer) {
+bool MediaPlayController::Initialize(std::shared_ptr<IMediaSource> mediaSource, QWidget *rendererContainer) {
     // 1.初始化队列
     APacket_ = std::make_shared<SyncQueue<AVPacket*>>(kPacketQueueMax, packetDeleter);
     VPacket_ = std::make_shared<SyncQueue<AVPacket*>>(kPacketQueueMax, packetDeleter);
@@ -25,10 +23,14 @@ bool MediaPlayController::Initialize(const QString& filePath, QWidget *rendererC
     VFrame_ = std::make_shared<SyncQueue<AVFrame*>>(kFrameQueueMax,  frameDeleter);
 
     //2.初始化媒体源
-    mediaSource_ = std::make_shared<FileMediaSource>();
-    mediaSource_->SetInfo(filePath);
+    if (!mediaSource) {
+        qCritical() << "Media source is null";
+        return false;
+    }
+
+    mediaSource_ = mediaSource;
     if (!mediaSource_->Open()) {
-        qCritical() << "媒体源打开失败:" << filePath;
+        qCritical() << "Failed to open media source";
         return false;
     }
 

@@ -40,7 +40,7 @@ public:
     ~MediaPlayController();
 
     // 初始化：传入媒体源+渲染容器
-    bool Initialize(const QString& filePath,
+    bool Initialize(std::shared_ptr<IMediaSource> mediaSource,
         QWidget* rendererContainer);
 
     // 链接信号槽

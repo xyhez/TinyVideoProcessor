@@ -6,6 +6,7 @@
 #include <QKeyEvent>
 #include <QPropertyAnimation>
 #include <QLabel>
+#include <memory>
 
 #include "application/MediaPlayController.h"
 

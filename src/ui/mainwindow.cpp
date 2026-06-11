@@ -1,5 +1,6 @@
 #include "ui/mainwindow.h"
 #include "ui_mainwindow.h"
+#include "domain/FileMediaSource.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -11,7 +12,8 @@ MainWindow::MainWindow(QWidget *parent)
 
     //1.应用层初始化
     QString filepath = "D:\\githubProject\\TinyVideoProcessor\\resource\\动物发现自己被绿.mp4";
-    if (!mediaPlayController_->Initialize(filepath, ui->video_widget)) {
+    auto mediaSource = std::make_shared<FileMediaSource>(filepath);
+    if (!mediaPlayController_->Initialize(mediaSource, ui->video_widget)) {
         qCritical() << "Controller 初始化失败";
         return;
     }
