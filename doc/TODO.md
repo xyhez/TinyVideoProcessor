@@ -14,16 +14,18 @@
 
 ## 任务 1: 梳理当前播放控制链路
 
-- [ ] 检查 `MediaPlayController::Start()`、`Pause()`、`Stop()` 当前行为。
-- [ ] 检查 `demuxer::Rewind()`、`demuxer::Forward()` 空实现。
-- [ ] 检查 `syncmanager::Forward()` 是否应该被通用 Seek 时钟重置替代。
-- [ ] 明确当前队列停止标志、唤醒、清空的调用顺序。
-- [ ] 明确 decoder 是否已有 flush 能力，没有则计划新增。
+- [x] 检查 `MediaPlayController::Start()`、`Pause()`、`Stop()` 当前行为。
+- [x] 检查 `demuxer::Rewind()`、`demuxer::Forward()` 空实现。
+- [x] 检查 `syncmanager::Forward()` 是否应该被通用 Seek 时钟重置替代。
+- [x] 明确当前队列停止标志、唤醒、清空的调用顺序。
+- [x] 明确 decoder 是否已有 flush 能力，没有则计划新增。
+
+产出报告：`doc/Phase1_1_任务1_播放控制链路梳理报告.md`
 
 验收：
 
-- [ ] 写清楚当前 Seek 缺失点。
-- [ ] 确认后续改动不需要让 `MainWindow` 直接依赖基础设施层。
+- [x] 写清楚当前 Seek 缺失点。
+- [x] 确认后续改动不需要让 `MainWindow` 直接依赖基础设施层。
 
 ## 任务 2: 为队列补齐 Seek 所需能力
 
