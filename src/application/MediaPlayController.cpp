@@ -7,7 +7,9 @@
 
 #include <qlayout.h>
 
-MediaPlayController::MediaPlayController(QObject *parent) {
+MediaPlayController::MediaPlayController(QObject *parent)
+    : QObject(parent)
+{
 
 }
 
@@ -31,28 +33,28 @@ bool MediaPlayController::Initialize(const QString& filePath, QWidget *rendererC
     }
 
     //3.基层对象构造
-    demuxer_ = new demuxer(mediaSource_,APacket_,VPacket_,AFrame_,VFrame_);
+    demuxer_ = std::make_unique<demuxer>(mediaSource_,APacket_,VPacket_,AFrame_,VFrame_);
     const Fileinfo& sourceInfo = mediaSource_->GetSourceInfo();
-    Adecoder_ = new decoder();
-    Vdecoder_ = new decoder();
-    audioplay_ = new AudioPlayer();
+    Adecoder_ = std::make_unique<decoder>();
+    Vdecoder_ = std::make_unique<decoder>();
+    audioplay_ = std::make_unique<AudioPlayer>();
     videoRender_ = new VideoRender(rendererContainer);
     syncManager_ = std::make_shared<syncmanager>();
 
     // 4.子线程初始化
-    demuxerTH_ = new QThread(this);
-    AdecoderTH_ = new QThread(this);
-    VdecoderTH_ = new QThread(this);
-    audioplayTH_ = new QThread(this);
+    demuxerTH_ = std::make_unique<QThread>();
+    AdecoderTH_ = std::make_unique<QThread>();
+    VdecoderTH_ = std::make_unique<QThread>();
+    audioplayTH_ = std::make_unique<QThread>();
 
     // 5.将对象初始化并移动到对应的线程
-    demuxer_->moveToThread(demuxerTH_);
+    demuxer_->moveToThread(demuxerTH_.get());
     Adecoder_->initDecoder(APacket_,AFrame_,demuxer_->reAcoderPar(),demuxer_->reAtimebase());
-    Adecoder_->moveToThread(AdecoderTH_);
+    Adecoder_->moveToThread(AdecoderTH_.get());
     Vdecoder_->initDecoder(VPacket_,VFrame_,demuxer_->reVcoderPar(),demuxer_->reVtimebase());
-    Vdecoder_->moveToThread(VdecoderTH_);
+    Vdecoder_->moveToThread(VdecoderTH_.get());
     audioplay_->initAudioPlay(demuxer_->reAcoderPar(), AFrame_, syncManager_, sourceInfo.A_timeBase);
-    audioplay_->moveToThread(audioplayTH_);
+    audioplay_->moveToThread(audioplayTH_.get());
     videoRender_->initvideoRender(VFrame_, syncManager_, sourceInfo.FrameRate, sourceInfo.V_timeBase);
 
     //6.设置videorender
@@ -68,17 +70,17 @@ bool MediaPlayController::Initialize(const QString& filePath, QWidget *rendererC
 }
 
 void MediaPlayController::CreateConnects() {
-    connect(demuxerTH_,  &QThread::started,
-        demuxer_, &demuxer::startDemuxer);
+    connect(demuxerTH_.get(),  &QThread::started,
+        demuxer_.get(), &demuxer::startDemuxer);
 
-    connect(AdecoderTH_, &QThread::started,
-        Adecoder_, &decoder::startDecoder);
+    connect(AdecoderTH_.get(), &QThread::started,
+        Adecoder_.get(), &decoder::startDecoder);
 
-    connect(VdecoderTH_, &QThread::started,
-        Vdecoder_, &decoder::startDecoder);
+    connect(VdecoderTH_.get(), &QThread::started,
+        Vdecoder_.get(), &decoder::startDecoder);
 
-    connect(audioplayTH_, &QThread::started,
-        audioplay_, &AudioPlayer::startAudioPlay);
+    connect(audioplayTH_.get(), &QThread::started,
+        audioplay_.get(), &AudioPlayer::startAudioPlay);
 }
 
 void MediaPlayController::ReleaseResources() {
@@ -94,12 +96,11 @@ void MediaPlayController::ReleaseResources() {
     if (audioplay_) audioplay_->stop();
     if (videoRender_) videoRender_->stopRendering();
 
-    auto stopThread = [](QThread*& th) {
+    auto stopThread = [](std::unique_ptr<QThread>& th) {
         if (th) {
             th->quit();
             th->wait();
-            delete th;
-            th = nullptr;
+            th.reset();
         }
     };
     stopThread(demuxerTH_);
@@ -107,10 +108,10 @@ void MediaPlayController::ReleaseResources() {
     stopThread(VdecoderTH_);
     stopThread(audioplayTH_);
 
-    delete demuxer_;    demuxer_    = nullptr;
-    delete Adecoder_;   Adecoder_   = nullptr;
-    delete Vdecoder_;   Vdecoder_   = nullptr;
-    delete audioplay_;  audioplay_  = nullptr;
+    demuxer_.reset();
+    Adecoder_.reset();
+    Vdecoder_.reset();
+    audioplay_.reset();
     // videoRender_ 由 Qt 父子树管理，无需 delete
 
     APacket_.reset();

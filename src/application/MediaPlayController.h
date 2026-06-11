@@ -3,6 +3,8 @@
 #define TINYVIDEOPROCESSOR_MEDIAPLAYCONTROLLER_H
 
 #include <QObject>
+#include <QThread>
+#include <memory>
 
 #include "core/queue.h"
 #include "domain/IMediaSource.h"
@@ -65,17 +67,17 @@ private:
     std::shared_ptr<syncmanager> syncManager_;
 
     // 组件
-    demuxer*     demuxer_     = nullptr;
-    decoder*     Adecoder_   = nullptr;
-    decoder*     Vdecoder_   = nullptr;
-    AudioPlayer* audioplay_   = nullptr;
+    std::unique_ptr<demuxer> demuxer_;
+    std::unique_ptr<decoder> Adecoder_;
+    std::unique_ptr<decoder> Vdecoder_;
+    std::unique_ptr<AudioPlayer> audioplay_;
     VideoRender* videoRender_ = nullptr;
 
     // 线程
-    QThread* demuxerTH_    = nullptr;
-    QThread* AdecoderTH_  = nullptr;
-    QThread* VdecoderTH_  = nullptr;
-    QThread* audioplayTH_  = nullptr;
+    std::unique_ptr<QThread> demuxerTH_;
+    std::unique_ptr<QThread> AdecoderTH_;
+    std::unique_ptr<QThread> VdecoderTH_;
+    std::unique_ptr<QThread> audioplayTH_;
 
     bool pauseFlag_ = false;
 
