@@ -17,9 +17,8 @@ MainWindow::MainWindow(QWidget *parent)
     }
 
     connect(mediaPlayController_.get(), &MediaPlayController::stateChanged,
-            this, [](MediaPlayController::PlaybackState state) {
-                Q_UNUSED(state);
-            });
+            this, &MainWindow::updatePlaybackControls);
+    updatePlaybackControls(mediaPlayController_->state());
 
 }
 
@@ -110,6 +109,12 @@ void MainWindow::stop() {
 
 void MainWindow::pause() {
     mediaPlayController_->Pause();
+}
+
+void MainWindow::updatePlaybackControls(MediaPlayController::PlaybackState state) {
+    const bool playing = state == MediaPlayController::PlaybackState::Playing;
+    ui->pushButton_play->setEnabled(!playing);
+    ui->pushButton_pause->setEnabled(playing);
 }
 
 void MainWindow::VolumeUp() {

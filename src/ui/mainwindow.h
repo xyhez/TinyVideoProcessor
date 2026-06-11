@@ -40,6 +40,8 @@ private:
     Ui::MainWindow *ui;
 
     std::unique_ptr<MediaPlayController> mediaPlayController_ = nullptr;
+
+    void updatePlaybackControls(MediaPlayController::PlaybackState state);
 };
 
 #endif // MAINWINDOW_H
