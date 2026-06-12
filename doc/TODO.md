@@ -63,15 +63,19 @@
 
 ## 任务 4: decoder 增加 flush 能力
 
-- [ ] 为音频 decoder 增加 `Flush()`。
-- [ ] 为视频 decoder 增加 `Flush()`。
-- [ ] 内部调用 `avcodec_flush_buffers()`。
-- [ ] 确保硬解路径 flush 后仍能继续输出有效帧。
+- [x] 为音频 decoder 增加 `Flush()`。
+- [x] 为视频 decoder 增加 `Flush()`。
+- [x] 内部调用 `avcodec_flush_buffers()`。
+- [x] 确保硬解路径 flush 后仍能继续输出有效帧。
+
+产出报告：`doc/Phase1_1_任务4_decoderFlush报告.md`
 
 验收：
 
-- [ ] Seek 后不会继续输出 seek 前缓存帧。
-- [ ] 硬解和软解路径都走同一 flush 入口。
+- [x] Seek 后不会继续输出 seek 前缓存帧。
+- [x] 硬解和软解路径都走同一 flush 入口。
+
+说明：任务 4 只提供 decoder 层 flush 能力，实际 Seek 时调用该能力由任务 5 的 `MediaPlayController` 编排完成。
 
 ## 任务 5: MediaPlayController 编排 Seek 流程
 

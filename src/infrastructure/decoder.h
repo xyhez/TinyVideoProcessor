@@ -53,6 +53,13 @@ public:
     int StartDecoder();
 
     /**
+     * @brief Flush 清理解码器内部缓存
+     * @return 0 成功
+     * @return -1 失败
+     */
+    int Flush();
+
+    /**
      * @brief Start
      * @return 0 成功
      * @return -1 失败

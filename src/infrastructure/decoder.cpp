@@ -336,6 +336,22 @@ int decoder::StartDecoder() {
     return 0;
 }
 
+int decoder::Flush() {
+    if (!Ctx) {
+        qWarning() << decoder_type << "decoder flush failed: context is null";
+        return -1;
+    }
+
+    avcodec_flush_buffers(Ctx);
+
+    if (frame) {
+        av_frame_unref(frame);
+    }
+
+    qDebug() << decoder_type << "decoder flushed";
+    return 0;
+}
+
 int decoder::Start() {
     mutex.lock();
     pause_flag = false;
