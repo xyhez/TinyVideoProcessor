@@ -113,42 +113,66 @@
 
 ## 任务 7: 播放位置和总时长信号
 
-- [ ] 从 `Fileinfo` 或媒体源信息中暴露总时长。
-- [ ] `MediaPlayController` 增加 `Duration()`。
-- [ ] `MediaPlayController` 增加 `Position()`。
-- [ ] 增加 `PositionChanged(double seconds)` 信号。
-- [ ] 增加 `DurationChanged(double seconds)` 信号。
-- [ ] 先用定时器或音频主时钟更新当前位置。
+- [ ] 确认 `Fileinfo::duration_` 的单位和来源，统一对外暴露为秒。
+- [ ] `MediaPlayController` 增加 `double Duration() const`，只从媒体源信息读取总时长。
+- [ ] `MediaPlayController` 增加 `double Position() const`，优先从 `syncmanager` 主时钟换算得到秒。
+- [ ] `MediaPlayController` 增加 `PositionChanged(double seconds)` 信号。
+- [ ] `MediaPlayController` 增加 `DurationChanged(double seconds)` 信号。
+- [ ] `MediaPlayController` 内部增加位置更新定时器，不让 `MainWindow` 主动查询基础设施层。
+- [ ] 初始化媒体源成功后发送一次 `DurationChanged(Duration())`。
+- [ ] Start/Seek/Stop 后确保位置能立即更新到当前语义位置。
+- [ ] Stop 后位置应回到 0。
+- [ ] 暂停时位置不应继续前进。
+- [ ] 形成报告：`doc/Phase1_1_任务7_播放位置和时长信号报告.md`
 
 验收：
 
 - [ ] 播放过程中位置持续更新。
 - [ ] Seek 后位置立即更新到目标附近。
 - [ ] 总时长只由媒体源信息决定，不从 UI 硬编码。
+- [ ] Stop 后位置显示为 0。
+- [ ] `MainWindow` 不直接依赖 `syncmanager`、`demuxer` 或 `Fileinfo` 内部细节。
 
 ## 任务 8: 为进度条 Seek 做接口准备
 
-- [ ] `MainWindow` 只绑定进度条事件，不直接操作 demuxer。
-- [ ] 拖动进度条时调用 `MediaPlayController::SeekTo()`。
-- [ ] 拖动过程中避免频繁 seek，可以只在释放时 seek。
-- [ ] 播放位置更新时刷新进度条。
+- [ ] 明确进度条显示单位：UI 使用毫秒或百分比，Controller 接口继续使用秒。
+- [ ] `MainWindow` 只绑定进度条事件，不直接操作 demuxer/decoder/syncmanager。
+- [ ] 播放位置更新时，由 `PositionChanged(double seconds)` 刷新进度条。
+- [ ] 总时长更新时，由 `DurationChanged(double seconds)` 设置进度条范围。
+- [ ] 用户按下进度条时暂停 UI 自动回写，避免信号互相驱动。
+- [ ] 用户拖动过程中只更新 UI 预览位置，不连续调用 seek。
+- [ ] 用户释放进度条时调用 `MediaPlayController::SeekTo(targetSeconds)`。
+- [ ] Seek 调用完成后恢复进度条跟随 `PositionChanged`。
+- [ ] 处理总时长为 0 或媒体源不可 seek 的边界。
+- [ ] 形成报告：`doc/Phase1_1_任务8_进度条Seek接口报告.md`
 
 验收：
 
 - [ ] 进度条显示不反向驱动播放状态混乱。
 - [ ] 用户拖动进度条后能跳到对应位置。
 - [ ] 拖动进度条不会破坏音视频同步。
+- [ ] 拖动过程中不会触发高频 seek。
+- [ ] `MainWindow` 没有新增基础设施层依赖。
 
 ## 任务 9: 播放速度控制预研
 
-- [ ] 确认 Qt 音频输出侧是否需要重采样/变速支持。
-- [ ] 确认视频渲染定时器如何适配速度。
-- [ ] 确认同步时钟是否以播放速度缩放。
-- [ ] 暂不与 Seek 同时实现，避免风险叠加。
+- [ ] 调研当前 `AudioPlayer` 输出链路是否支持不变调变速。
+- [ ] 确认是否需要引入音频变速处理：重采样、丢/插样、或后续接入专用算法。
+- [ ] 确认 `VideoRender` 的帧间隔如何按速度缩放。
+- [ ] 确认 `syncmanager` 主时钟是否需要引入 playback speed 概念。
+- [ ] 设计 `MediaPlayController::SetPlaybackSpeed(double speed)` 对外接口。
+- [ ] 设计 `PlaybackSpeedChanged(double speed)` 信号。
+- [ ] 明确支持范围：优先 0.5x、1.0x、1.5x、2.0x。
+- [ ] 明确异常输入处理：小于等于 0、过大速度、非有限数。
+- [ ] 明确播放速度与 Seek/Stop/Pause 的交互关系。
+- [ ] 暂不编码实现速度控制，只产出方案，避免和 Seek 稳定性风险叠加。
+- [ ] 形成报告：`doc/Phase1_1_任务9_播放速度控制预研报告.md`
 
 验收：
 
 - [ ] 形成实现方案后再进入编码。
+- [ ] 方案明确音频、视频、同步时钟三方职责。
+- [ ] 方案不要求 `MainWindow` 直接控制基础设施层。
 
 ## 1.1 完成标准
 
