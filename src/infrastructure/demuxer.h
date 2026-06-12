@@ -5,6 +5,7 @@
 #include <QMutex>
 #include <QDebug>
 #include <QThread>
+#include <QWaitCondition>
 #include <memory>
 
 #include "core/queue.h"
@@ -84,6 +85,19 @@ public:
     int SeekRelative(double seconds);
 
     /**
+     * @brief SuspendAndWait 进入管线挂起安全点
+     * @return 0 成功
+     * @return -1 已停止
+     */
+    int SuspendAndWait();
+
+    /**
+     * @brief Position 获取当前读取位置，单位秒
+     * @return 当前读取位置
+     */
+    double Position() const;
+
+    /**
      * @brief Rewind 倒退10s
      * @return  0 成功
      */
@@ -133,9 +147,15 @@ private:
 
     bool stop_flag = false;                             ///< 停止标志
 
-    double CurrentPositionSeconds() const;
+    bool suspend_requested_ = false;                    ///< 管线挂起请求
+    bool suspended_ = false;                            ///< 已到达管线挂起安全点
+    QWaitCondition suspendCondition_;                   ///< 管线挂起条件变量
 
     mutable QMutex mutex;                               ///< 互斥锁
+
+    double CurrentPositionSeconds() const;
+    bool WaitIfSuspended();
+    bool IsSuspendRequested() const;
 
     AVPacket* packet = nullptr;                         ///< 存从文件中读取出来的包
 

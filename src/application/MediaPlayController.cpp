@@ -3,7 +3,12 @@
 //
 
 #include "MediaPlayController.h"
+#include <QDebug>
 #include <qlayout.h>
+
+namespace {
+constexpr double kSeekStepSeconds = 10.0;
+}
 
 MediaPlayController::MediaPlayController(QObject *parent)
     : QObject(parent)
@@ -184,17 +189,114 @@ void MediaPlayController::VolumeDown() {
     audioplay_->VolumeDown();
 }
 
+void MediaPlayController::SeekTo(double seconds) {
+    if (!demuxer_ || !Adecoder_ || !Vdecoder_ || !syncManager_) {
+        qWarning() << "Seek failed: playback pipeline is not initialized";
+        return;
+    }
+
+    double targetSeconds = seconds;
+    if (targetSeconds < 0.0) {
+        targetSeconds = 0.0;
+    }
+
+    if (mediaSource_) {
+        const int durationSeconds = mediaSource_->GetSourceInfo().duration_;
+        if (durationSeconds > 0 && targetSeconds > durationSeconds) {
+            targetSeconds = durationSeconds;
+        }
+    }
+
+    const PlaybackState previousState = State();
+
+    if (previousState != PlaybackState::Stopped && !SuspendPipelineAndWait()) {
+        qWarning() << "Seek failed: playback pipeline suspend failed";
+        RestorePlaybackState(previousState);
+        return;
+    }
+
+    ClearQueues();
+
+    const int seekResult = demuxer_->SeekTo(targetSeconds);
+    if (seekResult != 0) {
+        qWarning() << "Seek failed: demuxer rejected target" << targetSeconds;
+        RestorePlaybackState(previousState);
+        return;
+    }
+
+    FlushDecoders();
+    Vdecoder_->SetDiscardBefore(targetSeconds);
+    ClearQueues();
+    syncManager_->SeekTo(targetSeconds * 1000.0);
+
+    RestorePlaybackState(previousState);
+}
+
+void MediaPlayController::SeekRelative(double seconds) {
+    if (!demuxer_) {
+        qWarning() << "Seek failed: demuxer is not initialized";
+        return;
+    }
+
+    SeekTo(demuxer_->Position() + seconds);
+}
+
 void MediaPlayController::Rewind() {
-    Pause();
-    demuxer_->Rewind();
-    Start();
+    SeekRelative(-kSeekStepSeconds);
 }
 
 void MediaPlayController::Forward() {
-    Pause();
-    syncManager_->Forward();
-    demuxer_->Forward();
-    Start();
+    SeekRelative(kSeekStepSeconds);
 }
 
+bool MediaPlayController::SuspendPipelineAndWait() {
+    SetState(PlaybackState::Paused);
+
+    if (videoRender_) {
+        videoRender_->Pause();
+    }
+    if (audioplay_) {
+        audioplay_->Pause();
+    }
+
+    bool suspended = true;
+    if (demuxer_ && demuxerTH_ && demuxerTH_->isRunning()) {
+        suspended = demuxer_->SuspendAndWait() == 0 && suspended;
+    }
+    if (Adecoder_ && AdecoderTH_ && AdecoderTH_->isRunning()) {
+        suspended = Adecoder_->SuspendAndWait() == 0 && suspended;
+    }
+    if (Vdecoder_ && VdecoderTH_ && VdecoderTH_->isRunning()) {
+        suspended = Vdecoder_->SuspendAndWait() == 0 && suspended;
+    }
+
+    return suspended;
+}
+
+void MediaPlayController::RestorePlaybackState(PlaybackState previousState) {
+    if (previousState == PlaybackState::Playing) {
+        Start();
+        return;
+    }
+
+    SetState(previousState);
+}
+
+void MediaPlayController::ClearQueues() {
+    if (APacket_) { APacket_->ClearAndWake(); }
+    if (VPacket_) { VPacket_->ClearAndWake(); }
+    if (AFrame_)  { AFrame_->ClearAndWake();  }
+    if (VFrame_)  { VFrame_->ClearAndWake();  }
+}
+
+void MediaPlayController::FlushDecoders() {
+    if (Adecoder_) {
+        Adecoder_->ClearDiscardBefore();
+        Adecoder_->Flush();
+    }
+    if (Vdecoder_) {
+        Vdecoder_->ClearDiscardBefore();
+        Vdecoder_->Flush();
+    }
+}
 

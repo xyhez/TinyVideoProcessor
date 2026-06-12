@@ -23,12 +23,14 @@ private:
     std::condition_variable cv_not_full_;           ///< 满队列条件变量
     size_t max_size_;                               ///< 队列最大容量
     std::atomic<bool> stop_flag_;                   ///< 停止标志
+    std::atomic<bool> wait_interrupted_;            ///< 非终止式等待中断标志
     std::function<void(T)> deleter_ = nullptr;      ///< 数据析构器
 public:
 // 核心接口
     SyncQueue(size_t max_size ,std::function<void(T)> deleter = nullptr)
     : max_size_(max_size)
     , stop_flag_(false)
+    , wait_interrupted_(false)
     , deleter_(deleter){
 
     }
@@ -40,21 +42,22 @@ public:
      * @brief 阻塞入队，队列满则等待
      * @param item
      */
-    void Push(T item) {
+    bool Push(T item) {
         {
             std::unique_lock<std::mutex> lock(mutex_);
             cv_not_full_.wait(lock, [this]{ return
-                    raw_queue_.size() < max_size_ || stop_flag_;
+                    raw_queue_.size() < max_size_ || stop_flag_ || wait_interrupted_;
             });
-            if (stop_flag_) {
+            if (stop_flag_ || wait_interrupted_) {
                 if (deleter_) {
                     deleter_(item);
                 }
-                return;
+                return false;
             }
             raw_queue_.push_back(item);
             cv_not_empty_.notify_one();
         }
+        return true;
     }
 
     /**
@@ -66,7 +69,7 @@ public:
         {
             std::unique_lock<std::mutex> lock(mutex_);
             cv_not_empty_.wait(lock, [this]{ return
-                !raw_queue_.empty() || stop_flag_;
+                !raw_queue_.empty() || stop_flag_ || wait_interrupted_;
             });
 
             if (raw_queue_.empty()) return false;
@@ -155,6 +158,14 @@ public:
         stop_flag_ = flag;
     }
 
+    bool IsStopRequested() const {
+        return stop_flag_;
+    }
+
+    bool IsWaitInterrupted() const {
+        return wait_interrupted_;
+    }
+
     void RequestStop() {
         SetStopFlag(true);
         WakeAll();
@@ -162,6 +173,16 @@ public:
 
     void Resume() {
         SetStopFlag(false);
+        ResumeWait();
+    }
+
+    void InterruptWait() {
+        wait_interrupted_ = true;
+        WakeAll();
+    }
+
+    void ResumeWait() {
+        wait_interrupted_ = false;
         WakeAll();
     }
 };

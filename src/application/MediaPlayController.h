@@ -56,6 +56,8 @@ public:
     void VolumeDown();
 
     // seek
+    void SeekTo(double seconds);
+    void SeekRelative(double seconds);
     void Rewind();
     void Forward();
 
@@ -94,6 +96,10 @@ private:
 
     void ReleaseResources();
     void SetState(PlaybackState state);
+    bool SuspendPipelineAndWait();
+    void RestorePlaybackState(PlaybackState previousState);
+    void ClearQueues();
+    void FlushDecoders();
 };
 
 

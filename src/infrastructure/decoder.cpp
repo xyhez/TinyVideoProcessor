@@ -1,5 +1,7 @@
 #include "decoder.h"
 
+#include <QMutexLocker>
+
 namespace {
 constexpr bool kEnableHardwareDecoder = false;
 }
@@ -260,14 +262,30 @@ int decoder::StartDecoder() {
 
     while (true) {
         // ========== 取包部分 ==========
+        if (!WaitIfSuspended()) {
+            break;
+        }
+
         AVPacket *packet = nullptr;
         if (!m_PacketVec->Pop(packet)) {
-            break;
+            if (m_PacketVec->IsStopRequested()) {
+                break;
+            }
+            continue;
         }
 
         if (!packet) continue;
 
-        int ret = avcodec_send_packet(Ctx, packet);
+        if (IsSuspendRequested()) {
+            av_packet_free(&packet);
+            continue;
+        }
+
+        int ret = 0;
+        {
+            QMutexLocker locker(&mutex);
+            ret = avcodec_send_packet(Ctx, packet);
+        }
         av_packet_free(&packet);
 
         if (ret < 0) {
@@ -279,7 +297,10 @@ int decoder::StartDecoder() {
 
         // ========== 接收帧部分 ==========
         while (true) {
-            ret = avcodec_receive_frame(Ctx, frame);
+            {
+                QMutexLocker locker(&mutex);
+                ret = avcodec_receive_frame(Ctx, frame);
+            }
             if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) break;
             if (ret < 0) {
                 char errBuf[256];
@@ -331,8 +352,17 @@ int decoder::StartDecoder() {
                 continue;
             }
 
+            if (ShouldDiscardFrame(outFrame)) {
+                av_frame_free(&outFrame);
+                av_frame_unref(frame);
+                continue;
+            }
+
             // ========== 入队 ==========
-            m_FrameVec->Push(outFrame);
+            if (!m_FrameVec->Push(outFrame)) {
+                av_frame_unref(frame);
+                continue;
+            }
 
             av_frame_unref(frame);  // 释放 codec 的引用，复用 frame
         }
@@ -348,21 +378,86 @@ int decoder::Flush() {
         return -1;
     }
 
-    avcodec_flush_buffers(Ctx);
-
-    if (frame) {
-        av_frame_unref(frame);
+    {
+        QMutexLocker locker(&mutex);
+        avcodec_flush_buffers(Ctx);
     }
 
     qDebug() << decoder_type << "decoder flushed";
     return 0;
 }
 
+int decoder::SuspendAndWait() {
+    {
+        QMutexLocker locker(&mutex);
+        if (stop_flag) {
+            return -1;
+        }
+        pause_flag = true;
+        suspend_requested_ = true;
+        suspended_ = false;
+    }
+
+    if (m_PacketVec) {
+        m_PacketVec->InterruptWait();
+    }
+    if (m_FrameVec) {
+        m_FrameVec->InterruptWait();
+    }
+
+    QMutexLocker locker(&mutex);
+    while (!suspended_ && !stop_flag) {
+        suspendCondition_.wait(&mutex);
+    }
+
+    return stop_flag ? -1 : 0;
+}
+
+void decoder::SetDiscardBefore(double seconds) {
+    QMutexLocker locker(&mutex);
+    m_discardBeforeEnabled = true;
+    m_discardBeforeSeconds = seconds < 0.0 ? 0.0 : seconds;
+}
+
+void decoder::ClearDiscardBefore() {
+    QMutexLocker locker(&mutex);
+    m_discardBeforeEnabled = false;
+    m_discardBeforeSeconds = 0.0;
+}
+
+bool decoder::ShouldDiscardFrame(const AVFrame *candidateFrame) {
+    if (!candidateFrame || candidateFrame->pts == AV_NOPTS_VALUE) {
+        return false;
+    }
+
+    QMutexLocker locker(&mutex);
+    if (!m_discardBeforeEnabled || m_time_base.num <= 0 || m_time_base.den <= 0) {
+        return false;
+    }
+
+    const double frameSeconds = candidateFrame->pts * av_q2d(m_time_base);
+    if (frameSeconds < m_discardBeforeSeconds) {
+        return true;
+    }
+
+    m_discardBeforeEnabled = false;
+    return false;
+}
+
 int decoder::Start() {
     mutex.lock();
     pause_flag = false;
+    suspend_requested_ = false;
     qDebug() << decoder_type << "解码线程开始运行";
+    suspendCondition_.wakeAll();
     mutex.unlock();
+
+    if (m_PacketVec) {
+        m_PacketVec->ResumeWait();
+    }
+    if (m_FrameVec) {
+        m_FrameVec->ResumeWait();
+    }
 
     return 0;
 }
@@ -370,7 +465,9 @@ int decoder::Start() {
 int decoder::Stop() {
     mutex.lock();
     stop_flag = true;
+    suspend_requested_ = false;
     qDebug() << decoder_type << "解码线程被停止";
+    suspendCondition_.wakeAll();
     mutex.unlock();
 
     return 0;
@@ -379,8 +476,27 @@ int decoder::Stop() {
 int decoder::Pause(){
     mutex.lock();
     pause_flag = true;
+    suspend_requested_ = true;
     qDebug() << decoder_type << "解码线程被暂停";
+    suspendCondition_.wakeAll();
     mutex.unlock();
 
     return 0;
+}
+bool decoder::WaitIfSuspended() {
+    QMutexLocker locker(&mutex);
+
+    while (suspend_requested_ && !stop_flag) {
+        suspended_ = true;
+        suspendCondition_.wakeAll();
+        suspendCondition_.wait(&mutex);
+    }
+
+    suspended_ = false;
+    return !stop_flag;
+}
+
+bool decoder::IsSuspendRequested() const {
+    QMutexLocker locker(&mutex);
+    return suspend_requested_;
 }

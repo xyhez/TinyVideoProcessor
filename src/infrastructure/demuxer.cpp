@@ -129,6 +129,10 @@ int demuxer::StartDemuxer() {
     }
 
     while (true) {
+        if (!WaitIfSuspended()) {
+            break;
+        }
+
         AVPacket* packet = av_packet_alloc();
         int ret = 0;
 
@@ -153,6 +157,11 @@ int demuxer::StartDemuxer() {
         }
 
         // 提前过滤非音视频流
+        if (IsSuspendRequested()) {
+            av_packet_free(&packet);
+            continue;
+        }
+
         if (packet->stream_index != m_audioStreamIndex &&
             packet->stream_index != m_videoStreamIndex) {
             av_packet_free(&packet);
@@ -169,7 +178,9 @@ int demuxer::StartDemuxer() {
                 }
                 m_AcurrentPTS = packet->pts;
             }
-            m_APacket->Push(packet);
+            if (!m_APacket->Push(packet)) {
+                continue;
+            }
         }
         // ========== 视频流 ==========
         else {
@@ -181,7 +192,9 @@ int demuxer::StartDemuxer() {
                 }
                 m_VcurrentPTS = packet->pts;
             }
-            m_VPacket->Push(packet);
+            if (!m_VPacket->Push(packet)) {
+                continue;
+            }
         }
     }
 
@@ -241,6 +254,36 @@ int demuxer::SeekRelative(double seconds) {
     return SeekTo(CurrentPositionSeconds() + seconds);
 }
 
+int demuxer::SuspendAndWait() {
+    {
+        QMutexLocker locker(&mutex);
+        if (stop_flag) {
+            return -1;
+        }
+        pause_flag = true;
+        suspend_requested_ = true;
+        suspended_ = false;
+    }
+
+    if (m_APacket) {
+        m_APacket->InterruptWait();
+    }
+    if (m_VPacket) {
+        m_VPacket->InterruptWait();
+    }
+
+    QMutexLocker locker(&mutex);
+    while (!suspended_ && !stop_flag) {
+        suspendCondition_.wait(&mutex);
+    }
+
+    return stop_flag ? -1 : 0;
+}
+
+double demuxer::Position() const {
+    return CurrentPositionSeconds();
+}
+
 double demuxer::CurrentPositionSeconds() const {
     QMutexLocker locker(&mutex);
 
@@ -258,8 +301,17 @@ double demuxer::CurrentPositionSeconds() const {
 int demuxer::Start() {
     mutex.lock();
     pause_flag = false;
+    suspend_requested_ = false;
     qDebug() << "解复用线程开始运行";
+    suspendCondition_.wakeAll();
     mutex.unlock();
+
+    if (m_APacket) {
+        m_APacket->ResumeWait();
+    }
+    if (m_VPacket) {
+        m_VPacket->ResumeWait();
+    }
 
     return 0;
 }
@@ -267,7 +319,9 @@ int demuxer::Start() {
 int demuxer::Stop() {
     mutex.lock();
     stop_flag = true;
+    suspend_requested_ = false;
     qDebug() << "解复用线程被停止";
+    suspendCondition_.wakeAll();
     mutex.unlock();
 
     return 0;
@@ -276,8 +330,27 @@ int demuxer::Stop() {
 int demuxer::Pause(){
     mutex.lock();
     pause_flag = true;
+    suspend_requested_ = true;
     qDebug() << "解复用线程被暂停";
+    suspendCondition_.wakeAll();
     mutex.unlock();
 
     return 0;
+}
+bool demuxer::WaitIfSuspended() {
+    QMutexLocker locker(&mutex);
+
+    while (suspend_requested_ && !stop_flag) {
+        suspended_ = true;
+        suspendCondition_.wakeAll();
+        suspendCondition_.wait(&mutex);
+    }
+
+    suspended_ = false;
+    return !stop_flag;
+}
+
+bool demuxer::IsSuspendRequested() const {
+    QMutexLocker locker(&mutex);
+    return suspend_requested_;
 }

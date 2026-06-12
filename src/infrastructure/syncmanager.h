@@ -36,6 +36,14 @@ public:
     double GetClock() const;
 
     /**
+     * @brief SeekTo 将主时钟重置到指定时间
+     * @param clockMs 目标时钟，单位毫秒(ms)
+     * @return 0 成功
+     * @return -1 失败
+     */
+    int SeekTo(double clockMs);
+
+    /**
      * @brief Forward 快进3s
      * @return 0 成功
      * @return -1 失败

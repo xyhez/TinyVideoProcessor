@@ -5,6 +5,7 @@
 #include <QMutex>
 #include <QDebug>
 #include <QThread>
+#include <QWaitCondition>
 #include <memory>
 
 #include "core/queue.h"
@@ -60,6 +61,24 @@ public:
     int Flush();
 
     /**
+     * @brief SuspendAndWait 进入管线挂起安全点
+     * @return 0 成功
+     * @return -1 已停止
+     */
+    int SuspendAndWait();
+
+    /**
+     * @brief SetDiscardBefore 丢弃指定时间点之前的输出帧
+     * @param seconds 目标时间，单位秒
+     */
+    void SetDiscardBefore(double seconds);
+
+    /**
+     * @brief ClearDiscardBefore 清除输出帧丢弃边界
+     */
+    void ClearDiscardBefore();
+
+    /**
      * @brief Start
      * @return 0 成功
      * @return -1 失败
@@ -100,6 +119,10 @@ private:
      */
     AVFrame *TransferHWFrame(AVFrame *hwFrame);
 
+    bool ShouldDiscardFrame(const AVFrame *candidateFrame);
+    bool WaitIfSuspended();
+    bool IsSuspendRequested() const;
+
     std::shared_ptr<SyncQueue<AVPacket*>> m_PacketVec;        ///< 包队列
     std::shared_ptr<SyncQueue<AVFrame*>>  m_FrameVec;         ///< 帧队列
 
@@ -116,13 +139,20 @@ private:
 
     bool stop_flag = false;                                 ///< 停止标志
 
-    QMutex mutex;                                           ///< 互斥锁
+    bool suspend_requested_ = false;                        ///< 管线挂起请求
+    bool suspended_ = false;                                ///< 已到达管线挂起安全点
+    QWaitCondition suspendCondition_;                       ///< 管线挂起条件变量
+
+    mutable QMutex mutex;                                   ///< 互斥锁
 
     QString decoder_type = "";                              ///< 解码器类型
 
     AVFrame *frame = nullptr;                               ///< 管理解码后的帧
 
     AVRational m_time_base;                                 ///< 时间基础
+
+    bool m_discardBeforeEnabled = false;                    ///< 是否丢弃指定时间前的输出帧
+    double m_discardBeforeSeconds = 0.0;                    ///< 输出帧丢弃边界，单位秒
 
     // 硬解码相关
     bool m_isHWDecoder = false;                             ///< 是否使用硬件解码

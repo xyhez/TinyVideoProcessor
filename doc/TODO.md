@@ -79,15 +79,15 @@
 
 ## 任务 5: MediaPlayController 编排 Seek 流程
 
-- [ ] 新增 `SeekTo(double seconds)`。
-- [ ] 新增 `SeekRelative(double seconds)`。
-- [ ] `Rewind()` 调用 `SeekRelative(-10)`。
-- [ ] `Forward()` 调用 `SeekRelative(10)`。
-- [ ] Seek 流程中暂停播放管线。
-- [ ] 清空音频包队列、视频包队列、音频帧队列、视频帧队列。
-- [ ] flush 音频 decoder 和视频 decoder。
-- [ ] 重置同步时钟到目标时间。
-- [ ] 恢复播放状态。
+- [x] 新增 `SeekTo(double seconds)`。
+- [x] 新增 `SeekRelative(double seconds)`。
+- [x] `Rewind()` 调用 `SeekRelative(-10)`。
+- [x] `Forward()` 调用 `SeekRelative(10)`。
+- [x] Seek 流程中暂停播放管线。
+- [x] 清空音频包队列、视频包队列、音频帧队列、视频帧队列。
+- [x] flush 音频 decoder 和视频 decoder。
+- [x] 重置同步时钟到目标时间。
+- [x] 恢复播放状态。
 
 验收：
 

@@ -24,6 +24,13 @@ double syncmanager::GetClock() const {
     return mainclock;
 }
 
+int syncmanager::SeekTo(double clockMs) {
+    QMutexLocker locker(&mutex);
+    mainclock = clockMs;
+
+    return 0;
+}
+
 int syncmanager::Forward() {
     QMutexLocker locker(&mutex);
     mainclock += 3000;
