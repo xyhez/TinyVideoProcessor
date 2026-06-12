@@ -70,13 +70,27 @@ public:
     int StartDemuxer();
 
     /**
-     * @brief Rewind 倒退3s
+     * @brief SeekTo 跳转到指定秒数
+     * @return 0 成功
+     * @return -1 失败
+     */
+    int SeekTo(double seconds);
+
+    /**
+     * @brief SeekRelative 按当前读取位置相对跳转指定秒数
+     * @return 0 成功
+     * @return -1 失败
+     */
+    int SeekRelative(double seconds);
+
+    /**
+     * @brief Rewind 倒退10s
      * @return  0 成功
      */
     int Rewind();
 
     /**
-     * @brief Forward 前进3s---300
+     * @brief Forward 前进10s
      * @return  0 成功
      */
     int Forward();
@@ -119,7 +133,9 @@ private:
 
     bool stop_flag = false;                             ///< 停止标志
 
-    QMutex mutex;                                       ///< 互斥锁
+    double CurrentPositionSeconds() const;
+
+    mutable QMutex mutex;                               ///< 互斥锁
 
     AVPacket* packet = nullptr;                         ///< 存从文件中读取出来的包
 
@@ -134,8 +150,8 @@ private:
     AVRational m_V_time_base;                           ///< 视频流time_base
 
 
-    int m_AcurrentPTS = 0;                              ///< 最新的音频流的pts
-    int m_VcurrentPTS = 0;                              ///< 最新的视频流的pts
+    int64_t m_AcurrentPTS = 0;                          ///< 最新的音频流的pts
+    int64_t m_VcurrentPTS = 0;                          ///< 最新的视频流的pts
 };
 
 #endif // DEMUXER_H

@@ -44,18 +44,22 @@
 
 ## 任务 3: demuxer 增加真实 Seek 能力
 
-- [ ] 在 `demuxer` 中保存可 seek 的 `AVFormatContext` 来源。
-- [ ] 新增 `SeekTo(double seconds)` 或等价接口。
-- [ ] 使用 `av_seek_frame()` 跳转到目标时间。
-- [ ] 处理目标时间边界：小于 0 时归零，大于总时长时限制到总时长。
-- [ ] Seek 后清理 demuxer 内部当前 PTS 状态。
-- [ ] 将 `Rewind()`、`Forward()` 改为调用通用 seek 逻辑。
+- [x] 在 `demuxer` 中保存可 seek 的 `AVFormatContext` 来源。
+- [x] 新增 `SeekTo(double seconds)` 或等价接口。
+- [x] 使用 `av_seek_frame()` 跳转到目标时间。
+- [x] 处理目标时间边界：小于 0 时归零，大于总时长时限制到总时长。
+- [x] Seek 后清理 demuxer 内部当前 PTS 状态。
+- [x] 将 `Rewind()`、`Forward()` 改为调用通用 seek 逻辑。
+
+产出报告：`doc/Phase1_1_任务3_demuxer真实Seek报告.md`
 
 验收：
 
-- [ ] 左右方向键能触发真实位置跳转。
-- [ ] 目标时间不会越界。
-- [ ] seek 失败时能返回失败状态，不静默吞掉错误。
+- [x] 左右方向键能触发真实位置跳转。
+- [x] 目标时间不会越界。
+- [x] seek 失败时能返回失败状态，不静默吞掉错误。
+
+说明：任务 3 只完成 demuxer 层 seek 原语，旧包/旧帧清理、decoder flush、同步时钟重置和播放状态恢复等待任务 4/5 编排。
 
 ## 任务 4: decoder 增加 flush 能力
 

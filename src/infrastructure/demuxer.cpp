@@ -1,5 +1,11 @@
 #include "demuxer.h"
 
+#include <QMutexLocker>
+
+namespace {
+constexpr double kSeekStepSeconds = 10.0;
+}
+
 demuxer::demuxer(std::shared_ptr<IMediaSource> mediaSource
                  ,std::shared_ptr<SyncQueue<AVPacket*>> APacket
                  ,std::shared_ptr<SyncQueue<AVPacket*>> VPacket
@@ -124,7 +130,16 @@ int demuxer::StartDemuxer() {
 
     while (true) {
         AVPacket* packet = av_packet_alloc();
-        int ret = av_read_frame(ic, packet);
+        int ret = 0;
+
+        {
+            QMutexLocker locker(&mutex);
+            if (stop_flag) {
+                av_packet_free(&packet);
+                break;
+            }
+            ret = av_read_frame(ic, packet);
+        }
 
         if (ret < 0) {
             av_packet_free(&packet);
@@ -146,20 +161,26 @@ int demuxer::StartDemuxer() {
 
         // ========== 音频流 ==========
         if (packet->stream_index == m_audioStreamIndex) {
-            if (stop_flag) {
-                av_packet_free(&packet);
-                break;
+            {
+                QMutexLocker locker(&mutex);
+                if (stop_flag) {
+                    av_packet_free(&packet);
+                    break;
+                }
+                m_AcurrentPTS = packet->pts;
             }
-            m_AcurrentPTS = packet->pts;
             m_APacket->Push(packet);
         }
         // ========== 视频流 ==========
         else {
-            if (stop_flag) {
-                av_packet_free(&packet);
-                break;
+            {
+                QMutexLocker locker(&mutex);
+                if (stop_flag) {
+                    av_packet_free(&packet);
+                    break;
+                }
+                m_VcurrentPTS = packet->pts;
             }
-            m_VcurrentPTS = packet->pts;
             m_VPacket->Push(packet);
         }
     }
@@ -168,11 +189,70 @@ int demuxer::StartDemuxer() {
 }
 
 int demuxer::Rewind() {
-    return 0;
+    return SeekRelative(-kSeekStepSeconds);
 }
 
 int demuxer::Forward() {
+    return SeekRelative(kSeekStepSeconds);
+}
+
+int demuxer::SeekTo(double seconds) {
+    if (!m_mediaSource) {
+        qWarning() << "Seek failed: media source is null";
+        return -1;
+    }
+
+    AVFormatContext* ic = m_mediaSource->GetFormatContect();
+    if (!ic) {
+        qWarning() << "Seek failed: format context is null";
+        return -1;
+    }
+
+    if (seconds < 0.0) {
+        seconds = 0.0;
+    }
+
+    if (ic->duration > 0) {
+        const double durationSeconds = ic->duration / 1000000.0;
+        if (seconds > durationSeconds) {
+            seconds = durationSeconds;
+        }
+    }
+
+    const int64_t targetTs = static_cast<int64_t>(seconds * AV_TIME_BASE);
+
+    QMutexLocker locker(&mutex);
+    const int ret = av_seek_frame(ic, -1, targetTs, AVSEEK_FLAG_BACKWARD);
+    if (ret < 0) {
+        char errBuf[256];
+        av_strerror(ret, errBuf, sizeof(errBuf));
+        qWarning() << "Seek failed:" << errBuf;
+        return -1;
+    }
+
+    m_AcurrentPTS = 0;
+    m_VcurrentPTS = 0;
+
+    qDebug() << "Demuxer seek to" << seconds << "seconds";
     return 0;
+}
+
+int demuxer::SeekRelative(double seconds) {
+    return SeekTo(CurrentPositionSeconds() + seconds);
+}
+
+double demuxer::CurrentPositionSeconds() const {
+    QMutexLocker locker(&mutex);
+
+    if (m_VcurrentPTS > 0 && m_V_time_base.den > 0) {
+        return m_VcurrentPTS * av_q2d(m_V_time_base);
+    }
+
+    if (m_AcurrentPTS > 0 && m_A_time_base.den > 0) {
+        return m_AcurrentPTS * av_q2d(m_A_time_base);
+    }
+
+    return 0.0;
 }
 
 int demuxer::Start() {
