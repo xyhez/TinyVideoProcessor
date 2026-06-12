@@ -1,5 +1,8 @@
-﻿#include "decoder.h"
+#include "decoder.h"
 
+namespace {
+constexpr bool kEnableHardwareDecoder = false;
+}
 decoder::decoder(QObject *parent)
     : QObject{parent}
 {
@@ -26,7 +29,10 @@ void decoder::CreateConnect() {
 
 bool decoder::InitHWDecoder()
 {
-    // return false;
+    if (!kEnableHardwareDecoder) {
+        qDebug() << "视频硬解已禁用，使用软件解码";
+        return false;
+    }
     if (par->codec_type != AVMEDIA_TYPE_VIDEO) {
         qDebug() << "音频流强制使用软解";
         return false;
