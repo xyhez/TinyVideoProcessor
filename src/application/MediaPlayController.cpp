@@ -87,10 +87,10 @@ void MediaPlayController::CreateConnects() {
 
 void MediaPlayController::ReleaseResources() {
     // 确保所有工作循环已停止（防 Stop() 未调）
-    if (APacket_) { APacket_->SetStopFlag(true); APacket_->WakeAll(); }
-    if (VPacket_) { VPacket_->SetStopFlag(true); VPacket_->WakeAll(); }
-    if (AFrame_)  { AFrame_->SetStopFlag(true);  AFrame_->WakeAll();  }
-    if (VFrame_)  { VFrame_->SetStopFlag(true);  VFrame_->WakeAll();  }
+    if (APacket_) { APacket_->RequestStop(); }
+    if (VPacket_) { VPacket_->RequestStop(); }
+    if (AFrame_)  { AFrame_->RequestStop();  }
+    if (VFrame_)  { VFrame_->RequestStop();  }
 
     if (demuxer_)   demuxer_->Stop();
     if (Adecoder_)  Adecoder_->Stop();
@@ -155,15 +155,10 @@ void MediaPlayController::Start() {
 void MediaPlayController::Stop() {
     SetState(PlaybackState::Stopped);
 
-    APacket_->SetStopFlag(true);
-    VPacket_->SetStopFlag(true);
-    AFrame_->SetStopFlag(true);
-    VFrame_->SetStopFlag(true);
-
-    APacket_->WakeAll();
-    VPacket_->WakeAll();
-    AFrame_->WakeAll();
-    VFrame_->WakeAll();
+    APacket_->RequestStop();
+    VPacket_->RequestStop();
+    AFrame_->RequestStop();
+    VFrame_->RequestStop();
 
     demuxer_->Stop();
     Adecoder_->Stop();

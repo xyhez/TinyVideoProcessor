@@ -135,6 +135,11 @@ public:
             raw_queue_.pop_front();
         }
         cv_not_full_.notify_all();
+        cv_not_empty_.notify_all();
+    }
+
+    void ClearAndWake() {
+        Clear();
     }
 
     void SetMaxSize(size_t max_size) {
@@ -148,5 +153,15 @@ public:
 
     void SetStopFlag(bool flag) {
         stop_flag_ = flag;
+    }
+
+    void RequestStop() {
+        SetStopFlag(true);
+        WakeAll();
+    }
+
+    void Resume() {
+        SetStopFlag(false);
+        WakeAll();
     }
 };

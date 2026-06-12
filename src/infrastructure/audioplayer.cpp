@@ -258,8 +258,7 @@ void AudioPlayer::Stop()
     m_stopFlag = true;
 
     if (m_audioFrameQueue) {
-        m_audioFrameQueue->SetStopFlag(true);
-        m_audioFrameQueue->WakeAll();
+        m_audioFrameQueue->RequestStop();
     }
 
     if (m_audioSink) {

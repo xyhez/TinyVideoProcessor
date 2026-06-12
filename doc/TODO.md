@@ -29,16 +29,18 @@
 
 ## 任务 2: 为队列补齐 Seek 所需能力
 
-- [ ] 确认 `SyncQueue::Clear()` 会正确释放队列内 AVPacket/AVFrame。
-- [ ] 确认清空队列时不会和阻塞中的 Push/Pop 死锁。
-- [ ] 必要时增加“清空并唤醒”的封装方法。
-- [ ] Seek 前后正确设置 `SetStopFlag()`，避免 demux/decode 线程卡住。
+- [x] 确认 `SyncQueue::Clear()` 会正确释放队列内 AVPacket/AVFrame。
+- [x] 确认清空队列时不会和阻塞中的 Push/Pop 死锁。
+- [x] 必要时增加“清空并唤醒”的封装方法。
+- [x] Seek 前后正确设置 `SetStopFlag()`，避免 demux/decode 线程卡住。
+
+产出报告：`doc/Phase1_1_任务2_队列Seek能力报告.md`
 
 验收：
 
-- [ ] Seek 时四个队列都能被清空。
-- [ ] 队列清空不泄漏 AVPacket/AVFrame。
-- [ ] 队列清空后可以重新接收新数据。
+- [x] Seek 时四个队列都能被清空。
+- [x] 队列清空不泄漏 AVPacket/AVFrame。
+- [x] 队列清空后可以重新接收新数据。
 
 ## 任务 3: demuxer 增加真实 Seek 能力
 
