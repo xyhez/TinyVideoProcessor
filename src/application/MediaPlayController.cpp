@@ -158,18 +158,18 @@ void MediaPlayController::Start() {
 }
 
 void MediaPlayController::Stop() {
+    if (!demuxer_ || !Adecoder_ || !Vdecoder_ || !syncManager_) {
+        SetState(PlaybackState::Stopped);
+        return;
+    }
+
+    if (state_ != PlaybackState::Stopped && !SuspendPipelineAndWait()) {
+        qWarning() << "Stop failed: playback pipeline suspend failed";
+        return;
+    }
+
+    ResetPipelineToStart();
     SetState(PlaybackState::Stopped);
-
-    APacket_->RequestStop();
-    VPacket_->RequestStop();
-    AFrame_->RequestStop();
-    VFrame_->RequestStop();
-
-    demuxer_->Stop();
-    Adecoder_->Stop();
-    Vdecoder_->Stop();
-    audioplay_->Stop();
-    videoRender_->StopRendering();
 }
 
 void MediaPlayController::Pause() {
@@ -280,6 +280,21 @@ void MediaPlayController::RestorePlaybackState(PlaybackState previousState) {
     }
 
     SetState(previousState);
+}
+
+void MediaPlayController::ResetPipelineToStart() {
+    if (videoRender_) {
+        videoRender_->StopRendering();
+    }
+    if (audioplay_) {
+        audioplay_->Pause();
+    }
+
+    ClearQueues();
+    demuxer_->SeekTo(0.0);
+    FlushDecoders();
+    ClearQueues();
+    syncManager_->SeekTo(0.0);
 }
 
 void MediaPlayController::ClearQueues() {

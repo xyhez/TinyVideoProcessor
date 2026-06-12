@@ -98,12 +98,12 @@
 
 ## 任务 6: Stop 行为回到起始位置
 
-- [ ] 明确 Stop 和 Pause 的状态差异。
-- [ ] Stop 时停止播放管线。
-- [ ] Stop 时清空所有队列。
-- [ ] Stop 时 flush decoder。
-- [ ] Stop 时同步时钟回到 0。
-- [ ] Stop 后再次 Start 从 0 开始播放。
+- [x] 明确 Stop 和 Pause 的状态差异。
+- [x] Stop 时停止播放管线。
+- [x] Stop 时清空所有队列。
+- [x] Stop 时 flush decoder。
+- [x] Stop 时同步时钟回到 0。
+- [x] Stop 后再次 Start 从 0 开始播放。
 
 验收：
 

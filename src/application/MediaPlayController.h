@@ -98,6 +98,7 @@ private:
     void SetState(PlaybackState state);
     bool SuspendPipelineAndWait();
     void RestorePlaybackState(PlaybackState previousState);
+    void ResetPipelineToStart();
     void ClearQueues();
     void FlushDecoders();
 };
