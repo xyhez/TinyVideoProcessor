@@ -63,8 +63,16 @@ public:
 
     PlaybackState State() const;
 
+    double Duration() const;
+
+    double Position() const;
+
 signals:
     void StateChanged(PlaybackState state);
+
+    void PositionChanged(double seconds);
+
+    void DurationChanged(double seconds);
 
 private:
     // 队列
@@ -91,6 +99,9 @@ private:
     std::unique_ptr<QThread> AdecoderTH_;
     std::unique_ptr<QThread> VdecoderTH_;
     std::unique_ptr<QThread> audioplayTH_;
+
+    // 定时向主线程中提供当前视频播放进度
+    std::unique_ptr<QTimer> positionTimer_ = nullptr;
 
     PlaybackState state_ = PlaybackState::Stopped;
 

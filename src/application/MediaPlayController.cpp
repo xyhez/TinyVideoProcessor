@@ -32,7 +32,6 @@ bool MediaPlayController::Initialize(std::shared_ptr<IMediaSource> mediaSource, 
         qCritical() << "Media source is null";
         return false;
     }
-
     mediaSource_ = mediaSource;
     if (!mediaSource_->Open()) {
         qCritical() << "Failed to open media source";
@@ -47,6 +46,8 @@ bool MediaPlayController::Initialize(std::shared_ptr<IMediaSource> mediaSource, 
     audioplay_ = std::make_unique<AudioPlayer>();
     videoRender_ = new VideoRender(rendererContainer);
     syncManager_ = std::make_shared<syncmanager>();
+    positionTimer_ = std::make_unique<QTimer>();
+    positionTimer_->setInterval(200); // 间隔200毫秒
 
     // 4.子线程初始化
     demuxerTH_ = std::make_unique<QThread>();
@@ -88,6 +89,10 @@ void MediaPlayController::CreateConnects() {
 
     connect(audioplayTH_.get(), &QThread::started,
         audioplay_.get(), &AudioPlayer::StartAudioPlay);
+
+    connect(positionTimer_.get(), &QTimer::timeout, this , [this]() {
+        emit PositionChanged(Position());
+    });
 }
 
 void MediaPlayController::ReleaseResources() {
@@ -127,10 +132,19 @@ void MediaPlayController::ReleaseResources() {
     VFrame_.reset();
     syncManager_.reset();
     mediaSource_.reset();
+    positionTimer_.reset();
 }
 
 MediaPlayController::PlaybackState MediaPlayController::State() const {
     return state_;
+}
+
+double MediaPlayController::Duration() const {
+    return mediaSource_ ? static_cast<double>(mediaSource_->GetSourceInfo().duration_):0.0;
+}
+
+double MediaPlayController::Position() const {
+    return syncManager_ ? syncManager_->GetClock() / 1000.0 : 0.0;
 }
 
 void MediaPlayController::SetState(PlaybackState state) {
@@ -144,6 +158,10 @@ void MediaPlayController::SetState(PlaybackState state) {
 
 void MediaPlayController::Start() {
     SetState(PlaybackState::Playing);
+
+    positionTimer_->start();
+    emit PositionChanged(Position());
+    emit DurationChanged(Duration());
 
     demuxerTH_->start();
     AdecoderTH_->start();
@@ -168,6 +186,9 @@ void MediaPlayController::Stop() {
         return;
     }
 
+    emit PositionChanged(0.0);
+    positionTimer_->stop();
+
     ResetPipelineToStart();
     SetState(PlaybackState::Stopped);
 }
@@ -179,6 +200,8 @@ void MediaPlayController::Pause() {
     Vdecoder_->Pause();
     audioplay_->Pause();
     videoRender_->Pause();
+    PositionChanged(Position());
+    positionTimer_->stop();
 }
 
 void MediaPlayController::VolumeUp() {
@@ -229,6 +252,8 @@ void MediaPlayController::SeekTo(double seconds) {
     ClearQueues();
     syncManager_->SeekTo(targetSeconds * 1000.0);
 
+    emit PositionChanged(Position());
+
     RestorePlaybackState(previousState);
 }
 
@@ -243,6 +268,7 @@ void MediaPlayController::SeekRelative(double seconds) {
 
 void MediaPlayController::Rewind() {
     SeekRelative(-kSeekStepSeconds);
+
 }
 
 void MediaPlayController::Forward() {

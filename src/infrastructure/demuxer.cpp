@@ -63,7 +63,7 @@ demuxer::demuxer(std::shared_ptr<IMediaSource> mediaSource
             }
             info.V_timeBase = av_q2d(ic->streams[i]->time_base);
             if (ic->duration > 0) {
-                info.duration_ = ic->duration/1000000;
+                info.duration_ = ic->duration/1000000; // info拿到的duration单位是s
             }
 
         }

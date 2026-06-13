@@ -23,6 +23,8 @@ class MainWindow : public QMainWindow
 public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
+    // 链接信号槽
+    void CreateConnects();
 
     void NoticeWindow(QString message);
     void closeEvent(QCloseEvent *event) override;

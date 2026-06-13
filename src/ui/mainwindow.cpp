@@ -1,6 +1,8 @@
-#include "ui/mainwindow.h"
+﻿#include "ui/mainwindow.h"
 #include "ui_mainwindow.h"
 #include "domain/FileMediaSource.h"
+
+#include <QDebug>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -11,17 +13,33 @@ MainWindow::MainWindow(QWidget *parent)
     this->setWindowTitle("modernFFplay-V2.0");
 
     //1.应用层初始化
-    QString filepath = "D:\\githubProject\\TinyVideoProcessor\\resource\\动物发现自己被绿.mp4";
-    auto mediaSource = std::make_shared<FileMediaSource>(filepath);
+    QString filepath = "F:\\desk\\图\\VID_20260116_151539.mp4";
+    std::shared_ptr<IMediaSource> mediaSource = std::make_shared<FileMediaSource>(filepath);
     if (!mediaPlayController_->Initialize(mediaSource, ui->video_widget)) {
         qCritical() << "Controller 初始化失败";
         return;
     }
 
-    connect(mediaPlayController_.get(), &MediaPlayController::StateChanged,
-            this, &MainWindow::UpdatePlaybackControls);
     UpdatePlaybackControls(mediaPlayController_->State());
 
+    CreateConnects();
+}
+
+void MainWindow::CreateConnects() {
+    connect(mediaPlayController_.get(), &MediaPlayController::StateChanged,
+            this, &MainWindow::UpdatePlaybackControls);
+
+    connect(mediaPlayController_.get(),&MediaPlayController::PositionChanged,this,[this](double position) {
+        int m = position/60;
+        int s = position - m * 60;
+        qDebug()<< "当前播放进度：" << QString::number(m) << ":" << QString::number(s);
+    });
+
+    connect(mediaPlayController_.get(),&MediaPlayController::DurationChanged,this,[this](double duration){
+        int m = duration/60;
+        int s = duration - m * 60;
+        qDebug() << "视频总时长：" << QString::number(m) << ":" << QString::number(s);
+    });
 }
 
 void MainWindow::NoticeWindow(QString message)
@@ -131,10 +149,12 @@ void MainWindow::VolumeDown() {
 
 void MainWindow::Rewind() {
     mediaPlayController_->Rewind();
+    NoticeWindow("快退：10秒");
 }
 
 void MainWindow::Forward() {
     mediaPlayController_->Forward();
+    NoticeWindow("快进：10秒");
 }
 
 void MainWindow::on_pushButton_play_clicked()

@@ -20,7 +20,7 @@ struct Fileinfo {
     int width_ = 0;
     int height_ = 0;
     AVCodecID CodecId_ = AV_CODEC_ID_NONE;
-    int duration_ = 0;
+    int duration_ = 0;          ///< 秒
     double FrameRate = 30.0;
     double A_timeBase = 0.0;
     double V_timeBase = 0.0;
