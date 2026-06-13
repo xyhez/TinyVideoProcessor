@@ -14,9 +14,34 @@
    <string>MainWindow</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QVBoxLayout" name="verticalLayout" stretch="10,1">
+   <layout class="QVBoxLayout" name="verticalLayout" stretch="20,1,1">
     <item>
      <widget class="QWidget" name="video_widget" native="true"/>
+    </item>
+    <item>
+     <layout class="QHBoxLayout" name="horizontalLayout_2">
+      <item>
+       <widget class="QLabel" name="label_position">
+        <property name="text">
+         <string>播放时间</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QSlider" name="slider_progress">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="label_duration">
+        <property name="text">
+         <string>视频时间</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
     </item>
     <item>
      <widget class="QWidget" name="widget_func" native="true">
@@ -46,7 +71,7 @@
      <x>0</x>
      <y>0</y>
      <width>1122</width>
-     <height>19</height>
+     <height>21</height>
     </rect>
    </property>
   </widget>

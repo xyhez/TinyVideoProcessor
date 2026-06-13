@@ -30,15 +30,29 @@ void MainWindow::CreateConnects() {
             this, &MainWindow::UpdatePlaybackControls);
 
     connect(mediaPlayController_.get(),&MediaPlayController::PositionChanged,this,[this](double position) {
-        int m = position/60;
-        int s = position - m * 60;
-        qDebug()<< "当前播放进度：" << QString::number(m) << ":" << QString::number(s);
+        if(!isSliderDragging_) {
+            int pos = static_cast<int>(position);
+            ui->slider_progress->setValue(pos);
+            ui->label_position->setText(formatTime(position));
+            qDebug()<< "当前播放进度：" << formatTime(position);
+        }
     });
 
     connect(mediaPlayController_.get(),&MediaPlayController::DurationChanged,this,[this](double duration){
-        int m = duration/60;
-        int s = duration - m * 60;
-        qDebug() << "视频总时长：" << QString::number(m) << ":" << QString::number(s);
+        ui->slider_progress->setRange(0,static_cast<int>(duration));
+        ui->slider_progress->setEnabled(static_cast<int>(duration) > 0);
+        ui->label_duration->setText(formatTime(duration));
+        qDebug() << "视频总时长：" << formatTime(duration);
+    });
+
+    connect(ui->slider_progress,&QSlider::sliderPressed,this,[this](){
+        isSliderDragging_ = true;
+    });
+
+    connect(ui->slider_progress,&QSlider::sliderReleased,this,[this](){
+        double target = static_cast<double>(ui->slider_progress->value());
+        mediaPlayController_->SeekTo(target);
+        isSliderDragging_ = false;
     });
 }
 
@@ -166,3 +180,10 @@ void MainWindow::on_pushButton_pause_clicked()
 {
     Pause();
 }
+
+QString MainWindow::formatTime(double totalSeconds) {
+    int m = totalSeconds/60;
+    int s = totalSeconds - m * 60;
+    return QString("%1:%2").arg(m).arg(s, 2, 10, QChar('0'));
+}
+

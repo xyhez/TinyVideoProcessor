@@ -254,16 +254,120 @@
 
 ## 任务 8: 为进度条 Seek 做接口准备
 
-- [ ] 明确进度条显示单位：UI 使用毫秒或百分比，Controller 接口继续使用秒。
-- [ ] `MainWindow` 只绑定进度条事件，不直接操作 demuxer/decoder/syncmanager。
-- [ ] 播放位置更新时，由 `PositionChanged(double seconds)` 刷新进度条。
-- [ ] 总时长更新时，由 `DurationChanged(double seconds)` 设置进度条范围。
-- [ ] 用户按下进度条时暂停 UI 自动回写，避免信号互相驱动。
-- [ ] 用户拖动过程中只更新 UI 预览位置，不连续调用 seek。
-- [ ] 用户释放进度条时调用 `MediaPlayController::SeekTo(targetSeconds)`。
-- [ ] Seek 调用完成后恢复进度条跟随 `PositionChanged`。
-- [ ] 处理总时长为 0 或媒体源不可 seek 的边界。
-- [ ] 形成报告：`doc/Phase1_1_任务8_进度条Seek接口报告.md`
+> 拆解为 5 个子步骤，每步编译验证。
+
+**设计原则**：MainWindow 只认 Controller 的 `PositionChanged` / `DurationChanged` / `SeekTo()`，不直接依赖基础设施层。
+
+---
+
+### 8.1 UI 添加进度条和时间标签
+
+**目标**：在 `mainwindow.ui` 中加入 `QSlider` + 两个时间 `QLabel`，控件就位但先不接线。
+
+- [ ] 在 `mainwindow.ui` 的 `widget_func` 中增加一行水平布局：
+  - `QLabel("label_current")` — 当前时间，默认显示 `00:00`
+  - `QSlider("slider_progress")` — 水平进度条（Orientation: Horizontal）
+  - `QLabel("label_duration")` — 总时长，默认显示 `00:00`
+- [ ] `.ui` 文件手动编辑 XML，不引入 Qt Designer 依赖。
+- [ ] `mainwindow.cpp` 中通过 `ui->label_current`、`ui->slider_progress`、`ui->label_duration` 可访问。
+- [ ] 编译验证。
+
+验收：
+- [ ] 窗口启动后看到进度条和两个时间标签。
+- [ ] 进度条初始禁用或值为 0。
+
+---
+
+### 8.2 连接信号：DurationChanged → 设置滑块范围 + 更新总时长标签
+
+**目标**：拿到总时长后，设置 `QSlider::setRange()` 和总时长标签文本。
+
+- [ ] 在 `CreateConnects()` 中增加 `DurationChanged` 连接：
+  ```cpp
+  connect(controller, &MediaPlayController::DurationChanged, this, [this](double seconds) {
+      int total = static_cast<int>(seconds);
+      ui->slider_progress->setRange(0, total);
+      ui->slider_progress->setEnabled(total > 0);
+      ui->label_duration->setText(formatTime(total));
+  });
+  ```
+- [ ] 增加私有辅助函数 `QString formatTime(int totalSeconds)` → `"MM:SS"`。
+- [ ] 编译验证。
+
+验收：
+- [ ] 播放开始后，总时长标签显示正确 MM:SS。
+- [ ] 滑块范围随总时长设置。
+- [ ] 总时长为 0 时滑块禁用。
+
+---
+
+### 8.3 连接信号：PositionChanged → 更新滑块位置 + 当前时间标签
+
+**目标**：播放时滑块跟随位置前进。
+
+- [ ] 在 `CreateConnects()` 中增加 `PositionChanged` 连接：
+  ```cpp
+  connect(controller, &MediaPlayController::PositionChanged, this, [this](double seconds) {
+      if (!m_isSliderDragging) {
+          int pos = static_cast<int>(seconds);
+          ui->slider_progress->setValue(pos);
+          ui->label_current->setText(formatTime(pos));
+      }
+  });
+  ```
+- [ ] `mainwindow.h` 增加 `bool m_isSliderDragging = false;` 成员。
+- [ ] 编译验证。
+
+验收：
+- [ ] 播放时滑块平滑前进。
+- [ ] 当前时间标签持续更新。
+- [ ] Stop 后滑块回到 0，标签显示 00:00。
+- [ ] Pause 时滑块冻结不变。
+
+---
+
+### 8.4 连接滑块信号：按下/拖动/释放
+
+**目标**：用户拖动滑块时暂停自动更新，释放时触发 Seek。
+
+- [ ] 连接 `slider_progress::sliderPressed`：设置 `m_isSliderDragging = true;`
+- [ ] 连接 `slider_progress::sliderMoved`（拖动中）：更新当前时间标签预览值 `ui->label_current->setText(formatTime(value));`，不调 SeekTo。
+- [ ] 连接 `slider_progress::sliderReleased`：
+  ```cpp
+  double target = static_cast<double>(ui->slider_progress->value());
+  controller->SeekTo(target);
+  m_isSliderDragging = false;
+  ```
+  SeekTo 完成后 `PositionChanged` 会发射，8.3 中的 `m_isSliderDragging` 已恢复 false，滑块恢复被 PositionChanged 驱动。
+- [ ] 编译验证。
+
+验收：
+- [ ] 拖动滑块时当前时间标签跟随预览值变化。
+- [ ] 拖动过程中不调用 SeekTo（不会触发视频跳转）。
+- [ ] 释放滑块后视频跳到目标位置。
+- [ ] 释放后进度条恢复跟随 PositionChanged。
+
+---
+
+### 8.5 边界情况处理 + 形成报告
+
+**目标**：防止异常情况导致 crash 或行为异常。
+
+- [ ] 总时长为 0：`DurationChanged` 中 `total > 0` 判断已处理滑块禁用（8.2）。
+- [ ] Stop 后滑块归零：`PositionChanged(0.0)` 已在 Controller 中 emit，8.3 中 `setValue(0)` 自然处理。
+- [ ] 滑块值范围校验：`sliderReleased` 中 `targetSeconds` 已由 Controller `SeekTo()` 内部 clamp（无需 MainWindow 重复）。
+- [ ] 快速双击空格（Pause→Play→Pause）时 `m_isSliderDragging` 不会卡在 true：因为 `sliderPressed` 只有鼠标/触控触发，键盘操作不影响。
+- [ ] 初始状态：`label_current` = `00:00`，`label_duration` = `00:00`，`slider_progress` 禁用。
+- [ ] 汇总以上，形成报告：`doc/Phase1_1_任务8_进度条Seek接口报告.md`
+
+验收：
+- [ ] 进度条显示不反向驱动播放状态混乱。
+- [ ] 用户拖动进度条后能跳到对应位置。
+- [ ] 拖动进度条不会破坏音视频同步。
+- [ ] 拖动过程中不会触发高频 seek。
+- [ ] `MainWindow` 没有新增基础设施层依赖。
+
+---
 
 验收：
 

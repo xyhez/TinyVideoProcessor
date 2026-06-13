@@ -47,6 +47,10 @@ private:
     std::unique_ptr<MediaPlayController> mediaPlayController_ = nullptr;
 
     void UpdatePlaybackControls(MediaPlayController::PlaybackState state);
+
+    bool isSliderDragging_ = false;
+
+    QString formatTime(double totalSeconds);
 };
 
 #endif // MAINWINDOW_H
