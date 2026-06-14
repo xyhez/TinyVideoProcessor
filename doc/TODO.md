@@ -377,25 +377,133 @@
 - [ ] 拖动过程中不会触发高频 seek。
 - [ ] `MainWindow` 没有新增基础设施层依赖。
 
-## 任务 9: 播放速度控制预研
+## 任务 9: 播放速度控制
 
-- [ ] 调研当前 `AudioPlayer` 输出链路是否支持不变调变速。
-- [ ] 确认是否需要引入音频变速处理：重采样、丢/插样、或后续接入专用算法。
-- [ ] 确认 `VideoRender` 的帧间隔如何按速度缩放。
-- [ ] 确认 `syncmanager` 主时钟是否需要引入 playback speed 概念。
-- [ ] 设计 `MediaPlayController::SetPlaybackSpeed(double speed)` 对外接口。
-- [ ] 设计 `PlaybackSpeedChanged(double speed)` 信号。
-- [ ] 明确支持范围：优先 0.5x、1.0x、1.5x、2.0x。
-- [ ] 明确异常输入处理：小于等于 0、过大速度、非有限数。
-- [ ] 明确播放速度与 Seek/Stop/Pause 的交互关系。
-- [ ] 暂不编码实现速度控制，只产出方案，避免和 Seek 稳定性风险叠加。
-- [ ] 形成报告：`doc/Phase1_1_任务9_播放速度控制预研报告.md`
+> 预研已完成，方案见 `doc/Phase1_1_任务9_播放速度控制预研报告.md`。
+> 核心思路：缩放音频 PCM 写输出 → 帧消费速度改变 → 主时钟推进速度自然跟随 → 视频同步逻辑无需改动。
+> 每步编译验证。
+
+---
+
+### 9.1 AudioPlayer 增加速度控制
+
+**目标**：新增 `SetSpeed(double)` 方法，缩放每次写入 `QAudioSink` 的 PCM 数据量。
+
+- [ ] `audioplayer.h` 增加成员 `double m_speed = 1.0;`
+- [ ] `audioplayer.h` 增加方法声明 `void SetSpeed(double speed);`
+- [ ] `audioplayer.cpp` 实现 `SetSpeed()`：
+  - 边界保护：speed ≤ 0 或非有限数直接 return
+  - 精度截断到 0.05：`qRound(speed * 20.0) / 20.0`
+  - 赋值 `m_speed = speed;`
+- [ ] `audioplayer.cpp` 修改 `Run()` 中写 PCM 循环（第199-230行）：
+  - 计算有效 chunk：`effectiveChunk = chunk / m_speed`
+  - speed > 1.0：只写 `effectiveChunk` 字节，跳过 `chunk - effectiveChunk` 字节（快放采样丢弃）
+  - speed < 1.0：写 `effectiveChunk` 字节，但循环重复写 `qRound(1.0/m_speed)` 次（慢放采样重复）
+  - speed == 1.0：行为不变
+  - 同步推进 `totalBytesWritten` 逻辑（保持实际写入量，以维护延迟计算准确）
+- [ ] 编译验证。
+
+验收：
+- [ ] `SetSpeed(2.0)` 后音频播放速度翻倍（音调升高，可接受已知限制）。
+- [ ] `SetSpeed(0.5)` 后音频播放速度减半（音调降低）。
+- [ ] 切换速度不 crash，不破坏重采样链路。
+
+---
+
+### 9.2 VideoRender 增加速度控制
+
+**目标**：新增 `SetSpeed(double)` 方法，按速度缩放帧间隔。
+
+- [ ] `videorender.h` 增加成员 `double m_speed = 1.0;`。
+- [ ] `videorender.h` 增加方法声明 `void SetSpeed(double speed);`
+- [ ] `videorender.cpp` 实现 `SetSpeed()`：
+  - 边界保护同 9.1。
+  - 更新 `m_speed = speed;`
+- [ ] `videorender.cpp` 修改 `RenderFrame()` 中 `ScheduleNextFrame(m_frameIntervalMs)` 改为 `ScheduleNextFrame(scaledInterval)`，其中 `scaledInterval = qMax(1, qRound(m_frameIntervalMs / m_speed))`。
+- [ ] 编译验证。
+
+验收：
+- [ ] 2.0x 时帧间隔减半（`m_frameIntervalMs/2`），视频渲染频率翻倍。
+- [ ] 0.5x 时帧间隔加倍，视频渲染频率减半。
+- [ ] 音视频同步保持（主时钟由音频驱动，自然跟随）。
+
+---
+
+### 9.3 MediaPlayController 增加 SetPlaybackSpeed 入口
+
+**目标**：应用层统一入口，输入验证，下发到 AudioPlayer + VideoRender 两个组件。
+
+- [ ] `MediaPlayController.h` 增加：
+  ```cpp
+  public:
+      void SetPlaybackSpeed(double speed);
+      double PlaybackSpeed() const;
+  signals:
+      void PlaybackSpeedChanged(double speed);
+  private:
+      double playbackSpeed_ = 1.0;
+  ```
+- [ ] `MediaPlayController.cpp` 实现 `SetPlaybackSpeed()`：
+  - `speed <= 0.0 || !std::isfinite(speed)` → qWarning + return
+  - 精度截断到 0.05
+  - `if (qFuzzyCompare(playbackSpeed_, speed)) return;` 去重
+  - `playbackSpeed_ = speed;`
+  - `audioplay_->SetSpeed(speed);`
+  - `videoRender_->SetSpeed(speed);`
+  - `emit PlaybackSpeedChanged(speed);`
+- [ ] `PlaybackSpeed() const` 直接 return `playbackSpeed_`。
+- [ ] 编译验证。
+
+验收：
+- [ ] `SetPlaybackSpeed(2.0)` 调用后 AudioPlayer 和 VideoRender 都收到速度变更。
+- [ ] 重复设相同速度不会重复下发（去重生效）。
+- [ ] 无效值（0、-1、NaN）被拒绝，不影响当前播放。
+
+---
+
+### 9.4 MainWindow 绑定速度控制快捷键（可选）
+
+**目标**：用键盘快速切换播放速度，验证整个链路。
+
+- [ ] `keyReleaseEvent` 增加快捷键：
+  - `Qt::Key_1` → `SetPlaybackSpeed(0.5)` + `NoticeWindow("速度: 0.5x")`
+  - `Qt::Key_2` → `SetPlaybackSpeed(1.0)` + `NoticeWindow("速度: 1.0x")`
+  - `Qt::Key_3` → `SetPlaybackSpeed(1.5)` + `NoticeWindow("速度: 1.5x")`
+  - `Qt::Key_4` → `SetPlaybackSpeed(2.0)` + `NoticeWindow("速度: 2.0x")`
+- [ ] 连接 `PlaybackSpeedChanged` 信号，debug 输出当前速度。
+- [ ] 编译验证。
+
+验收：
+- [ ] 按键 1/2/3/4 能实时切换速度。
+- [ ] 速度切换后音视频同步保持。
+- [ ] 切换速度不中断播放。
+
+---
+
+### 9.5 边界测试
+
+**目标**：手动验证关键场景，确认无回归。
+
+- [ ] 正常速度播放 10s → 切 2.0x 播放 10s → 切回 1.0x → 音视频同步不丢。
+- [ ] 2.0x 播放中 Pause → 恢复 → 速度保持 2.0x。
+- [ ] 0.5x 播放中 Seek → Seek 后速度保持 0.5x。
+- [ ] 2.0x 播放中 Stop → Start → 速度保持 2.0x（速度是持久状态）。
+- [ ] 高速播放（2.0x）时拖动进度条 Seek → 不 crash。
+
+验收：
+- [ ] Speed 不因 Pause/Seek/Stop 而意外重置。
+- [ ] 所有速度切换不 crash。
+- [ ] `MainWindow` 不直接依赖基础设施层。
+
+---
 
 验收：
 
-- [ ] 形成实现方案后再进入编码。
-- [ ] 方案明确音频、视频、同步时钟三方职责。
-- [ ] 方案不要求 `MainWindow` 直接控制基础设施层。
+- [ ] 0.5x/1.0x/1.5x/2.0x 切换正常。
+- [ ] 变速后音视频保持同步。
+- [ ] Seek/Stop/Pause 后速度状态保持。
+- [ ] 无效速度输入被拒绝。
+- [ ] `MainWindow` 不直接依赖基础设施层。
 
 ## 1.1 完成标准
 
@@ -406,3 +514,177 @@
 - [ ] 进度信息能用于 UI 进度条。
 - [ ] `MainWindow` 没有新增基础设施层依赖。
 - [ ] 没有新增全局变量。
+
+---
+
+# Phase 1.2: 文件列表管理
+
+> 目标：播放列表 + 切换文件 + 循环模式。
+
+---
+
+## 1.2.1 创建 PlaylistManager 数据类
+
+**目标**：新建领域层类，管理文件路径列表、当前播放索引、播放模式。纯数据逻辑，不依赖 Qt GUI。
+
+- [ ] 新建 `src/domain/PlaylistManager.h/.cpp`。
+- [ ] 定义 `enum class PlayMode { Sequential, SingleLoop, ListLoop, Random };`
+- [ ] `PlaylistManager` 继承 `QObject`：
+  ```cpp
+  class PlaylistManager : public QObject {
+      Q_OBJECT
+  public:
+      void AddFile(const QString& filePath);
+      void RemoveFile(int index);
+      void Clear();
+      int Count() const;
+      int CurrentIndex() const;
+      QString CurrentFile() const;
+      QString NextFile();       // 根据 PlayMode 计算
+      QString PreviousFile();   // 根据 PlayMode 计算
+      void SetPlayMode(PlayMode mode);
+      PlayMode GetPlayMode() const;
+      void SetCurrentIndex(int index);
+  signals:
+      void PlaylistChanged();
+      void CurrentIndexChanged(int index);
+  private:
+      QStringList files_;
+      int currentIndex_ = -1;
+      PlayMode playMode_ = PlayMode::Sequential;
+  };
+  ```
+- [ ] `NextFile()` 逻辑：
+  - Sequential：`index+1`，到末尾停
+  - SingleLoop：`index` 不变（当前文件循环）
+  - ListLoop：`index+1`，到末尾回绕到 0
+  - Random：随机选一个不同于当前的 index
+- [ ] `PreviousFile()` 逻辑：`index-1`，非负数；random 模式同 next 随机选。
+- [ ] `AddFile` 去重（相同路径不重复加入）。
+- [ ] `CMakeLists.txt` 添加 `src/domain/PlaylistManager.cpp`。
+- [ ] 编译验证。
+
+验收：
+- [ ] AddFile/Clear/Count 正确。
+- [ ] NextFile/PreviousFile 四种模式行为正确。
+- [ ] Random 不会连续两次返回同一首（至少尝试避免）。
+- [ ] 去重生效。
+
+---
+
+## 1.2.2 UI 布局改造：左侧加文件列表
+
+**目标**：`mainwindow.ui` 改为水平分栏：左侧 `QListWidget`，右侧保持现有垂直三块。
+
+- [ ] 修改 `mainwindow.ui` 的 `centralwidget` 布局：
+  - 外层从 `QVBoxLayout` 改为 `QHBoxLayout`
+  - 左侧：`QListWidget("listWidget_files")` — 文件列表，固定宽度 ~200px
+  - 右侧：`QWidget` 包裹原有 `QVBoxLayout`（视频+进度条+按钮），stretch=1
+- [ ] `QListWidget` 设置：
+  - `selectionMode`: SingleSelection
+  - `dragDropMode`: InternalMove（后续 1.2.7 启用拖拽）
+- [ ] 编译验证，窗口左侧出现空白列表。
+
+验收：
+- [ ] 窗口启动后左侧有 `QListWidget`，右侧视频区域正常显示。
+- [ ] 拖拽窗口边缘，列表和视频区域按比例缩放。
+
+---
+
+## 1.2.3 MediaPlayController 支持切换媒体源
+
+**目标**：`Stop() → 换源 → Start()` 目前分三步调用，加一个 `SwitchSource()` 一步完成。
+
+- [ ] `MediaPlayController.h` 增加 `bool SwitchSource(const QString& filePath);`
+- [ ] `MediaPlayController.cpp` 实现：
+  ```cpp
+  bool SwitchSource(const QString& filePath) {
+      // 1. 停止当前管线
+      Stop();
+      // 2. 释放旧资源（ReleaseResources 现有逻辑）
+      // 3. 创建新 FileMediaSource
+      // 4. 重新 Initialize
+      // 5. 如果之前是 Playing 状态，自动 Start
+  }
+  ```
+- [ ] 区分"全新初始化"和"切换源"：`SwitchSource` 可复用 `Initialize` 的逻辑，但需先 `ReleaseResources`。
+- [ ] 编译验证。
+
+验收：
+- [ ] 播放中调用 `SwitchSource(newFile)` → 停止旧视频，播新视频。
+- [ ] Stop 状态下调用 `SwitchSource` → 切换源但不自动播放。
+- [ ] 新文件路径无效时返回 false，不 crash。
+
+---
+
+## 1.2.4 MainWindow 连接列表交互
+
+**目标**：双击列表项 → 切换播放文件。启动时添加到列表。
+
+- [ ] `MainWindow::OpenFile()` 弹出文件对话框（`QFileDialog::getOpenFileNames`），批量添加 `*.mp4/*.mkv/*.avi`。
+- [ ] `MainWindow::CreateConnects()` 增加：
+  - `listWidget_files::itemDoubleClicked` → 取 `item->data(FilePathRole)` → `SwitchSource` + `Start`
+  - 或通过 `PlaylistManager::SetCurrentIndex` → `CurrentIndexChanged` → 切换
+- [ ] 构造函数中：初始化时把启动文件也加入 `PlaylistManager` + `listWidget`。
+- [ ] `listWidget` 中每项存文件路径（用 `Qt::UserRole`）。
+- [ ] 编译验证。
+
+验收：
+- [ ] 启动时当前文件出现在列表中。
+- [ ] 双击列表另一文件 → 切换播放。
+- [ ] 列表连续切换不 crash。
+
+---
+
+## 1.2.5 上一个/下一个 + 快捷键
+
+**目标**：UI 按钮 + 键盘快捷键实现切集。
+
+- [ ] `widget_func` 增加 `pushButton_prev`（上一个）和 `pushButton_next`（下一个）。
+- [ ] `on_pushButton_prev_clicked` → `PlaylistManager::PreviousFile()` → `SwitchSource` + `Start`
+- [ ] `on_pushButton_next_clicked` → `PlaylistManager::NextFile()` → `SwitchSource` + `Start`
+- [ ] 播放到末尾（Sequential 模式最后一个文件结束）→ 自动停，发信号通知 UI。
+- [ ] `keyReleaseEvent` 增加：
+  - `Ctrl+Left` → prev
+  - `Ctrl+Right` → next
+- [ ] 编译验证。
+
+验收：
+- [ ] Prev/Next 切集后音视频同步正常。
+- [ ] 第一个文件按 Prev 不 crash（留在原位）。
+- [ ] 最后一个文件 Next 后：Sequential 模式停止，ListLoop 回绕到第一个。
+
+---
+
+## 1.2.6 播放模式切换
+
+**目标**：右键菜单或按钮切换四种播放模式。
+
+- [ ] `widget_func` 增加 `QComboBox("comboBox_mode")` 或一组互斥按钮，四个选项：顺序/单曲循环/列表循环/随机。
+- [ ] `MainWindow::CreateConnects()` 增加：
+  - `comboBox_mode::currentIndexChanged` → `PlaylistManager::SetPlayMode()`
+- [ ] 播放到文件末尾时检测模式决定行为：
+  - Sequential：停止，`NoticeWindow("播放完毕")`
+  - SingleLoop：`SeekTo(0)` + `Start`（从头循环当前文件）
+  - ListLoop：`NextFile()` + `SwitchSource` + `Start`
+  - Random：`NextFile()`（随机） + `SwitchSource` + `Start`
+- [ ] 检测 EOF 的时机：`MediaPlayController` 监听 demuxer 的 EOF 信号（如果已有），或通过 `StateChanged` + `Position ≈ Duration` 判断。
+- [ ] 编译验证。
+
+验收：
+- [ ] 四种模式切换后立即生效。
+- [ ] 单曲循环：视频播完自动从头开始。
+- [ ] 列表循环：最后一集播完切回第一集。
+- [ ] 顺序播放：播完停止不跳。
+- [ ] 随机播放：每次 NextFile 顺序不固定。
+
+---
+
+## 验收：
+
+- [ ] 播放列表支持添加/删除/清空。
+- [ ] 双击列表项切换播放。
+- [ ] 上一个/下一个按钮和快捷键正常工作。
+- [ ] 四种循环模式行为正确。
+- [ ] 文件列表不反向侵入基础设施层。
+- [ ] `MainWindow` 通过 `PlaylistManager` 和 `MediaPlayController` 交互，不直接碰 demuxer/decoder。
