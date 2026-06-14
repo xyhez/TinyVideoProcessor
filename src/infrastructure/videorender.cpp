@@ -1,5 +1,4 @@
 ﻿#include "videorender.h"
-#include <QDebug>
 #include <QOpenGLPixelTransferOptions>
 
 static const int SYNC_THRESHOLD_MS = 40;
@@ -32,26 +31,21 @@ void VideoRender::InitVideoRender(std::shared_ptr<SyncQueue<AVFrame*>> frameQueu
     m_videoTimeBase = videoTimeBase;
 
     if (frameRate > 0 && frameRate < 120) {
-        m_frameInterval = qRound(1000.0 / frameRate);
+        m_frameIntervalMs = qRound(1000.0 / frameRate);
     }
 }
 
 void VideoRender::StartRendering()
 {
-    if (!m_timer) {
-        m_timer = new QTimer(this);
-        connect(m_timer, &QTimer::timeout, this, &VideoRender::RenderFrame);
-    }
-    m_timer->start(m_frameInterval);
+    m_running = true;
     m_rendered = 0;
     m_dropped = 0;
+    QTimer::singleShot(0, this, &VideoRender::RenderFrame);
 }
 
 void VideoRender::StopRendering()
 {
-    if (m_timer) {
-        m_timer->stop();
-    }
+    m_running = false;
     if (m_frameQueue) {
         m_frameQueue->WakeAll();
     }
@@ -59,40 +53,41 @@ void VideoRender::StopRendering()
 
 void VideoRender::RenderFrame()
 {
-    if (!m_frameQueue || !m_syncManager) return;
+    if (!m_running || !m_frameQueue || !m_syncManager) return;
 
+    // 1. 查看队首帧
     AVFrame* nextFrame = nullptr;
-    if (!m_frameQueue->Front(nextFrame)) {
-        return;
-    }
-
-    if (!nextFrame) {
+    if (!m_frameQueue->Front(nextFrame) || !nextFrame) {
+        ScheduleNextFrame(m_frameIntervalMs);
         return;
     }
 
     double videoPts = nextFrame->pts * m_videoTimeBase * 1000.0;
-    double audioPts = m_syncManager->GetClock()-20;
+    double audioPts = m_syncManager->GetClock() - 20;
     double diff = videoPts - audioPts;
-    // qDebug()<<"时钟:"<<audioPts<<"  当前视频帧的时间:"<<videoPts<<" 差距:"<<diff;
 
+    // 2. 帧来得太早 → 精确等待后重判
     if (diff > SYNC_THRESHOLD_MS) {
         int waitMs = qMin(qRound(diff), 30);
-        m_timer->setInterval(waitMs);
+        ScheduleNextFrame(waitMs);
         return;
     }
 
+    // 3. 帧来得太晚 → 丢帧追赶，立即判下一帧
     if (diff < -SYNC_THRESHOLD_MS) {
         AVFrame* drop = nullptr;
         if (m_frameQueue->TryPop(drop) && drop) {
             av_frame_free(&drop);
             m_dropped++;
         }
-        m_timer->setInterval(0);
+        ScheduleNextFrame(0);
         return;
     }
 
+    // 4. 在同步窗口内 → 渲染
     AVFrame* newFrame = nullptr;
     if (!m_frameQueue->TryPop(newFrame) || !newFrame) {
+        ScheduleNextFrame(m_frameIntervalMs);
         return;
     }
 
@@ -106,9 +101,15 @@ void VideoRender::RenderFrame()
     m_frameMutex.unlock();
 
     m_rendered++;
-
-    m_timer->setInterval(m_frameInterval);
     update();
+
+    // 5. 调度下一次：按帧间隔
+    ScheduleNextFrame(m_frameIntervalMs);
+}
+
+void VideoRender::ScheduleNextFrame(int delayMs)
+{
+    QTimer::singleShot(delayMs, this, &VideoRender::RenderFrame);
 }
 
 void VideoRender::initializeGL()

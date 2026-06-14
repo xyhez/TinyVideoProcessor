@@ -34,7 +34,6 @@ void MainWindow::CreateConnects() {
             int pos = static_cast<int>(position);
             ui->slider_progress->setValue(pos);
             ui->label_position->setText(formatTime(position));
-            qDebug()<< "当前播放进度：" << formatTime(position);
         }
     });
 
@@ -42,7 +41,6 @@ void MainWindow::CreateConnects() {
         ui->slider_progress->setRange(0,static_cast<int>(duration));
         ui->slider_progress->setEnabled(static_cast<int>(duration) > 0);
         ui->label_duration->setText(formatTime(duration));
-        qDebug() << "视频总时长：" << formatTime(duration);
     });
 
     connect(ui->slider_progress,&QSlider::sliderPressed,this,[this](){

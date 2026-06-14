@@ -18,8 +18,13 @@ extern "C" {
 }
 
 /**
- * @brief 视频渲染器 - 极简事件驱动版
- * @details 核心逻辑：Timer按视频帧率触发 → 取帧 → 同步判断 → 渲染/等待/丢帧
+ * @brief 视频渲染器 - 自调度事件驱动版
+ * @details 核心逻辑：自调度 RenderFrame → 取帧 → 同步判断 diff = frame.PTS - masterClock
+ *          → diff > 阈值：ScheduleNextFrame(delay) 精确等待
+ *          → diff < -阈值：丢帧，立即 ScheduleNextFrame(0) 追赶
+ *          → 正常：渲染，ScheduleNextFrame(帧间隔)
+ *          空闲时以帧间隔回退轮询，队列有帧则按需唤醒。
+ *          参考 ffplay video_refresh() 的自调度模式。
  */
 class VideoRender : public QOpenGLWidget, protected QOpenGLFunctions
 {
@@ -52,6 +57,7 @@ private:
     void DrawFrame();
     void CalcRect(float& x, float& y, float& w, float& h);
     void FreeTextures();
+    void ScheduleNextFrame(int delayMs);
 
     std::shared_ptr<SyncQueue<AVFrame*>> m_frameQueue;
     std::shared_ptr<syncmanager> m_syncManager;
@@ -63,10 +69,10 @@ private:
     AVFrame* m_displayFrame = nullptr;
     QMutex m_frameMutex;
 
-    QTimer* m_timer = nullptr;
-    int m_frameInterval = 33;
+    int m_frameIntervalMs = 33;
     double m_videoTimeBase = 0.0;
     bool m_hasFrame = false;
+    bool m_running = false;
 
     int m_videoW = 0, m_videoH = 0;
     AVRational m_sar = {1, 1};

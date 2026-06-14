@@ -195,12 +195,12 @@ void MediaPlayController::Stop() {
 
 void MediaPlayController::Pause() {
     SetState(PlaybackState::Paused);
+    emit PositionChanged(Position());
     demuxer_->Pause();
     Adecoder_->Pause();
     Vdecoder_->Pause();
     audioplay_->Pause();
     videoRender_->Pause();
-    PositionChanged(Position());
     positionTimer_->stop();
 }
 
