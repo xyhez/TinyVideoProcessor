@@ -395,6 +395,9 @@ int decoder::SuspendAndWait() {
         }
         pause_flag = true;
         suspend_requested_ = true;
+        if (suspended_) {
+            return 0;
+        }
         suspended_ = false;
     }
 
