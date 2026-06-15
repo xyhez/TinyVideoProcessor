@@ -31,24 +31,73 @@ MediaPlayController::~MediaPlayController() {
 }
 
 bool MediaPlayController::Initialize(std::shared_ptr<IMediaSource> mediaSource, QWidget *rendererContainer) {
+    if (!mediaSource) {
+        qCritical() << "Media source is null";
+        return false;
+    }
+
+    if (!mediaSource->Open()) {
+        qCritical() << "Failed to open media source";
+        return false;
+    }
+
+    if (!InitializeOpenedMediaSource(mediaSource, rendererContainer)) {
+        mediaSource->Close();
+        ReleaseResources();
+        return false;
+    }
+
+    return true;
+}
+
+bool MediaPlayController::SwitchSource(std::shared_ptr<IMediaSource> mediaSource,
+                                       QWidget* rendererContainer,
+                                       bool autoStart) {
+    if (!mediaSource) {
+        qWarning() << "SwitchSource failed: media source is null";
+        return false;
+    }
+
+    if (!mediaSource->Open()) {
+        qWarning() << "SwitchSource failed: open new media source failed";
+        return false;
+    }
+
+    Stop();
+    ReleaseResources();
+    SetState(PlaybackState::Stopped);
+
+    if (!InitializeOpenedMediaSource(mediaSource, rendererContainer)) {
+        qWarning() << "SwitchSource failed: initialize new media source failed";
+        mediaSource->Close();
+        ReleaseResources();
+        SetState(PlaybackState::Stopped);
+        emit DurationChanged(0.0);
+        emit PositionChanged(0.0);
+        return false;
+    }
+
+    if (autoStart) {
+        Start();
+    } else {
+        emit DurationChanged(Duration());
+        emit PositionChanged(Position());
+    }
+
+    return true;
+}
+
+bool MediaPlayController::InitializeOpenedMediaSource(std::shared_ptr<IMediaSource> mediaSource,
+                                                      QWidget* rendererContainer) {
+    mediaSource_ = mediaSource;
+
     // 1.初始化队列
     APacket_ = std::make_shared<SyncQueue<AVPacket*>>(kPacketQueueMax, packetDeleter);
     VPacket_ = std::make_shared<SyncQueue<AVPacket*>>(kPacketQueueMax, packetDeleter);
     AFrame_ = std::make_shared<SyncQueue<AVFrame*>>(kFrameQueueMax,  frameDeleter);
     VFrame_ = std::make_shared<SyncQueue<AVFrame*>>(kFrameQueueMax,  frameDeleter);
 
-    //2.初始化媒体源
-    if (!mediaSource) {
-        qCritical() << "Media source is null";
-        return false;
-    }
-    mediaSource_ = mediaSource;
-    if (!mediaSource_->Open()) {
-        qCritical() << "Failed to open media source";
-        return false;
-    }
-
-    //3.基层对象构造
+    // 2.基层对象构造
     demuxer_ = std::make_unique<demuxer>(mediaSource_,APacket_,VPacket_,AFrame_,VFrame_);
     const Fileinfo& sourceInfo = mediaSource_->GetSourceInfo();
     Adecoder_ = std::make_unique<decoder>();
@@ -59,13 +108,13 @@ bool MediaPlayController::Initialize(std::shared_ptr<IMediaSource> mediaSource, 
     positionTimer_ = std::make_unique<QTimer>();
     positionTimer_->setInterval(200); // 间隔200毫秒
 
-    // 4.子线程初始化
+    // 3.子线程初始化
     demuxerTH_ = std::make_unique<QThread>();
     AdecoderTH_ = std::make_unique<QThread>();
     VdecoderTH_ = std::make_unique<QThread>();
     audioplayTH_ = std::make_unique<QThread>();
 
-    // 5.将对象初始化并移动到对应的线程
+    // 4.将对象初始化并移动到对应的线程
     demuxer_->moveToThread(demuxerTH_.get());
     Adecoder_->InitDecoder(APacket_,AFrame_,demuxer_->ReAcoderPar(),demuxer_->ReAtimebase());
     Adecoder_->moveToThread(AdecoderTH_.get());
@@ -77,13 +126,15 @@ bool MediaPlayController::Initialize(std::shared_ptr<IMediaSource> mediaSource, 
     audioplay_->SetSpeed(playbackSpeed_);
     videoRender_->SetSpeed(playbackSpeed_);
 
-    //6.设置videorender
+    // 5.设置videorender
     if (rendererContainer) {
-        rendererContainer->setLayout(new QVBoxLayout());
+        if (!rendererContainer->layout()) {
+            rendererContainer->setLayout(new QVBoxLayout());
+        }
         rendererContainer->layout()->addWidget(videoRender_);
     }
 
-    //7.链接信号槽
+    // 6.链接信号槽
     CreateConnects();
 
     emit DurationChanged(Duration());
@@ -111,6 +162,10 @@ void MediaPlayController::CreateConnects() {
 }
 
 void MediaPlayController::ReleaseResources() {
+    if (positionTimer_) {
+        positionTimer_->stop();
+    }
+
     // 确保所有工作循环已停止（防 Stop() 未调）
     if (APacket_) { APacket_->RequestStop(); }
     if (VPacket_) { VPacket_->RequestStop(); }
@@ -139,13 +194,19 @@ void MediaPlayController::ReleaseResources() {
     Adecoder_.reset();
     Vdecoder_.reset();
     audioplay_.reset();
-    // videoRender_ 由 Qt 父子树管理，无需 delete
+    if (videoRender_) {
+        delete videoRender_;
+        videoRender_ = nullptr;
+    }
 
     APacket_.reset();
     VPacket_.reset();
     AFrame_.reset();
     VFrame_.reset();
     syncManager_.reset();
+    if (mediaSource_) {
+        mediaSource_->Close();
+    }
     mediaSource_.reset();
     positionTimer_.reset();
 }

@@ -59,6 +59,18 @@ public:
         QWidget* rendererContainer);
 
     /**
+     * @brief SwitchSource 切换当前媒体源
+     * @param mediaSource 新媒体源抽象
+     * @param rendererContainer 视频渲染容器
+     * @param autoStart 切换成功后是否立即播放
+     * @return true 切换成功
+     * @return false 切换失败
+     */
+    bool SwitchSource(std::shared_ptr<IMediaSource> mediaSource,
+                      QWidget* rendererContainer,
+                      bool autoStart);
+
+    /**
      * @brief CreateConnects 创建 Controller 内部信号槽连接
      */
     void CreateConnects();
@@ -201,6 +213,16 @@ private:
      * @brief ReleaseResources 释放当前播放管线资源
      */
     void ReleaseResources();
+
+    /**
+     * @brief InitializeOpenedMediaSource 使用已打开的媒体源初始化播放管线
+     * @param mediaSource 已打开的媒体源抽象
+     * @param rendererContainer 视频渲染容器
+     * @return true 初始化成功
+     * @return false 初始化失败
+     */
+    bool InitializeOpenedMediaSource(std::shared_ptr<IMediaSource> mediaSource,
+                                     QWidget* rendererContainer);
 
     /**
      * @brief SetState 设置播放状态并发出状态变化信号

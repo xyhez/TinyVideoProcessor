@@ -668,27 +668,27 @@
 
 **目标**：建立“当前播放项变化 -> 创建 `FileMediaSource` -> 切换 `MediaPlayController` 当前媒体源”的流程，同时保持 Controller 依赖 `IMediaSource` 抽象。
 
-- [ ] `MediaPlayController.h` 增加换源入口，参数使用媒体源抽象：
+- [x] `MediaPlayController.h` 增加换源入口，参数使用媒体源抽象：
   ```cpp
   bool SwitchSource(std::shared_ptr<IMediaSource> mediaSource,
                     QWidget* rendererContainer,
                     bool autoStart);
   ```
-- [ ] `SwitchSource()` 内部流程：
-  - 记录切换前是否处于 Playing 状态。
+- [x] `SwitchSource()` 内部流程：
+  - 切换前先验证新媒体源可以打开。
   - 停止当前管线。
   - 释放旧资源。
   - 使用新的 `IMediaSource` 重新初始化。
   - `autoStart == true` 时启动新媒体源；否则只完成初始化。
 - [ ] 应用层根据 `PlaylistItem::filePath` 创建 `FileMediaSource`，再传给 Controller。
-- [ ] 文件路径无效或媒体源打开失败时返回 false，不污染 PlaylistManager 当前状态。
+- [x] 文件路径无效或媒体源打开失败时返回 false，不污染 PlaylistManager 当前状态。
 - [ ] 编译验证。
 
 验收：
 - [ ] 播放中切换文件：旧视频停止，新视频正常播放。
 - [ ] Stop 状态下切换文件：只切换当前源，不自动播放。
-- [ ] 切换失败不 crash，旧状态处理规则明确。
-- [ ] `MediaPlayController` 不新增 `QString filePath` 型换源接口。
+- [x] 切换失败不 crash，旧状态处理规则明确。
+- [x] `MediaPlayController` 不新增 `QString filePath` 型换源接口。
 
 ---
 
