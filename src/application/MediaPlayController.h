@@ -106,6 +106,31 @@ public:
     void VolumeDown();
 
     /**
+     * @brief SetVolume 设置音量
+     * @param volume 音量值，范围 0.0-1.0
+     */
+    void SetVolume(double volume);
+
+    /**
+     * @brief Volume 获取当前音量
+     * @return 当前音量，范围 0.0-1.0
+     */
+    double Volume() const;
+
+    /**
+     * @brief SetMuted 设置静音状态
+     * @param muted 是否静音
+     */
+    void SetMuted(bool muted);
+
+    /**
+     * @brief IsMuted 获取当前静音状态
+     * @return true 已静音
+     * @return false 未静音
+     */
+    bool IsMuted() const;
+
+    /**
      * @brief SeekTo 跳转到指定播放位置
      * @param seconds 目标位置，单位秒
      */
@@ -187,6 +212,18 @@ signals:
      */
     void PlaybackFinished();
 
+    /**
+     * @brief VolumeChanged 音量变化信号
+     * @param volume 当前音量，范围 0.0-1.0
+     */
+    void VolumeChanged(double volume);
+
+    /**
+     * @brief MuteChanged 静音状态变化信号
+     * @param muted 是否静音
+     */
+    void MuteChanged(bool muted);
+
 private:
     // 队列
     std::shared_ptr<SyncQueue<AVPacket*>> APacket_ = nullptr;
@@ -218,6 +255,8 @@ private:
 
     PlaybackState state_ = PlaybackState::Stopped;
     double playbackSpeed_ = 1.0;
+    double volume_ = 1.0;
+    bool muted_ = false;
 
     /**
      * @brief ReleaseResources 释放当前播放管线资源

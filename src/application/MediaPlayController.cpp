@@ -3,6 +3,7 @@
 //
 
 #include "MediaPlayController.h"
+#include <algorithm>
 #include <QDebug>
 #include <qlayout.h>
 #include <cmath>
@@ -10,6 +11,8 @@
 namespace {
 constexpr double kSeekStepSeconds = 10.0;
 constexpr double kSpeedEpsilon = 0.001;
+constexpr double kVolumeStep = 0.05;
+constexpr double kVolumeEpsilon = 0.0001;
 
 bool IsSupportedPlaybackSpeed(double speed)
 {
@@ -136,6 +139,8 @@ bool MediaPlayController::InitializeOpenedMediaSource(std::shared_ptr<IMediaSour
 
     // 6.链接信号槽
     CreateConnects();
+    audioplay_->SetVolume(volume_);
+    audioplay_->SetMuted(muted_);
 
     emit DurationChanged(Duration());
     emit PositionChanged(Position());
@@ -161,6 +166,16 @@ void MediaPlayController::CreateConnects() {
 
     connect(positionTimer_.get(), &QTimer::timeout, this , [this]() {
         emit PositionChanged(Position());
+    });
+
+    connect(audioplay_.get(), &AudioPlayer::VolumeChanged, this, [this](qreal volume) {
+        volume_ = static_cast<double>(volume);
+        emit VolumeChanged(volume_);
+    });
+
+    connect(audioplay_.get(), &AudioPlayer::MuteChanged, this, [this](bool muted) {
+        muted_ = muted;
+        emit MuteChanged(muted_);
     });
 }
 
@@ -340,11 +355,46 @@ void MediaPlayController::Pause() {
 }
 
 void MediaPlayController::VolumeUp() {
-    audioplay_->VolumeUp();
+    SetVolume(volume_ + kVolumeStep);
 }
 
 void MediaPlayController::VolumeDown() {
-    audioplay_->VolumeDown();
+    SetVolume(volume_ - kVolumeStep);
+}
+
+void MediaPlayController::SetVolume(double volume) {
+    const double clampedVolume = std::clamp(volume, 0.0, 1.0);
+    if (std::fabs(volume_ - clampedVolume) < kVolumeEpsilon) {
+        return;
+    }
+
+    volume_ = clampedVolume;
+    if (audioplay_) {
+        audioplay_->SetVolume(volume_);
+    } else {
+        emit VolumeChanged(volume_);
+    }
+}
+
+double MediaPlayController::Volume() const {
+    return volume_;
+}
+
+void MediaPlayController::SetMuted(bool muted) {
+    if (muted_ == muted) {
+        return;
+    }
+
+    muted_ = muted;
+    if (audioplay_) {
+        audioplay_->SetMuted(muted_);
+    } else {
+        emit MuteChanged(muted_);
+    }
+}
+
+bool MediaPlayController::IsMuted() const {
+    return muted_;
 }
 
 void MediaPlayController::SeekTo(double seconds) {

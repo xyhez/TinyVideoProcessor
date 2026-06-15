@@ -828,21 +828,21 @@
 
 **目标**：应用层统一对外暴露音量控制，不让 UI 接触基础设施层。
 
-- [ ] 新增 `SetVolume(double volume)`。
-- [ ] 新增 `double Volume() const`。
-- [ ] 新增 `SetMuted(bool muted)`。
-- [ ] 新增 `bool IsMuted() const`。
-- [ ] 新增 `VolumeChanged(double volume)` 信号。
-- [ ] 新增 `MuteChanged(bool muted)` 信号。
-- [ ] 连接 `AudioPlayer::VolumeChanged` 到 Controller 信号。
-- [ ] 连接 `AudioPlayer::MuteChanged` 到 Controller 信号。
-- [ ] `VolumeUp()` / `VolumeDown()` 继续作为快捷入口保留。
-- [ ] Controller 持有当前音量和静音状态，换源后下发到新的 `AudioPlayer`。
+- [x] 新增 `SetVolume(double volume)`。
+- [x] 新增 `double Volume() const`。
+- [x] 新增 `SetMuted(bool muted)`。
+- [x] 新增 `bool IsMuted() const`。
+- [x] 新增 `VolumeChanged(double volume)` 信号。
+- [x] 新增 `MuteChanged(bool muted)` 信号。
+- [x] 连接 `AudioPlayer::VolumeChanged` 到 Controller 信号。
+- [x] 连接 `AudioPlayer::MuteChanged` 到 Controller 信号。
+- [x] `VolumeUp()` / `VolumeDown()` 继续作为快捷入口保留。
+- [x] Controller 持有当前音量和静音状态，换源后下发到新的 `AudioPlayer`。
 
 验收：
-- [ ] UI 只依赖 Controller 音量接口。
-- [ ] 切换文件后音量状态保持。
-- [ ] Controller 不新增 UI 控件依赖。
+- [x] UI 只依赖 Controller 音量接口。
+- [x] 切换文件后音量状态保持。
+- [x] Controller 不新增 UI 控件依赖。
 
 ---
 
