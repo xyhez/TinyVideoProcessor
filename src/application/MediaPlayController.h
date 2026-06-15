@@ -182,6 +182,11 @@ signals:
      */
     void PlaybackSpeedChanged(double speed);
 
+    /**
+     * @brief PlaybackFinished 当前媒体源自然播放结束信号
+     */
+    void PlaybackFinished();
+
 private:
     // 队列
     std::shared_ptr<SyncQueue<AVPacket*>> APacket_ = nullptr;

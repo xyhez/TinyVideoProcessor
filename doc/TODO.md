@@ -729,12 +729,12 @@
 - [x] `keyReleaseEvent` 增加：
   - `Ctrl+Left` -> prev。
   - `Ctrl+Right` -> next。
-- [ ] 播放到文件末尾时检测模式决定行为：
-  - Sequential：停止，`NoticeWindow("播放完毕")`
-  - SingleLoop：`SeekTo(0)` + `Start`（从头循环当前文件）
+- [x] 播放到文件末尾时检测模式决定行为：
+  - Sequential：停止并保持结束位置
+  - SingleLoop：重新切换当前项 + `Start`（EOF 后重建当前媒体源）
   - ListLoop：`MoveNext()` + 换源 + `Start`
   - Random：`MoveNext()` + 换源 + `Start`
-- [ ] 检测 EOF 的时机：`MediaPlayController` 监听 demuxer 的 EOF 信号（如果已有），或通过 `StateChanged` + `Position ≈ Duration` 判断。
+- [x] 检测 EOF 的时机：`MediaPlayController` 监听 demuxer 的 EOF 信号（如果已有），或通过 `StateChanged` + `Position ≈ Duration` 判断。
 - [ ] 编译验证。
 
 验收：

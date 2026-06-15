@@ -139,6 +139,11 @@ private:
     void PlayNext();
 
     /**
+     * @brief HandlePlaybackFinished 根据播放模式处理当前媒体播放结束
+     */
+    void HandlePlaybackFinished();
+
+    /**
      * @brief RefreshPlaylistView 刷新播放列表显示
      */
     void RefreshPlaylistView();

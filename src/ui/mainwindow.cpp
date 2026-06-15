@@ -55,6 +55,9 @@ void MainWindow::CreateConnects() {
         qDebug() << "Playback speed changed:" << speed;
     });
 
+    connect(mediaPlayController_.get(), &MediaPlayController::PlaybackFinished,
+            this, &MainWindow::HandlePlaybackFinished);
+
     connect(playlistManager_.get(), &PlaylistManager::PlaylistChanged, this, [this]() {
         RefreshPlaylistView();
     });
@@ -278,6 +281,26 @@ void MainWindow::PlayNext() {
         && originalIndex < playlistManager_->Count()) {
         playlistManager_->SetCurrentIndex(originalIndex);
     }
+}
+
+void MainWindow::HandlePlaybackFinished() {
+    if (playlistManager_->Count() == 0 || playlistManager_->CurrentIndex() < 0) {
+        return;
+    }
+
+    switch (playlistManager_->GetPlayMode()) {
+    case PlaylistManager::PlayMode::Sequential:
+        return;
+    case PlaylistManager::PlayMode::SingleLoop:
+        SwitchToPlaylistIndex(playlistManager_->CurrentIndex(), true);
+        return;
+    case PlaylistManager::PlayMode::ListLoop:
+    case PlaylistManager::PlayMode::Random:
+        PlayNext();
+        return;
+    }
+
+    return;
 }
 
 void MainWindow::RefreshPlaylistView() {

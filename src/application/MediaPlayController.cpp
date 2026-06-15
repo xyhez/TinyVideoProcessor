@@ -320,6 +320,7 @@ void MediaPlayController::HandleDemuxFinished() {
 
     SetState(PlaybackState::Stopped);
     emit PositionChanged(Duration());
+    emit PlaybackFinished();
 }
 
 void MediaPlayController::Pause() {
