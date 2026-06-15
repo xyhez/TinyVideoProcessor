@@ -27,7 +27,7 @@ MediaPlayController::MediaPlayController(QObject *parent)
 }
 
 MediaPlayController::~MediaPlayController() {
-    ReleaseResources();
+    Shutdown();
 }
 
 bool MediaPlayController::Initialize(std::shared_ptr<IMediaSource> mediaSource, QWidget *rendererContainer) {
@@ -155,6 +155,9 @@ void MediaPlayController::CreateConnects() {
 
     connect(audioplayTH_.get(), &QThread::started,
         audioplay_.get(), &AudioPlayer::StartAudioPlay);
+
+    connect(demuxer_.get(), &demuxer::DemuxFinished,
+            this, &MediaPlayController::HandleDemuxFinished);
 
     connect(positionTimer_.get(), &QTimer::timeout, this , [this]() {
         emit PositionChanged(Position());
@@ -297,6 +300,26 @@ void MediaPlayController::Stop() {
 
     ResetPipelineToStart();
     SetState(PlaybackState::Stopped);
+}
+
+void MediaPlayController::Shutdown() {
+    ReleaseResources();
+    SetState(PlaybackState::Stopped);
+}
+
+void MediaPlayController::HandleDemuxFinished() {
+    if (APacket_) {
+        APacket_->RequestStop();
+    }
+    if (VPacket_) {
+        VPacket_->RequestStop();
+    }
+    if (positionTimer_) {
+        positionTimer_->stop();
+    }
+
+    SetState(PlaybackState::Stopped);
+    emit PositionChanged(Duration());
 }
 
 void MediaPlayController::Pause() {

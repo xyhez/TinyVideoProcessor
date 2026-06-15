@@ -86,6 +86,11 @@ public:
     void Stop();
 
     /**
+     * @brief Shutdown 关闭并释放当前播放管线
+     */
+    void Shutdown();
+
+    /**
      * @brief Pause 暂停播放
      */
     void Pause();
@@ -229,6 +234,11 @@ private:
      * @param state 目标播放状态
      */
     void SetState(PlaybackState state);
+
+    /**
+     * @brief HandleDemuxFinished 处理媒体源自然播放结束
+     */
+    void HandleDemuxFinished();
 
     /**
      * @brief SuspendPipelineAndWait 挂起 demuxer/decoder 管线并等待安全点

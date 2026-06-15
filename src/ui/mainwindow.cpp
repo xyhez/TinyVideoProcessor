@@ -108,7 +108,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
 {
     Q_UNUSED(event);
 
-    mediaPlayController_->Stop();
+    mediaPlayController_->Shutdown();
 
 }
 

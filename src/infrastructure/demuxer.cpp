@@ -128,6 +128,7 @@ int demuxer::StartDemuxer() {
         return -1;
     }
 
+    bool reachedEof = false;
     while (true) {
         if (!WaitIfSuspended()) {
             break;
@@ -149,6 +150,7 @@ int demuxer::StartDemuxer() {
             av_packet_free(&packet);
             if (ret == AVERROR_EOF) {
                 qDebug() << "Demuxing finished (EOF)";
+                reachedEof = true;
                 break;
             }
             qDebug() << "读取错误，重试...";
@@ -196,6 +198,16 @@ int demuxer::StartDemuxer() {
                 continue;
             }
         }
+    }
+
+    if (reachedEof) {
+        if (m_APacket) {
+            m_APacket->RequestStop();
+        }
+        if (m_VPacket) {
+            m_VPacket->RequestStop();
+        }
+        emit DemuxFinished();
     }
 
     return 0;

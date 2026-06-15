@@ -147,6 +147,10 @@ public:
     int Pause();
 
 signals:
+    /**
+     * @brief DemuxFinished 解复用自然读到文件尾
+     */
+    void DemuxFinished();
 
 
 private:
