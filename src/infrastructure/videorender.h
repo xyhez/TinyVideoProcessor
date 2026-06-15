@@ -32,33 +32,104 @@ class VideoRender : public QOpenGLWidget, protected QOpenGLFunctions
     Q_OBJECT
 
 public:
+    /**
+     * @brief VideoRender 构造函数
+     * @param parent Qt 父窗口
+     */
     explicit VideoRender(QWidget* parent = nullptr);
+
+    /**
+     * @brief VideoRender 析构函数，释放 OpenGL 纹理和显示帧
+     */
     ~VideoRender();
 
-    // 初始化：传入帧队列、同步管理器、视频帧率（关键！）
+    /**
+     * @brief InitVideoRender 初始化视频渲染器
+     * @param frameQueue 视频帧队列
+     * @param syncManager 同步时钟管理器
+     * @param frameRate 视频帧率
+     * @param videoTimeBase 视频流时间基
+     */
     void InitVideoRender(std::shared_ptr<SyncQueue<AVFrame*>> frameQueue,
                          std::shared_ptr<syncmanager> syncManager,
                          double frameRate,
                          double videoTimeBase);
 
+    /**
+     * @brief StartRendering 启动视频渲染调度
+     */
     void StartRendering();
+
+    /**
+     * @brief StopRendering 停止视频渲染调度
+     */
     void StopRendering();
+
+    /**
+     * @brief Pause 暂停视频渲染
+     */
     void Pause() { StopRendering(); }
+
+    /**
+     * @brief SetSpeed 设置渲染调度感知的播放速度
+     * @param speed 支持的播放速度档位
+     */
     void SetSpeed(double speed);
 
 private slots:
+    /**
+     * @brief RenderFrame 自调度渲染循环入口
+     */
     void RenderFrame();
 
 protected:
+    /**
+     * @brief initializeGL 初始化 OpenGL 状态和纹理资源
+     */
     void initializeGL() override;
+
+    /**
+     * @brief resizeGL 处理渲染窗口尺寸变化
+     * @param w 窗口宽度
+     * @param h 窗口高度
+     */
     void resizeGL(int w, int h) override;
+
+    /**
+     * @brief paintGL 绘制当前显示帧
+     */
     void paintGL() override;
 
 private:
+    /**
+     * @brief UploadTexture 上传 AVFrame 的 YUV 数据到纹理
+     * @param frame 待上传的视频帧
+     */
     void UploadTexture(AVFrame* frame);
+
+    /**
+     * @brief DrawFrame 绘制当前纹理帧
+     */
     void DrawFrame();
+
+    /**
+     * @brief CalcRect 计算保持宽高比后的渲染矩形
+     * @param x 输出矩形左下角 x
+     * @param y 输出矩形左下角 y
+     * @param w 输出矩形宽度
+     * @param h 输出矩形高度
+     */
     void CalcRect(float& x, float& y, float& w, float& h);
+
+    /**
+     * @brief FreeTextures 释放 OpenGL 纹理资源
+     */
     void FreeTextures();
+
+    /**
+     * @brief ScheduleNextFrame 安排下一次渲染调度
+     * @param delayMs 延迟时间，单位毫秒
+     */
     void ScheduleNextFrame(int delayMs);
 
     std::shared_ptr<SyncQueue<AVFrame*>> m_frameQueue;

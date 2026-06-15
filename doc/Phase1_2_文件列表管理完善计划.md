@@ -42,7 +42,7 @@ struct PlaylistItem {
 
 ### PlaylistManager
 
-新增应用层或领域层附近的播放列表管理类，建议先放在 `src/application`，因为它承担应用状态编排，不负责 FFmpeg 解析。
+新增领域层播放列表管理类，放在 `src/domain`。它只负责播放列表数据、当前索引和播放模式选择规则，不负责真实播放、不创建 `FileMediaSource`、不依赖 FFmpeg 基础设施。
 
 建议职责：
 
@@ -53,7 +53,8 @@ public:
     enum class PlayMode {
         Sequential,
         ListLoop,
-        SingleLoop
+        SingleLoop,
+        Random
     };
 
     int Count() const;
@@ -69,16 +70,22 @@ public:
     bool MoveNext();
     bool MovePrevious();
     void SetPlayMode(PlayMode mode);
+    PlayMode GetPlayMode() const;
 
 signals:
     void PlaylistChanged();
     void CurrentIndexChanged(int index);
-    void CurrentItemChanged(const PlaylistItem& item);
     void PlayModeChanged(PlayMode mode);
 };
 ```
 
 第一版可以不做拖拽、不做最近播放、不做持久化，避免 Phase1.2 一开始就扩大范围。
+
+说明：
+
+- `AddFile()` 需要做路径规范化和去重，避免同一个文件用相对路径、绝对路径重复加入。
+- `CurrentItem()` 用查询接口获得即可，第一版不强制增加 `CurrentItemChanged(const PlaylistItem&)`，避免自定义结构体信号带来 Qt 元类型注册问题。
+- 删除条目时必须明确 current index 规则：删除当前项后优先指向同位置的新条目；如果删除末尾则回退到最后一项；列表为空时为 `-1`。
 
 ### MediaPlayController 的边界
 
@@ -88,11 +95,14 @@ signals:
 
 ```cpp
 bool Initialize(std::shared_ptr<IMediaSource> mediaSource, QWidget* rendererContainer);
+bool SwitchSource(std::shared_ptr<IMediaSource> mediaSource, QWidget* rendererContainer, bool autoStart);
 void Start();
 void Stop();
 void Pause();
 void SeekTo(double seconds);
 ```
+
+如果新增 `SwitchSource()`，参数必须继续使用 `IMediaSource` 抽象，不要退回 `SwitchSource(const QString& filePath)`。文件路径到 `FileMediaSource` 的转换由应用层完成，这样后续摄像头、网络流仍能复用同一套换源流程。
 
 当播放列表切换文件时，由应用层协调：
 
@@ -118,22 +128,27 @@ PlaylistManager 选中条目
 - [ ] 支持 `Clear()`。
 - [ ] 支持 `CurrentIndex()` / `CurrentItem()`。
 - [ ] 支持 `SetCurrentIndex()`。
-- [ ] 增加 `PlaylistChanged()` 和 `CurrentItemChanged()` 信号。
+- [ ] 增加 `PlaylistChanged()`、`CurrentIndexChanged()` 和 `PlayModeChanged()` 信号。
+- [ ] `AddFile()` 做路径规范化和去重。
+- [ ] 明确删除条目后的 current index 规则。
 - [ ] 不接 UI，不切换真实播放，只完成列表状态能力。
 
 验收：
 
 - [ ] 添加文件后列表数量正确。
 - [ ] 删除当前项后 current index 有明确规则。
+- [ ] 删除当前项之前的条目时 current index 正确前移。
 - [ ] 清空列表后 current index 归为无效。
+- [ ] 相同文件不会被重复加入。
 - [ ] 不引入 MainWindow 对基础设施层的依赖。
 
 ### 任务 2：上一项/下一项选择规则
 
-- [ ] 定义播放模式：顺序播放、列表循环、单曲循环。
+- [ ] 定义播放模式：顺序播放、列表循环、单曲循环、随机播放。
 - [ ] 实现 `MoveNext()`。
 - [ ] 实现 `MovePrevious()`。
 - [ ] 明确空列表、单项列表、末尾、开头的行为。
+- [ ] 随机播放模式下，列表数量大于 1 时尽量避免连续返回同一项。
 - [ ] 暂不自动播放，只改变当前条目。
 
 验收：
@@ -141,10 +156,12 @@ PlaylistManager 选中条目
 - [ ] 顺序模式到末尾后不越界。
 - [ ] 列表循环模式末尾后回到第一项。
 - [ ] 单曲循环模式 next/previous 保持当前项。
+- [ ] 随机模式在多文件列表中能切换到不同条目。
 
 ### 任务 3：文件切换和 Controller 初始化衔接
 
 - [ ] 在应用层建立“当前播放项变化 -> 创建 FileMediaSource -> 初始化 MediaPlayController”的流程。
+- [ ] Controller 换源接口继续接收 `std::shared_ptr<IMediaSource>`，不接收文件路径。
 - [ ] 切换前停止当前播放管线。
 - [ ] 切换时释放或重置当前 `MediaPlayController` 资源。
 - [ ] 新媒体源初始化失败时保留明确错误状态，不污染列表状态。
@@ -213,7 +230,7 @@ Phase1.2 暂不处理：
 - 播放器能管理多个本地文件。
 - 可以添加、删除、清空列表。
 - 可以切换当前播放文件。
-- 上一项/下一项规则明确。
+- 上一项/下一项和随机播放规则明确。
 - 文件切换不破坏播放管线稳定性。
 - `MainWindow` 仍然只负责 UI 交互。
 - 不新增全局变量。

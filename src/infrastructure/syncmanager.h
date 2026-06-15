@@ -18,16 +18,24 @@ class syncmanager : public QObject
 {
     Q_OBJECT
 public:
+    /**
+     * @brief syncmanager 构造函数
+     * @param parent Qt 父对象
+     */
     explicit syncmanager(QObject *parent = nullptr);
+
+    /**
+     * @brief syncmanager 析构函数
+     */
     ~syncmanager();
 
     /**
      * @brief RefreshClock
-     * @param double 新的时钟
+     * @param clockMs 新的主时钟，单位毫秒(ms)
      * @return 0 成功
      * @return -1 失败
      */
-    int RefreshClock(double);
+    int RefreshClock(double clockMs);
 
     /**
      * @brief GetClock 获取主时钟

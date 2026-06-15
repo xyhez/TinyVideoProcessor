@@ -570,164 +570,197 @@
 
 # Phase 1.2: 文件列表管理
 
-> 目标：播放列表 + 切换文件 + 循环模式。
+> 目标：播放列表 + 切换文件 + 循环模式。继续遵循 `doc/架构指导.md`：`MainWindow` 只做 UI 交互和事件转发，`MediaPlayController` 只控制当前媒体源，播放列表状态放在领域层，不绕过 `IMediaSource` 抽象。
 
 ---
 
 ## 1.2.1 创建 PlaylistManager 数据类
 
-**目标**：新建领域层类，管理文件路径列表、当前播放索引、播放模式。纯数据逻辑，不依赖 Qt GUI。
+**目标**：新建领域层类，管理播放列表条目、当前播放索引和播放模式。只做数据与选择规则，不依赖 Qt GUI，不创建 `FileMediaSource`，不接触 demuxer/decoder 等基础设施。
 
-- [ ] 新建 `src/domain/PlaylistManager.h/.cpp`。
-- [ ] 定义 `enum class PlayMode { Sequential, SingleLoop, ListLoop, Random };`
-- [ ] `PlaylistManager` 继承 `QObject`：
+- [x] 新建 `src/domain/PlaylistManager.h/.cpp`。
+- [x] 定义 `PlaylistItem`：
+  ```cpp
+  struct PlaylistItem {
+      QString filePath;
+      QString displayName;
+      double durationSeconds = 0.0;
+  };
+  ```
+- [x] 定义 `enum class PlayMode { Sequential, ListLoop, SingleLoop, Random };`
+- [x] `PlaylistManager` 继承 `QObject`，第一版接口如下：
   ```cpp
   class PlaylistManager : public QObject {
       Q_OBJECT
   public:
-      void AddFile(const QString& filePath);
-      void RemoveFile(int index);
-      void Clear();
       int Count() const;
       int CurrentIndex() const;
-      QString CurrentFile() const;
-      QString NextFile();       // 根据 PlayMode 计算
-      QString PreviousFile();   // 根据 PlayMode 计算
+      QList<PlaylistItem> Items() const;
+      std::optional<PlaylistItem> CurrentItem() const;
+
+      void AddFile(const QString& filePath);
+      void AddFiles(const QStringList& filePaths);
+      void RemoveAt(int index);
+      void Clear();
+      bool SetCurrentIndex(int index);
+
       void SetPlayMode(PlayMode mode);
       PlayMode GetPlayMode() const;
-      void SetCurrentIndex(int index);
+
   signals:
       void PlaylistChanged();
       void CurrentIndexChanged(int index);
+      void PlayModeChanged(PlayMode mode);
   private:
-      QStringList files_;
+      QList<PlaylistItem> items_;
       int currentIndex_ = -1;
       PlayMode playMode_ = PlayMode::Sequential;
   };
   ```
-- [ ] `NextFile()` 逻辑：
-  - Sequential：`index+1`，到末尾停
-  - SingleLoop：`index` 不变（当前文件循环）
-  - ListLoop：`index+1`，到末尾回绕到 0
-  - Random：随机选一个不同于当前的 index
-- [ ] `PreviousFile()` 逻辑：`index-1`，非负数；random 模式同 next 随机选。
-- [ ] `AddFile` 去重（相同路径不重复加入）。
-- [ ] `CMakeLists.txt` 添加 `src/domain/PlaylistManager.cpp`。
+- [x] `AddFile()` 做路径规范化和去重，相同文件不重复加入。
+- [x] `AddFile()` 自动生成 `displayName`，优先使用文件名。
+- [x] `RemoveAt()` 明确 current index 规则：
+  - 删除当前项前面的条目：`currentIndex_` 前移一位。
+  - 删除当前项：优先指向同位置的新条目；如果删除末尾则回退到最后一项。
+  - 删除后列表为空：`currentIndex_ = -1`。
+- [x] `SetCurrentIndex()` 对越界 index 返回 false，不改变当前状态。
+- [x] `CMakeLists.txt` 添加 `src/domain/PlaylistManager.cpp`。
 - [ ] 编译验证。
 
 验收：
-- [ ] AddFile/Clear/Count 正确。
-- [ ] NextFile/PreviousFile 四种模式行为正确。
-- [ ] Random 不会连续两次返回同一首（至少尝试避免）。
-- [ ] 去重生效。
+- [x] AddFile/AddFiles/Clear/Count 正确。
+- [x] CurrentIndex/CurrentItem 在空列表、单项列表、多项列表下正确。
+- [x] RemoveAt 删除当前项、当前项之前、当前项之后的行为正确。
+- [x] 去重生效。
+- [x] 不引入 `MainWindow` 或基础设施层依赖。
 
 ---
 
-## 1.2.2 UI 布局改造：左侧加文件列表
+## 1.2.2 上一个/下一个选择规则
 
-**目标**：`mainwindow.ui` 改为水平分栏：左侧 `QListWidget`，右侧保持现有垂直三块。
+**目标**：在 `PlaylistManager` 内完成播放模式和前后项选择规则。这里只改变当前条目，不触发真实播放。
 
-- [ ] 修改 `mainwindow.ui` 的 `centralwidget` 布局：
-  - 外层从 `QVBoxLayout` 改为 `QHBoxLayout`
-  - 左侧：`QListWidget("listWidget_files")` — 文件列表，固定宽度 ~200px
-  - 右侧：`QWidget` 包裹原有 `QVBoxLayout`（视频+进度条+按钮），stretch=1
-- [ ] `QListWidget` 设置：
-  - `selectionMode`: SingleSelection
-  - `dragDropMode`: InternalMove（后续 1.2.7 启用拖拽）
-- [ ] 编译验证，窗口左侧出现空白列表。
+- [ ] 增加 `bool MoveNext()`。
+- [ ] 增加 `bool MovePrevious()`。
+- [ ] `Sequential`：
+  - Next 到末尾后返回 false，current index 保持不变。
+  - Previous 到开头后返回 false，current index 保持不变。
+- [ ] `ListLoop`：
+  - Next 末尾回绕到 0。
+  - Previous 开头回绕到最后一项。
+- [ ] `SingleLoop`：
+  - Next/Previous 都保持当前项，列表非空时返回 true。
+- [ ] `Random`：
+  - 列表数量大于 1 时尽量选择不同于当前项的 index。
+  - 列表数量为 1 时保持当前项。
+- [ ] 空列表下 MoveNext/MovePrevious 返回 false。
+- [ ] 编译验证。
 
 验收：
-- [ ] 窗口启动后左侧有 `QListWidget`，右侧视频区域正常显示。
-- [ ] 拖拽窗口边缘，列表和视频区域按比例缩放。
+- [ ] 四种播放模式选择行为正确。
+- [ ] 空列表、单项列表、开头、末尾不越界。
+- [ ] Random 不会在多文件列表中固定返回同一项。
+- [ ] MoveNext/MovePrevious 只改变播放列表状态，不触发 Controller 播放。
 
 ---
 
-## 1.2.3 MediaPlayController 支持切换媒体源
+## 1.2.3 文件切换和 Controller 初始化衔接
 
-**目标**：`Stop() → 换源 → Start()` 目前分三步调用，加一个 `SwitchSource()` 一步完成。
+**目标**：建立“当前播放项变化 -> 创建 `FileMediaSource` -> 切换 `MediaPlayController` 当前媒体源”的流程，同时保持 Controller 依赖 `IMediaSource` 抽象。
 
-- [ ] `MediaPlayController.h` 增加 `bool SwitchSource(const QString& filePath);`
-- [ ] `MediaPlayController.cpp` 实现：
+- [ ] `MediaPlayController.h` 增加换源入口，参数使用媒体源抽象：
   ```cpp
-  bool SwitchSource(const QString& filePath) {
-      // 1. 停止当前管线
-      Stop();
-      // 2. 释放旧资源（ReleaseResources 现有逻辑）
-      // 3. 创建新 FileMediaSource
-      // 4. 重新 Initialize
-      // 5. 如果之前是 Playing 状态，自动 Start
-  }
+  bool SwitchSource(std::shared_ptr<IMediaSource> mediaSource,
+                    QWidget* rendererContainer,
+                    bool autoStart);
   ```
-- [ ] 区分"全新初始化"和"切换源"：`SwitchSource` 可复用 `Initialize` 的逻辑，但需先 `ReleaseResources`。
+- [ ] `SwitchSource()` 内部流程：
+  - 记录切换前是否处于 Playing 状态。
+  - 停止当前管线。
+  - 释放旧资源。
+  - 使用新的 `IMediaSource` 重新初始化。
+  - `autoStart == true` 时启动新媒体源；否则只完成初始化。
+- [ ] 应用层根据 `PlaylistItem::filePath` 创建 `FileMediaSource`，再传给 Controller。
+- [ ] 文件路径无效或媒体源打开失败时返回 false，不污染 PlaylistManager 当前状态。
 - [ ] 编译验证。
 
 验收：
-- [ ] 播放中调用 `SwitchSource(newFile)` → 停止旧视频，播新视频。
-- [ ] Stop 状态下调用 `SwitchSource` → 切换源但不自动播放。
-- [ ] 新文件路径无效时返回 false，不 crash。
+- [ ] 播放中切换文件：旧视频停止，新视频正常播放。
+- [ ] Stop 状态下切换文件：只切换当前源，不自动播放。
+- [ ] 切换失败不 crash，旧状态处理规则明确。
+- [ ] `MediaPlayController` 不新增 `QString filePath` 型换源接口。
 
 ---
 
-## 1.2.4 MainWindow 连接列表交互
+## 1.2.4 MainWindow UI 绑定
 
-**目标**：双击列表项 → 切换播放文件。启动时添加到列表。
+**目标**：`MainWindow` 展示播放列表并转发 UI 事件，不保存播放列表业务状态，不直接创建或操作基础设施组件。
 
+- [ ] `mainwindow.ui` 改为水平分栏：
+  - 左侧：`QListWidget("listWidget_files")`，用于展示播放列表。
+  - 右侧：保留现有视频、进度条、控制按钮区域。
+- [ ] `QListWidget` 设置 `SingleSelection`。
 - [ ] `MainWindow::OpenFile()` 弹出文件对话框（`QFileDialog::getOpenFileNames`），批量添加 `*.mp4/*.mkv/*.avi`。
-- [ ] `MainWindow::CreateConnects()` 增加：
-  - `listWidget_files::itemDoubleClicked` → 取 `item->data(FilePathRole)` → `SwitchSource` + `Start`
-  - 或通过 `PlaylistManager::SetCurrentIndex` → `CurrentIndexChanged` → 切换
-- [ ] 构造函数中：初始化时把启动文件也加入 `PlaylistManager` + `listWidget`。
-- [ ] `listWidget` 中每项存文件路径（用 `Qt::UserRole`）。
+- [ ] 文件选择结果只转发给 `PlaylistManager::AddFiles()`。
+- [ ] `PlaylistChanged()` 后刷新 `QListWidget` 展示。
+- [ ] 双击列表项只转发 index，调用 `PlaylistManager::SetCurrentIndex()`。
+- [ ] 当前项变化后，由应用层创建 `FileMediaSource` 并调用 Controller 换源。
+- [ ] 启动文件加入 `PlaylistManager`，并同步显示在列表中。
 - [ ] 编译验证。
 
 验收：
+- [ ] UI 可以添加、删除、清空文件。
 - [ ] 启动时当前文件出现在列表中。
-- [ ] 双击列表另一文件 → 切换播放。
+- [ ] 双击列表另一文件可以切换播放。
 - [ ] 列表连续切换不 crash。
+- [ ] `MainWindow` 不新增 demuxer/decoder/queue 相关 include。
 
 ---
 
-## 1.2.5 上一个/下一个 + 快捷键
+## 1.2.5 上一个/下一个 + 播放模式 UI
 
-**目标**：UI 按钮 + 键盘快捷键实现切集。
+**目标**：把 `PlaylistManager` 的 MoveNext/MovePrevious 和播放模式暴露到 UI，仍然只通过应用层和 Controller 抽象完成换源。
 
 - [ ] `widget_func` 增加 `pushButton_prev`（上一个）和 `pushButton_next`（下一个）。
-- [ ] `on_pushButton_prev_clicked` → `PlaylistManager::PreviousFile()` → `SwitchSource` + `Start`
-- [ ] `on_pushButton_next_clicked` → `PlaylistManager::NextFile()` → `SwitchSource` + `Start`
-- [ ] 播放到末尾（Sequential 模式最后一个文件结束）→ 自动停，发信号通知 UI。
-- [ ] `keyReleaseEvent` 增加：
-  - `Ctrl+Left` → prev
-  - `Ctrl+Right` → next
-- [ ] 编译验证。
-
-验收：
-- [ ] Prev/Next 切集后音视频同步正常。
-- [ ] 第一个文件按 Prev 不 crash（留在原位）。
-- [ ] 最后一个文件 Next 后：Sequential 模式停止，ListLoop 回绕到第一个。
-
----
-
-## 1.2.6 播放模式切换
-
-**目标**：右键菜单或按钮切换四种播放模式。
-
 - [ ] `widget_func` 增加 `QComboBox("comboBox_mode")` 或一组互斥按钮，四个选项：顺序/单曲循环/列表循环/随机。
-- [ ] `MainWindow::CreateConnects()` 增加：
-  - `comboBox_mode::currentIndexChanged` → `PlaylistManager::SetPlayMode()`
+- [ ] `pushButton_prev` 点击后调用 `PlaylistManager::MovePrevious()`，成功后切换当前媒体源并播放。
+- [ ] `pushButton_next` 点击后调用 `PlaylistManager::MoveNext()`，成功后切换当前媒体源并播放。
+- [ ] `comboBox_mode::currentIndexChanged` 只调用 `PlaylistManager::SetPlayMode()`。
+- [ ] `keyReleaseEvent` 增加：
+  - `Ctrl+Left` -> prev。
+  - `Ctrl+Right` -> next。
 - [ ] 播放到文件末尾时检测模式决定行为：
   - Sequential：停止，`NoticeWindow("播放完毕")`
   - SingleLoop：`SeekTo(0)` + `Start`（从头循环当前文件）
-  - ListLoop：`NextFile()` + `SwitchSource` + `Start`
-  - Random：`NextFile()`（随机） + `SwitchSource` + `Start`
+  - ListLoop：`MoveNext()` + 换源 + `Start`
+  - Random：`MoveNext()` + 换源 + `Start`
 - [ ] 检测 EOF 的时机：`MediaPlayController` 监听 demuxer 的 EOF 信号（如果已有），或通过 `StateChanged` + `Position ≈ Duration` 判断。
 - [ ] 编译验证。
 
 验收：
+- [ ] Prev/Next 切集后音视频同步正常。
+- [ ] 第一个文件按 Prev 不 crash。
+- [ ] 最后一个文件 Next 后：Sequential 模式保持原位，ListLoop 回绕到第一个。
 - [ ] 四种模式切换后立即生效。
 - [ ] 单曲循环：视频播完自动从头开始。
 - [ ] 列表循环：最后一集播完切回第一集。
 - [ ] 顺序播放：播完停止不跳。
-- [ ] 随机播放：每次 NextFile 顺序不固定。
+- [ ] 随机播放：每次 MoveNext 顺序不固定。
+
+---
+
+## 1.2.6 最近播放记录预留
+
+**目标**：只形成方案，不急着编码，避免 Phase1.2 主线扩大。
+
+- [ ] 明确最近播放记录保存字段：文件路径、显示名、上次播放位置、最后播放时间。
+- [ ] 明确保存位置：优先考虑 `QSettings`，后续如列表复杂再考虑独立配置文件。
+- [ ] 明确是否恢复上次播放位置。
+- [ ] 明确最近播放记录与当前播放列表的关系：启动时可恢复列表，但不自动播放。
+
+验收：
+- [ ] 形成方案文档后再进入编码。
+- [ ] 不影响播放列表、换源、循环模式主线。
 
 ---
 
@@ -737,5 +770,6 @@
 - [ ] 双击列表项切换播放。
 - [ ] 上一个/下一个按钮和快捷键正常工作。
 - [ ] 四种循环模式行为正确。
+- [ ] 文件切换继续通过 `IMediaSource` 抽象完成。
 - [ ] 文件列表不反向侵入基础设施层。
 - [ ] `MainWindow` 通过 `PlaylistManager` 和 `MediaPlayController` 交互，不直接碰 demuxer/decoder。

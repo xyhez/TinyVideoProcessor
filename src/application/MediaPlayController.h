@@ -37,47 +37,132 @@ public:
         Paused
     };
 
+    /**
+     * @brief MediaPlayController 构造函数
+     * @param parent Qt 父对象
+     */
     explicit MediaPlayController(QObject* parent = nullptr);
+
+    /**
+     * @brief MediaPlayController 析构函数，释放播放管线资源
+     */
     ~MediaPlayController();
 
-    // 初始化：传入媒体源+渲染容器
+    /**
+     * @brief Initialize 初始化播放管线
+     * @param mediaSource 媒体源抽象
+     * @param rendererContainer 视频渲染容器
+     * @return true 初始化成功
+     * @return false 初始化失败
+     */
     bool Initialize(std::shared_ptr<IMediaSource> mediaSource,
         QWidget* rendererContainer);
 
-    // 链接信号槽
+    /**
+     * @brief CreateConnects 创建 Controller 内部信号槽连接
+     */
     void CreateConnects();
 
-    // 播放控制
+    /**
+     * @brief Start 启动或恢复播放
+     */
     void Start();
+
+    /**
+     * @brief Stop 停止播放并回到起始位置
+     */
     void Stop();
+
+    /**
+     * @brief Pause 暂停播放
+     */
     void Pause();
 
-    // 音量控制
+    /**
+     * @brief VolumeUp 增大音量
+     */
     void VolumeUp();
+
+    /**
+     * @brief VolumeDown 减小音量
+     */
     void VolumeDown();
 
-    // seek
+    /**
+     * @brief SeekTo 跳转到指定播放位置
+     * @param seconds 目标位置，单位秒
+     */
     void SeekTo(double seconds);
+
+    /**
+     * @brief SeekRelative 相对当前位置跳转
+     * @param seconds 相对跳转秒数，负数表示后退
+     */
     void SeekRelative(double seconds);
+
+    /**
+     * @brief Rewind 后退固定时间
+     */
     void Rewind();
+
+    /**
+     * @brief Forward 前进固定时间
+     */
     void Forward();
 
+    /**
+     * @brief State 获取当前播放状态
+     * @return 当前播放状态
+     */
     PlaybackState State() const;
 
+    /**
+     * @brief Duration 获取当前媒体总时长
+     * @return 总时长，单位秒
+     */
     double Duration() const;
 
+    /**
+     * @brief Position 获取当前播放位置
+     * @return 当前播放位置，单位秒
+     */
     double Position() const;
 
+    /**
+     * @brief SetPlaybackSpeed 设置播放速度
+     * @param speed 支持的播放速度档位
+     */
     void SetPlaybackSpeed(double speed);
+
+    /**
+     * @brief PlaybackSpeed 获取当前播放速度
+     * @return 当前播放速度
+     */
     double PlaybackSpeed() const;
 
 signals:
+    /**
+     * @brief StateChanged 播放状态变化信号
+     * @param state 新播放状态
+     */
     void StateChanged(PlaybackState state);
 
+    /**
+     * @brief PositionChanged 播放位置变化信号
+     * @param seconds 当前播放位置，单位秒
+     */
     void PositionChanged(double seconds);
 
+    /**
+     * @brief DurationChanged 媒体总时长变化信号
+     * @param seconds 总时长，单位秒
+     */
     void DurationChanged(double seconds);
 
+    /**
+     * @brief PlaybackSpeedChanged 播放速度变化信号
+     * @param speed 当前播放速度
+     */
     void PlaybackSpeedChanged(double speed);
 
 private:
@@ -112,12 +197,43 @@ private:
     PlaybackState state_ = PlaybackState::Stopped;
     double playbackSpeed_ = 1.0;
 
+    /**
+     * @brief ReleaseResources 释放当前播放管线资源
+     */
     void ReleaseResources();
+
+    /**
+     * @brief SetState 设置播放状态并发出状态变化信号
+     * @param state 目标播放状态
+     */
     void SetState(PlaybackState state);
+
+    /**
+     * @brief SuspendPipelineAndWait 挂起 demuxer/decoder 管线并等待安全点
+     * @return true 挂起成功
+     * @return false 挂起失败
+     */
     bool SuspendPipelineAndWait();
+
+    /**
+     * @brief RestorePlaybackState 按 Seek 前状态恢复播放管线
+     * @param previousState Seek 前播放状态
+     */
     void RestorePlaybackState(PlaybackState previousState);
+
+    /**
+     * @brief ResetPipelineToStart 清空缓存并把管线重置到起始位置
+     */
     void ResetPipelineToStart();
+
+    /**
+     * @brief ClearQueues 清空音视频包队列和帧队列
+     */
     void ClearQueues();
+
+    /**
+     * @brief FlushDecoders 清理解码器内部缓存
+     */
     void FlushDecoders();
 };
 

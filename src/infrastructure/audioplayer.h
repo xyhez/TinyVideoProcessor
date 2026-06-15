@@ -32,26 +32,41 @@ class AudioPlayer : public QObject
     Q_OBJECT
 
 public:
+    /**
+     * @brief AudioPlayer 构造函数
+     * @param p Qt 父对象
+     */
     AudioPlayer(QObject *p = nullptr);
+
+    /**
+     * @brief AudioPlayer 析构函数，释放音频输出和重采样资源
+     */
     ~AudioPlayer();
 
+    /**
+     * @brief InitAudioPlay 初始化音频播放链路
+     * @param codecPar 音频解码参数
+     * @param frameQueue 音频帧队列
+     * @param syncManager 同步时钟管理器
+     * @param audioTimeBase 音频流时间基
+     */
     void InitAudioPlay(AVCodecParameters* codecPar,
                        std::shared_ptr<SyncQueue<AVFrame*>> frameQueue,
                        std::shared_ptr<syncmanager> syncManager,
                        double audioTimeBase);
 
     /**
-     * @brief Start
+     * @brief Start 启动或恢复音频播放
      */
     void Start();
 
     /**
-     * @brief Stop
+     * @brief Stop 停止音频播放
      */
     void Stop();
 
     /**
-     * @brief Pause
+     * @brief Pause 暂停音频播放
      */
     void Pause();
 
@@ -71,7 +86,7 @@ public:
     void VolumeDown();
 
     /**
-     * @brief StartAudioPlay
+     * @brief StartAudioPlay 音频播放线程入口
      */
     void StartAudioPlay();
 
@@ -83,8 +98,9 @@ public:
 signals:
     /**
      * @brief VolumeChanged 返回当前的音量
+     * @param volume 当前音量
      */
-    void VolumeChanged(qreal);
+    void VolumeChanged(qreal volume);
 
 private:
     std::shared_ptr<SyncQueue<AVFrame*>> m_audioFrameQueue;
@@ -123,15 +139,50 @@ private:
     std::atomic<double> m_speed {1.0};
 
 private:
+    /**
+     * @brief InitResampler 初始化音频重采样器
+     */
     void InitResampler();
+
+    /**
+     * @brief InitAudioOutput 初始化 Qt 音频输出设备
+     */
     void InitAudioOutput();
+
+    /**
+     * @brief CalculateHardwareLatency 估算音频硬件缓冲延迟
+     * @return 延迟时间，单位毫秒
+     */
     double CalculateHardwareLatency();
+
+    /**
+     * @brief BuildSpeedAdjustedPcm 根据播放速度生成变速后的 PCM 数据
+     * @param pcmBytes 原始 PCM 字节数
+     * @param bytesPerSampleFrame 单个采样帧字节数
+     * @param speed 播放速度
+     * @return 变速后 PCM 字节数
+     */
     int BuildSpeedAdjustedPcm(int pcmBytes, int bytesPerSampleFrame, double speed);
+
+    /**
+     * @brief WritePcmBuffer 分块写入 PCM 并刷新主时钟
+     * @param data PCM 数据指针
+     * @param bytes PCM 字节数
+     * @param bytesPerSampleFrame 单个采样帧字节数
+     * @param speed 当前播放速度
+     * @param frameStartClockMs 当前音频帧起始时钟，单位毫秒
+     * @return true 写入完成
+     * @return false 写入被停止或失败
+     */
     bool WritePcmBuffer(const char* data,
                         int bytes,
                         int bytesPerSampleFrame,
                         double speed,
                         double frameStartClockMs);
+
+    /**
+     * @brief Run 音频播放主循环
+     */
     void Run();
 
 signals:

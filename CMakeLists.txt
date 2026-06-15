@@ -59,6 +59,8 @@ set(PROJECT_SOURCES
         src/domain/FileMediaSource.h
         src/application/MediaPlayController.h
         src/application/MediaPlayController.cpp
+        src/domain/PlaylistManager.cpp
+        src/domain/PlaylistManager.h
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)

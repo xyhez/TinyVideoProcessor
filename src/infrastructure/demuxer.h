@@ -29,12 +29,25 @@ class demuxer : public QObject
 {
     Q_OBJECT
 public:
+    /**
+     * @brief demuxer 构造函数
+     * @param mediaSource 媒体源抽象
+     * @param APacket 音频包队列
+     * @param VPacket 视频包队列
+     * @param AFrame 音频帧队列
+     * @param VFrame 视频帧队列
+     * @param parent Qt 父对象
+     */
     explicit demuxer(std::shared_ptr<IMediaSource> mediaSource
                      ,std::shared_ptr<SyncQueue<AVPacket*>> APacket = nullptr
                      ,std::shared_ptr<SyncQueue<AVPacket*>> VPacket = nullptr
                      ,std::shared_ptr<SyncQueue<AVFrame*>>  AFrame  = nullptr
                      ,std::shared_ptr<SyncQueue<AVFrame*>>  VFrame  = nullptr
                      ,QObject *parent = nullptr);
+
+    /**
+     * @brief demuxer 析构函数
+     */
     ~demuxer();
 
     /**
@@ -51,13 +64,13 @@ public:
 
     /**
      * @brief ReAtimebase
-     * @return
+     * @return 音频流 time_base
      */
     AVRational ReAtimebase();
 
     /**
      * @brief ReVtimebase
-     * @return
+     * @return 视频流 time_base
      */
     AVRational ReVtimebase();
 
@@ -153,8 +166,24 @@ private:
 
     mutable QMutex mutex;                               ///< 互斥锁
 
+    /**
+     * @brief CurrentPositionSeconds 获取当前解复用读取位置
+     * @return 当前读取位置，单位秒
+     */
     double CurrentPositionSeconds() const;
+
+    /**
+     * @brief WaitIfSuspended 如果收到挂起请求则等待恢复
+     * @return true 可以继续运行
+     * @return false 已停止
+     */
     bool WaitIfSuspended();
+
+    /**
+     * @brief IsSuspendRequested 判断是否请求管线挂起
+     * @return true 已请求挂起
+     * @return false 未请求挂起
+     */
     bool IsSuspendRequested() const;
 
     AVPacket* packet = nullptr;                         ///< 存从文件中读取出来的包

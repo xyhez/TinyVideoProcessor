@@ -24,7 +24,15 @@ class decoder : public QObject
 {
     Q_OBJECT
 public:
+    /**
+     * @brief decoder 构造函数
+     * @param parent Qt 父对象
+     */
     explicit decoder(QObject *parent = nullptr);
+
+    /**
+     * @brief decoder 析构函数，释放解码器和硬解资源
+     */
     ~decoder();
 
     /**
@@ -119,8 +127,26 @@ private:
      */
     AVFrame *TransferHWFrame(AVFrame *hwFrame);
 
+    /**
+     * @brief ShouldDiscardFrame 判断候选帧是否早于丢弃边界
+     * @param candidateFrame 待判断帧
+     * @return true 需要丢弃
+     * @return false 可以输出
+     */
     bool ShouldDiscardFrame(const AVFrame *candidateFrame);
+
+    /**
+     * @brief WaitIfSuspended 如果收到挂起请求则等待恢复
+     * @return true 可以继续运行
+     * @return false 已停止
+     */
     bool WaitIfSuspended();
+
+    /**
+     * @brief IsSuspendRequested 判断是否请求管线挂起
+     * @return true 已请求挂起
+     * @return false 未请求挂起
+     */
     bool IsSuspendRequested() const;
 
     std::shared_ptr<SyncQueue<AVPacket*>> m_PacketVec;        ///< 包队列
