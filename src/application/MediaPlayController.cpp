@@ -74,6 +74,9 @@ bool MediaPlayController::Initialize(std::shared_ptr<IMediaSource> mediaSource, 
     //7.链接信号槽
     CreateConnects();
 
+    emit DurationChanged(Duration());
+    emit PositionChanged(Position());
+
     return true;
 }
 
@@ -157,6 +160,11 @@ void MediaPlayController::SetState(PlaybackState state) {
 }
 
 void MediaPlayController::Start() {
+    if (!demuxer_ || !Adecoder_ || !Vdecoder_ || !audioplay_ || !videoRender_ || !positionTimer_) {
+        qWarning() << "Start failed: playback pipeline is not initialized";
+        return;
+    }
+
     SetState(PlaybackState::Playing);
 
     positionTimer_->start();
@@ -176,7 +184,7 @@ void MediaPlayController::Start() {
 }
 
 void MediaPlayController::Stop() {
-    if (!demuxer_ || !Adecoder_ || !Vdecoder_ || !syncManager_) {
+    if (!demuxer_ || !Adecoder_ || !Vdecoder_ || !syncManager_ || !positionTimer_) {
         SetState(PlaybackState::Stopped);
         return;
     }
@@ -194,6 +202,11 @@ void MediaPlayController::Stop() {
 }
 
 void MediaPlayController::Pause() {
+    if (!demuxer_ || !Adecoder_ || !Vdecoder_ || !audioplay_ || !videoRender_ || !positionTimer_) {
+        qWarning() << "Pause failed: playback pipeline is not initialized";
+        return;
+    }
+
     SetState(PlaybackState::Paused);
     emit PositionChanged(Position());
     demuxer_->Pause();

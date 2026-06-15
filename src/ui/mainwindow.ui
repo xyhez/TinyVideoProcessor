@@ -21,14 +21,26 @@
     <item>
      <layout class="QHBoxLayout" name="horizontalLayout_2">
       <item>
-       <widget class="QLabel" name="label_position">
+       <widget class="QLabel" name="label_current">
         <property name="text">
-         <string>播放时间</string>
+         <string>00:00</string>
         </property>
        </widget>
       </item>
       <item>
        <widget class="QSlider" name="slider_progress">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="minimum">
+         <number>0</number>
+        </property>
+        <property name="maximum">
+         <number>0</number>
+        </property>
+        <property name="value">
+         <number>0</number>
+        </property>
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
         </property>
@@ -37,7 +49,7 @@
       <item>
        <widget class="QLabel" name="label_duration">
         <property name="text">
-         <string>视频时间</string>
+         <string>00:00</string>
         </property>
        </widget>
       </item>

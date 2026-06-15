@@ -12,8 +12,10 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
     this->setWindowTitle("modernFFplay-V2.0");
 
+    CreateConnects();
+
     //1.应用层初始化
-    QString filepath = "F:\\desk\\图\\VID_20260116_151539.mp4";
+    QString filepath = "D:\\githubProject\\TinyVideoProcessor\\resource\\动物发现自己被绿.mp4";
     std::shared_ptr<IMediaSource> mediaSource = std::make_shared<FileMediaSource>(filepath);
     if (!mediaPlayController_->Initialize(mediaSource, ui->video_widget)) {
         qCritical() << "Controller 初始化失败";
@@ -21,8 +23,6 @@ MainWindow::MainWindow(QWidget *parent)
     }
 
     UpdatePlaybackControls(mediaPlayController_->State());
-
-    CreateConnects();
 }
 
 void MainWindow::CreateConnects() {
@@ -33,7 +33,7 @@ void MainWindow::CreateConnects() {
         if(!isSliderDragging_) {
             int pos = static_cast<int>(position);
             ui->slider_progress->setValue(pos);
-            ui->label_position->setText(formatTime(position));
+            ui->label_current->setText(formatTime(position));
         }
     });
 
@@ -47,10 +47,14 @@ void MainWindow::CreateConnects() {
         isSliderDragging_ = true;
     });
 
+    connect(ui->slider_progress,&QSlider::sliderMoved,this,[this](int value){
+        ui->label_current->setText(formatTime(value));
+    });
+
     connect(ui->slider_progress,&QSlider::sliderReleased,this,[this](){
         double target = static_cast<double>(ui->slider_progress->value());
-        mediaPlayController_->SeekTo(target);
         isSliderDragging_ = false;
+        mediaPlayController_->SeekTo(target);
     });
 }
 

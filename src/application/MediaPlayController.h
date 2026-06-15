@@ -4,6 +4,7 @@
 
 #include <QObject>
 #include <QThread>
+#include <QTimer>
 #include <memory>
 
 #include "core/queue.h"

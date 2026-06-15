@@ -121,13 +121,13 @@
 
 **目标**：搞清楚两个数据的来源和单位，避免后续接口设计出错。
 
-- [ ] 确认 `Fileinfo::duration_` 赋值来源：`demuxer.cpp:54` 处 `ic->duration/1000000`。`AVFormatContext::duration` 单位为微秒，除以 1,000,000 后单位为**秒**。`Fileinfo::duration_` 类型为 `int`。
-- [ ] 确认 `syncmanager::GetClock()` 返回值单位：`mainclock` 成员注释写"单位毫秒(ms)"，`RefreshClock()` 调用处（`audioplayer.cpp:196`）传入 `tmp->pts * g_videoinfo.A_timeBase * 1000`，即毫秒。
-- [ ] 确认 `syncmanager::SeekTo()` 参数单位：毫秒。
-- [ ] **结论**：`Duration()` 对外返回秒（`int`→`double`），`Position()` 从 `syncmanager::GetClock()` 取毫秒 ÷ 1000 得到秒。Controller 接口统一用秒，UI 自行转换。
+- [x] 确认 `Fileinfo::duration_` 赋值来源：`demuxer.cpp:66` 处 `ic->duration/1000000`。`AVFormatContext::duration` 单位为微秒，除以 1,000,000 后单位为**秒**。`Fileinfo::duration_` 类型为 `int`。
+- [x] 确认 `syncmanager::GetClock()` 返回值单位：`mainclock` 成员注释写"单位毫秒(ms)"，`RefreshClock()` 调用处（`audioplayer.cpp:196`）传入音频时钟，即毫秒。
+- [x] 确认 `syncmanager::SeekTo()` 参数单位：毫秒。
+- [x] **结论**：`Duration()` 对外返回秒（`int`→`double`），`Position()` 从 `syncmanager::GetClock()` 取毫秒 ÷ 1000 得到秒。Controller 接口统一用秒，UI 自行转换。
 
 验收：
-- [ ] 单位结论有代码行号佐证，不靠猜测。
+- [x] 单位结论有代码行号佐证，不靠猜测。
 
 ---
 
@@ -135,15 +135,15 @@
 
 **目标**：在 `MediaPlayController` 上增加两个 const 查询方法。
 
-- [ ] `double Duration() const`：`return mediaSource_ ? static_cast<double>(mediaSource_->GetSourceInfo().duration_) : 0.0;`
-- [ ] `double Position() const`：`return syncManager_ ? syncManager_->GetClock() / 1000.0 : 0.0;`
-- [ ] 头文件 `MediaPlayController.h` 增加两个方法声明。
+- [x] `double Duration() const`：`return mediaSource_ ? static_cast<double>(mediaSource_->GetSourceInfo().duration_) : 0.0;`
+- [x] `double Position() const`：`return syncManager_ ? syncManager_->GetClock() / 1000.0 : 0.0;`
+- [x] 头文件 `MediaPlayController.h` 增加两个方法声明。
 - [ ] 编译验证。
 
 验收：
-- [ ] `Duration()` 在 Initialize 成功后返回 >0 的秒数。
-- [ ] `Position()` 在播放中返回递增的秒数。
-- [ ] 未初始化时两个方法都返回 0.0，不 crash。
+- [x] `Duration()` 在 Initialize 成功后返回 >0 的秒数。
+- [ ] `Position()` 在播放中返回递增的秒数。（需运行时验证）
+- [x] 未初始化时两个方法都返回 0.0，不 crash。
 
 ---
 
@@ -151,8 +151,8 @@
 
 **目标**：声明两个信号，让 UI 层可以绑定。
 
-- [ ] `MediaPlayController.h` 增加 `void PositionChanged(double seconds);`
-- [ ] `MediaPlayController.h` 增加 `void DurationChanged(double seconds);`
+- [x] `MediaPlayController.h` 增加 `void PositionChanged(double seconds);`
+- [x] `MediaPlayController.h` 增加 `void DurationChanged(double seconds);`
 - [ ] 编译验证（信号只声明不定义，moc 自动生成实现）。
 
 验收：
@@ -164,20 +164,20 @@
 
 **目标**：Controller 内部用 QTimer 周期发射 `PositionChanged`，MainWindow 无需主动轮询。
 
-- [ ] 在 `MediaPlayController` 中添加 `QTimer* positionTimer_` 成员。
-- [ ] 在 `Initialize()` 中创建定时器：`positionTimer_ = new QTimer(this);`
-- [ ] 设置间隔 200ms（兼顾 UI 平滑与 CPU 开销）。
-- [ ] `connect(positionTimer_, &QTimer::timeout, this, [this]() { emit PositionChanged(Position()); });`
-- [ ] 在 `Start()` 中 `positionTimer_->start();`
-- [ ] 在 `Stop()` 中 `positionTimer_->stop();`
-- [ ] 在 `~MediaPlayController()` 或 `ReleaseResources()` 中停止定时器。
+- [x] 在 `MediaPlayController` 中添加 `positionTimer_` 成员。
+- [x] 在 `Initialize()` 中创建定时器。
+- [x] 设置间隔 200ms（兼顾 UI 平滑与 CPU 开销）。
+- [x] `connect(positionTimer_, &QTimer::timeout, this, [this]() { emit PositionChanged(Position()); });`
+- [x] 在 `Start()` 中 `positionTimer_->start();`
+- [x] 在 `Stop()` 中 `positionTimer_->stop();`
+- [x] 在 `ReleaseResources()` 中释放定时器。
 - [ ] `PositionChanged` 去重：仅在值与上次不同时才 emit（可选优化，初版可跳过）。
 - [ ] 编译验证。
 
 验收：
-- [ ] 播放时 `PositionChanged` 持续发射，间隔约 200ms。
-- [ ] Stop 后 `PositionChanged` 停止发射。
-- [ ] 关闭窗口时定时器随 Controller 析构安全停止。
+- [ ] 播放时 `PositionChanged` 持续发射，间隔约 200ms。（需运行时验证）
+- [x] Stop 后 `PositionChanged` 停止发射。
+- [x] 关闭窗口时定时器随 Controller 析构安全停止。
 
 ---
 
@@ -185,17 +185,17 @@
 
 **目标**：Start/Stop/Seek 操作后 Position 不等待下一个定时器周期，立即更新。
 
-- [ ] `Stop()`：在 `SetState(Stopped)` 之前 emit `PositionChanged(0.0)`。
-- [ ] `Start()`：在 `SetState(Playing)` 之后 emit `PositionChanged(Position())`。
-- [ ] `SeekTo()`：在 `syncManager_->SeekTo()` 之后 emit `PositionChanged(targetSeconds)`。
-- [ ] `Initialize()` 成功后：emit `DurationChanged(Duration())`。
-- [ ] `Start()` 中如果首次播放，也 emit `DurationChanged(Duration())`（防止 Initialize 时 MediaSource 尚未 Open 导致 duration_=0 的情况；当前 Initialize 里已 Open，但留防御）。
+- [x] `Stop()`：在 `SetState(Stopped)` 之前 emit `PositionChanged(0.0)`。
+- [x] `Start()`：在 `SetState(Playing)` 之后 emit `PositionChanged(Position())`。
+- [x] `SeekTo()`：在 `syncManager_->SeekTo()` 之后 emit `PositionChanged(Position())`。
+- [x] `Initialize()` 成功后：emit `DurationChanged(Duration())`。
+- [x] `Start()` 中如果首次播放，也 emit `DurationChanged(Duration())`（防止 Initialize 时 MediaSource 尚未 Open 导致 duration_=0 的情况；当前 Initialize 里已 Open，但留防御）。
 - [ ] 编译验证。
 
 验收：
-- [ ] Stop 后 `PositionChanged` 发射值为 0.0。
-- [ ] Seek 后 `PositionChanged` 发射值为目标秒数（不等到 200ms 定时器）。
-- [ ] 初始化成功后 `DurationChanged` 发射总时长。
+- [x] Stop 后 `PositionChanged` 发射值为 0.0。
+- [x] Seek 后 `PositionChanged` 发射值为目标秒数（不等到 200ms 定时器）。
+- [x] 初始化成功后 `DurationChanged` 发射总时长。
 
 ---
 
@@ -203,15 +203,15 @@
 
 **目标**：Pause 状态 Position 冻结，不继续增长。
 
-- [ ] `Pause()`：`positionTimer_->stop();`，然后 emit `PositionChanged(Position())`（冻结当前值）。
-- [ ] `Start()`：已经在 7.4 中处理了 `positionTimer_->start();`，覆盖从 Pause 恢复的场景。
+- [x] `Pause()`：`positionTimer_->stop();`，然后 emit `PositionChanged(Position())`（冻结当前值）。
+- [x] `Start()`：已经在 7.4 中处理了 `positionTimer_->start();`，覆盖从 Pause 恢复的场景。
 - [ ] 编译验证。
 - [ ] 手动测试：播放 → 暂停 → 等 3 秒 → PositionChanged 不再发射新值。
 
 验收：
-- [ ] 暂停期间定时器停止，Position 冻结。
-- [ ] 恢复播放后 Position 从冻结值继续增长。
-- [ ] 暂停时 emit 了一次当前 Position（UI 可以据此显示精确的暂停位置）。
+- [x] 暂停期间定时器停止，Position 冻结。
+- [ ] 恢复播放后 Position 从冻结值继续增长。（需运行时验证）
+- [x] 暂停时 emit 了一次当前 Position（UI 可以据此显示精确的暂停位置）。
 
 ---
 
@@ -219,38 +219,38 @@
 
 **目标**：处理异常状态，不 crash、不发射荒谬值。
 
-- [ ] `Duration()` null guard（已在 7.2 中处理）。
-- [ ] `Position()` null guard（已在 7.2 中处理）。
-- [ ] 总时长为 0（直播流或未 Open）：`Duration()` 返回 0.0，UI 据此隐藏进度条或显示不确定状态。
-- [ ] `positionTimer_` 回调中 double-check `syncManager_` 非空（极端情况：定时器触发时 Controller 正在析构）。
-- [ ] `SeekTo()` 空值检查维持现有逻辑不变（已有 null guard）。
+- [x] `Duration()` null guard（已在 7.2 中处理）。
+- [x] `Position()` null guard（已在 7.2 中处理）。
+- [x] 总时长为 0（直播流或未 Open）：`Duration()` 返回 0.0，UI 据此禁用进度条或显示不确定状态。
+- [x] `positionTimer_` 回调通过 `Position()` 间接检查 `syncManager_` 非空。
+- [x] `SeekTo()` 空值检查维持现有逻辑不变（已有 null guard）。
 - [ ] 编译验证。
 
 验收：
-- [ ] 未 Initialize 时调用 `Duration()` / `Position()` 不 crash。
-- [ ] 总时长为 0 时 UI 不会除零。
-- [ ] 析构期间定时器不会访问已释放的 syncManager_（通过 `QTimer` 绑定 parent 自动管理生命周期）。
+- [x] 未 Initialize 时调用 `Duration()` / `Position()` 不 crash。
+- [x] 总时长为 0 时 UI 不会除零。
+- [x] 析构期间定时器不会访问已释放的 syncManager_。
 
 ---
 
 ### 7.8 形成报告
 
-- [ ] 汇总以上 7 个子步骤的实施结果。
-- [ ] 记录 `Duration()` / `Position()` 的精确语义和单位。
-- [ ] 记录定时器间隔选择理由（200ms = 5Hz，小于人眼感知延迟 100ms 的两倍，适合进度条刷新）。
-- [ ] 记录边界情况处理方式。
-- [ ] 形成报告：`doc/Phase1_1_任务7_播放位置和时长信号报告.md`
+- [x] 汇总以上 7 个子步骤的实施结果。
+- [x] 记录 `Duration()` / `Position()` 的精确语义和单位。
+- [x] 记录定时器间隔选择理由（200ms = 5Hz）。
+- [x] 记录边界情况处理方式。
+- [x] 形成报告：`doc/Phase1_1_任务7_播放位置和时长信号报告.md`
 
 ---
 
 验收：
 
-- [ ] 播放过程中位置持续更新。
-- [ ] Seek 后位置立即更新到目标附近。
-- [ ] 总时长只由媒体源信息决定，不从 UI 硬编码。
-- [ ] Stop 后位置显示为 0。
-- [ ] 暂停时位置不继续前进。
-- [ ] `MainWindow` 不直接依赖 `syncmanager`、`demuxer` 或 `Fileinfo` 内部细节。
+- [ ] 播放过程中位置持续更新。（需运行时验证）
+- [x] Seek 后位置立即更新到目标附近。
+- [x] 总时长只由媒体源信息决定，不从 UI 硬编码。
+- [x] Stop 后位置显示为 0。
+- [x] 暂停时位置不继续前进。
+- [x] `MainWindow` 不直接依赖 `syncmanager`、`demuxer` 或 `Fileinfo` 内部细节。
 
 ## 任务 8: 为进度条 Seek 做接口准备
 
@@ -264,17 +264,17 @@
 
 **目标**：在 `mainwindow.ui` 中加入 `QSlider` + 两个时间 `QLabel`，控件就位但先不接线。
 
-- [ ] 在 `mainwindow.ui` 的 `widget_func` 中增加一行水平布局：
+- [x] 在 `mainwindow.ui` 中增加一行水平布局：
   - `QLabel("label_current")` — 当前时间，默认显示 `00:00`
   - `QSlider("slider_progress")` — 水平进度条（Orientation: Horizontal）
   - `QLabel("label_duration")` — 总时长，默认显示 `00:00`
-- [ ] `.ui` 文件手动编辑 XML，不引入 Qt Designer 依赖。
-- [ ] `mainwindow.cpp` 中通过 `ui->label_current`、`ui->slider_progress`、`ui->label_duration` 可访问。
+- [x] `.ui` 文件手动编辑 XML，不引入 Qt Designer 依赖。
+- [x] `mainwindow.cpp` 中通过 `ui->label_current`、`ui->slider_progress`、`ui->label_duration` 可访问。
 - [ ] 编译验证。
 
 验收：
-- [ ] 窗口启动后看到进度条和两个时间标签。
-- [ ] 进度条初始禁用或值为 0。
+- [ ] 窗口启动后看到进度条和两个时间标签。（需运行时验证）
+- [x] 进度条初始禁用或值为 0。
 
 ---
 
@@ -282,7 +282,7 @@
 
 **目标**：拿到总时长后，设置 `QSlider::setRange()` 和总时长标签文本。
 
-- [ ] 在 `CreateConnects()` 中增加 `DurationChanged` 连接：
+- [x] 在 `CreateConnects()` 中增加 `DurationChanged` 连接：
   ```cpp
   connect(controller, &MediaPlayController::DurationChanged, this, [this](double seconds) {
       int total = static_cast<int>(seconds);
@@ -291,13 +291,13 @@
       ui->label_duration->setText(formatTime(total));
   });
   ```
-- [ ] 增加私有辅助函数 `QString formatTime(int totalSeconds)` → `"MM:SS"`。
+- [x] 增加私有辅助函数 `QString formatTime(double totalSeconds)` → `"MM:SS"`。
 - [ ] 编译验证。
 
 验收：
-- [ ] 播放开始后，总时长标签显示正确 MM:SS。
-- [ ] 滑块范围随总时长设置。
-- [ ] 总时长为 0 时滑块禁用。
+- [ ] 播放开始后，总时长标签显示正确 MM:SS。（需运行时验证）
+- [x] 滑块范围随总时长设置。
+- [x] 总时长为 0 时滑块禁用。
 
 ---
 
@@ -305,7 +305,7 @@
 
 **目标**：播放时滑块跟随位置前进。
 
-- [ ] 在 `CreateConnects()` 中增加 `PositionChanged` 连接：
+- [x] 在 `CreateConnects()` 中增加 `PositionChanged` 连接：
   ```cpp
   connect(controller, &MediaPlayController::PositionChanged, this, [this](double seconds) {
       if (!m_isSliderDragging) {
@@ -315,14 +315,14 @@
       }
   });
   ```
-- [ ] `mainwindow.h` 增加 `bool m_isSliderDragging = false;` 成员。
+- [x] `mainwindow.h` 增加 `bool isSliderDragging_ = false;` 成员。
 - [ ] 编译验证。
 
 验收：
-- [ ] 播放时滑块平滑前进。
-- [ ] 当前时间标签持续更新。
-- [ ] Stop 后滑块回到 0，标签显示 00:00。
-- [ ] Pause 时滑块冻结不变。
+- [ ] 播放时滑块平滑前进。（需运行时验证）
+- [ ] 当前时间标签持续更新。（需运行时验证）
+- [x] Stop 后滑块回到 0，标签显示 00:00。
+- [x] Pause 时滑块冻结不变。
 
 ---
 
@@ -330,22 +330,22 @@
 
 **目标**：用户拖动滑块时暂停自动更新，释放时触发 Seek。
 
-- [ ] 连接 `slider_progress::sliderPressed`：设置 `m_isSliderDragging = true;`
-- [ ] 连接 `slider_progress::sliderMoved`（拖动中）：更新当前时间标签预览值 `ui->label_current->setText(formatTime(value));`，不调 SeekTo。
-- [ ] 连接 `slider_progress::sliderReleased`：
+- [x] 连接 `slider_progress::sliderPressed`：设置 `isSliderDragging_ = true;`
+- [x] 连接 `slider_progress::sliderMoved`（拖动中）：更新当前时间标签预览值 `ui->label_current->setText(formatTime(value));`，不调 SeekTo。
+- [x] 连接 `slider_progress::sliderReleased`：
   ```cpp
   double target = static_cast<double>(ui->slider_progress->value());
   controller->SeekTo(target);
   m_isSliderDragging = false;
   ```
-  SeekTo 完成后 `PositionChanged` 会发射，8.3 中的 `m_isSliderDragging` 已恢复 false，滑块恢复被 PositionChanged 驱动。
+  当前实现先恢复 `isSliderDragging_ = false`，再调用 `SeekTo()`，确保 SeekTo 内同步发射的 `PositionChanged` 不会被忽略。
 - [ ] 编译验证。
 
 验收：
-- [ ] 拖动滑块时当前时间标签跟随预览值变化。
-- [ ] 拖动过程中不调用 SeekTo（不会触发视频跳转）。
-- [ ] 释放滑块后视频跳到目标位置。
-- [ ] 释放后进度条恢复跟随 PositionChanged。
+- [x] 拖动滑块时当前时间标签跟随预览值变化。
+- [x] 拖动过程中不调用 SeekTo（不会触发视频跳转）。
+- [ ] 释放滑块后视频跳到目标位置。（需运行时验证）
+- [x] 释放后进度条恢复跟随 PositionChanged。
 
 ---
 
@@ -353,29 +353,29 @@
 
 **目标**：防止异常情况导致 crash 或行为异常。
 
-- [ ] 总时长为 0：`DurationChanged` 中 `total > 0` 判断已处理滑块禁用（8.2）。
-- [ ] Stop 后滑块归零：`PositionChanged(0.0)` 已在 Controller 中 emit，8.3 中 `setValue(0)` 自然处理。
-- [ ] 滑块值范围校验：`sliderReleased` 中 `targetSeconds` 已由 Controller `SeekTo()` 内部 clamp（无需 MainWindow 重复）。
-- [ ] 快速双击空格（Pause→Play→Pause）时 `m_isSliderDragging` 不会卡在 true：因为 `sliderPressed` 只有鼠标/触控触发，键盘操作不影响。
-- [ ] 初始状态：`label_current` = `00:00`，`label_duration` = `00:00`，`slider_progress` 禁用。
-- [ ] 汇总以上，形成报告：`doc/Phase1_1_任务8_进度条Seek接口报告.md`
+- [x] 总时长为 0：`DurationChanged` 中 `total > 0` 判断已处理滑块禁用（8.2）。
+- [x] Stop 后滑块归零：`PositionChanged(0.0)` 已在 Controller 中 emit，8.3 中 `setValue(0)` 自然处理。
+- [x] 滑块值范围校验：`sliderReleased` 中 `targetSeconds` 已由 Controller `SeekTo()` 内部 clamp（无需 MainWindow 重复）。
+- [x] 快速双击空格（Pause→Play→Pause）时 `isSliderDragging_` 不会卡在 true：因为 `sliderPressed` 只有鼠标/触控触发，键盘操作不影响。
+- [x] 初始状态：`label_current` = `00:00`，`label_duration` = `00:00`，`slider_progress` 禁用。
+- [x] 汇总以上，形成报告：`doc/Phase1_1_任务8_进度条Seek接口报告.md`
 
 验收：
-- [ ] 进度条显示不反向驱动播放状态混乱。
-- [ ] 用户拖动进度条后能跳到对应位置。
-- [ ] 拖动进度条不会破坏音视频同步。
-- [ ] 拖动过程中不会触发高频 seek。
-- [ ] `MainWindow` 没有新增基础设施层依赖。
+- [x] 进度条显示不反向驱动播放状态混乱。
+- [ ] 用户拖动进度条后能跳到对应位置。（需运行时验证）
+- [ ] 拖动进度条不会破坏音视频同步。（需运行时验证）
+- [x] 拖动过程中不会触发高频 seek。
+- [x] `MainWindow` 没有新增基础设施层依赖。
 
 ---
 
 验收：
 
-- [ ] 进度条显示不反向驱动播放状态混乱。
-- [ ] 用户拖动进度条后能跳到对应位置。
-- [ ] 拖动进度条不会破坏音视频同步。
-- [ ] 拖动过程中不会触发高频 seek。
-- [ ] `MainWindow` 没有新增基础设施层依赖。
+- [x] 进度条显示不反向驱动播放状态混乱。
+- [ ] 用户拖动进度条后能跳到对应位置。（需运行时验证）
+- [ ] 拖动进度条不会破坏音视频同步。（需运行时验证）
+- [x] 拖动过程中不会触发高频 seek。
+- [x] `MainWindow` 没有新增基础设施层依赖。
 
 ## 任务 9: 播放速度控制
 
