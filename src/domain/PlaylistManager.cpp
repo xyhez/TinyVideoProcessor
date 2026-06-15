@@ -1,6 +1,7 @@
 #include "PlaylistManager.h"
 
 #include <QFileInfo>
+#include <QRandomGenerator>
 
 PlaylistManager::PlaylistManager(QObject* parent)
     : QObject(parent) {
@@ -105,6 +106,76 @@ bool PlaylistManager::SetCurrentIndex(int index) {
     currentIndex_ = index;
     emit CurrentIndexChanged(currentIndex_);
     return true;
+}
+
+bool PlaylistManager::MoveNext() {
+    if (items_.isEmpty()) {
+        return false;
+    }
+
+    const int itemCount = items_.size();
+    if (currentIndex_ < 0 || currentIndex_ >= itemCount) {
+        return SetCurrentIndex(0);
+    }
+
+    switch (playMode_) {
+    case PlayMode::Sequential:
+        if (currentIndex_ >= itemCount - 1) {
+            return false;
+        }
+        return SetCurrentIndex(currentIndex_ + 1);
+    case PlayMode::ListLoop:
+        return SetCurrentIndex((currentIndex_ + 1) % itemCount);
+    case PlayMode::SingleLoop:
+        return true;
+    case PlayMode::Random:
+        if (itemCount == 1) {
+            return true;
+        }
+
+        int nextIndex = currentIndex_;
+        while (nextIndex == currentIndex_) {
+            nextIndex = QRandomGenerator::global()->bounded(itemCount);
+        }
+        return SetCurrentIndex(nextIndex);
+    }
+
+    return false;
+}
+
+bool PlaylistManager::MovePrevious() {
+    if (items_.isEmpty()) {
+        return false;
+    }
+
+    const int itemCount = items_.size();
+    if (currentIndex_ < 0 || currentIndex_ >= itemCount) {
+        return SetCurrentIndex(0);
+    }
+
+    switch (playMode_) {
+    case PlayMode::Sequential:
+        if (currentIndex_ <= 0) {
+            return false;
+        }
+        return SetCurrentIndex(currentIndex_ - 1);
+    case PlayMode::ListLoop:
+        return SetCurrentIndex(currentIndex_ == 0 ? itemCount - 1 : currentIndex_ - 1);
+    case PlayMode::SingleLoop:
+        return true;
+    case PlayMode::Random:
+        if (itemCount == 1) {
+            return true;
+        }
+
+        int previousIndex = currentIndex_;
+        while (previousIndex == currentIndex_) {
+            previousIndex = QRandomGenerator::global()->bounded(itemCount);
+        }
+        return SetCurrentIndex(previousIndex);
+    }
+
+    return false;
 }
 
 void PlaylistManager::SetPlayMode(PlayMode mode) {

@@ -86,6 +86,20 @@ public:
     bool SetCurrentIndex(int index);
 
     /**
+     * @brief MoveNext 根据播放模式移动到下一项
+     * @return true 移动或保持当前项成功
+     * @return false 空列表或顺序模式已到末尾
+     */
+    bool MoveNext();
+
+    /**
+     * @brief MovePrevious 根据播放模式移动到上一项
+     * @return true 移动或保持当前项成功
+     * @return false 空列表或顺序模式已到开头
+     */
+    bool MovePrevious();
+
+    /**
      * @brief SetPlayMode 设置播放模式
      * @param mode 播放模式
      */

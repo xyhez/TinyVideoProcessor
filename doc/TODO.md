@@ -640,27 +640,27 @@
 
 **目标**：在 `PlaylistManager` 内完成播放模式和前后项选择规则。这里只改变当前条目，不触发真实播放。
 
-- [ ] 增加 `bool MoveNext()`。
-- [ ] 增加 `bool MovePrevious()`。
-- [ ] `Sequential`：
+- [x] 增加 `bool MoveNext()`。
+- [x] 增加 `bool MovePrevious()`。
+- [x] `Sequential`：
   - Next 到末尾后返回 false，current index 保持不变。
   - Previous 到开头后返回 false，current index 保持不变。
-- [ ] `ListLoop`：
+- [x] `ListLoop`：
   - Next 末尾回绕到 0。
   - Previous 开头回绕到最后一项。
-- [ ] `SingleLoop`：
+- [x] `SingleLoop`：
   - Next/Previous 都保持当前项，列表非空时返回 true。
-- [ ] `Random`：
+- [x] `Random`：
   - 列表数量大于 1 时尽量选择不同于当前项的 index。
   - 列表数量为 1 时保持当前项。
-- [ ] 空列表下 MoveNext/MovePrevious 返回 false。
+- [x] 空列表下 MoveNext/MovePrevious 返回 false。
 - [ ] 编译验证。
 
 验收：
-- [ ] 四种播放模式选择行为正确。
-- [ ] 空列表、单项列表、开头、末尾不越界。
-- [ ] Random 不会在多文件列表中固定返回同一项。
-- [ ] MoveNext/MovePrevious 只改变播放列表状态，不触发 Controller 播放。
+- [x] 四种播放模式选择行为正确。
+- [x] 空列表、单项列表、开头、末尾不越界。
+- [x] Random 不会在多文件列表中固定返回同一项。
+- [x] MoveNext/MovePrevious 只改变播放列表状态，不触发 Controller 播放。
 
 ---
 
