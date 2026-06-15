@@ -124,6 +124,11 @@ private:
     void ClearPlaylist();
 
     /**
+     * @brief InitializePlayModeComboBox 初始化播放模式下拉框
+     */
+    void InitializePlayModeComboBox();
+
+    /**
      * @brief PlayPrevious 切换到播放列表上一项并播放
      */
     void PlayPrevious();

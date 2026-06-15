@@ -721,12 +721,12 @@
 
 **目标**：把 `PlaylistManager` 的 MoveNext/MovePrevious 和播放模式暴露到 UI，仍然只通过应用层和 Controller 抽象完成换源。
 
-- [ ] `widget_func` 增加 `pushButton_prev`（上一个）和 `pushButton_next`（下一个）。
-- [ ] `widget_func` 增加 `QComboBox("comboBox_mode")` 或一组互斥按钮，四个选项：顺序/单曲循环/列表循环/随机。
-- [ ] `pushButton_prev` 点击后调用 `PlaylistManager::MovePrevious()`，成功后切换当前媒体源并播放。
-- [ ] `pushButton_next` 点击后调用 `PlaylistManager::MoveNext()`，成功后切换当前媒体源并播放。
-- [ ] `comboBox_mode::currentIndexChanged` 只调用 `PlaylistManager::SetPlayMode()`。
-- [ ] `keyReleaseEvent` 增加：
+- [x] `widget_func` 增加 `pushButton_prev`（上一个）和 `pushButton_next`（下一个）。
+- [x] `widget_func` 增加 `QComboBox("comboBox_mode")` 或一组互斥按钮，四个选项：顺序/单曲循环/列表循环/随机。
+- [x] `pushButton_prev` 点击后调用 `PlaylistManager::MovePrevious()`，成功后切换当前媒体源并播放。
+- [x] `pushButton_next` 点击后调用 `PlaylistManager::MoveNext()`，成功后切换当前媒体源并播放。
+- [x] `comboBox_mode::currentIndexChanged` 只调用 `PlaylistManager::SetPlayMode()`。
+- [x] `keyReleaseEvent` 增加：
   - `Ctrl+Left` -> prev。
   - `Ctrl+Right` -> next。
 - [ ] 播放到文件末尾时检测模式决定行为：

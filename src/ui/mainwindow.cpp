@@ -3,9 +3,11 @@
 #include "domain/FileMediaSource.h"
 
 #include <QAbstractItemView>
+#include <QComboBox>
 #include <QDebug>
 #include <QFileDialog>
 #include <QListWidgetItem>
+#include <QSignalBlocker>
 #include <QTimer>
 
 MainWindow::MainWindow(QWidget *parent)
@@ -17,6 +19,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
     this->setWindowTitle("modernFFplay-V2.0");
     ui->listWidget_files->setSelectionMode(QAbstractItemView::SingleSelection);
+    InitializePlayModeComboBox();
 
     CreateConnects();
 
@@ -64,6 +67,16 @@ void MainWindow::CreateConnects() {
         }
     });
 
+    connect(playlistManager_.get(), &PlaylistManager::PlayModeChanged, this, [this](PlaylistManager::PlayMode mode) {
+        const int index = ui->comboBox_mode->findData(static_cast<int>(mode));
+        if (index < 0 || ui->comboBox_mode->currentIndex() == index) {
+            return;
+        }
+
+        QSignalBlocker blocker(ui->comboBox_mode);
+        ui->comboBox_mode->setCurrentIndex(index);
+    });
+
     connect(ui->listWidget_files, &QListWidget::itemDoubleClicked, this, [this](QListWidgetItem* item) {
         const int index = ui->listWidget_files->row(item);
         SwitchToPlaylistIndex(index, true);
@@ -72,6 +85,16 @@ void MainWindow::CreateConnects() {
     connect(ui->pushButton_prev, &QPushButton::clicked, this, &MainWindow::PlayPrevious);
 
     connect(ui->pushButton_next, &QPushButton::clicked, this, &MainWindow::PlayNext);
+
+    connect(ui->comboBox_mode, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int index) {
+        bool ok = false;
+        const int modeValue = ui->comboBox_mode->itemData(index).toInt(&ok);
+        if (!ok) {
+            return;
+        }
+
+        playlistManager_->SetPlayMode(static_cast<PlaylistManager::PlayMode>(modeValue));
+    });
 
     connect(ui->slider_progress,&QSlider::sliderPressed,this,[this](){
         isSliderDragging_ = true;
@@ -215,6 +238,20 @@ void MainWindow::ClearPlaylist() {
 
     playlistManager_->Clear();
     mediaPlayController_->Shutdown();
+}
+
+void MainWindow::InitializePlayModeComboBox() {
+    ui->comboBox_mode->clear();
+    ui->comboBox_mode->addItem("顺序播放", static_cast<int>(PlaylistManager::PlayMode::Sequential));
+    ui->comboBox_mode->addItem("单曲循环", static_cast<int>(PlaylistManager::PlayMode::SingleLoop));
+    ui->comboBox_mode->addItem("列表循环", static_cast<int>(PlaylistManager::PlayMode::ListLoop));
+    ui->comboBox_mode->addItem("随机播放", static_cast<int>(PlaylistManager::PlayMode::Random));
+
+    const int currentModeIndex = ui->comboBox_mode->findData(
+        static_cast<int>(playlistManager_->GetPlayMode()));
+    if (currentModeIndex >= 0) {
+        ui->comboBox_mode->setCurrentIndex(currentModeIndex);
+    }
 }
 
 void MainWindow::PlayPrevious() {
