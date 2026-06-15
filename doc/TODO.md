@@ -91,10 +91,10 @@
 
 验收：
 
-- [ ] 快进/快退后音视频同步。
-- [ ] Seek 后无旧画面闪回。
-- [ ] Seek 后无旧音频残留。
-- [ ] 暂停状态下 Seek 后仍保持暂停，播放状态下 Seek 后继续播放。
+- [x] 快进/快退后音视频同步。
+- [x] Seek 后无旧画面闪回。
+- [x] Seek 后无旧音频残留。
+- [x] 暂停状态下 Seek 后仍保持暂停，播放状态下 Seek 后继续播放。
 
 ## 任务 6: Stop 行为回到起始位置
 
@@ -107,9 +107,9 @@
 
 验收：
 
-- [ ] Stop 后画面和音频都停止。
-- [ ] Stop 后再次播放从开头开始。
-- [ ] Stop 不导致线程无法再次启动。
+- [x] Stop 后画面和音频都停止。
+- [x] Stop 后再次播放从开头开始。
+- [x] Stop 不导致线程无法再次启动。
 
 ## 任务 7: 播放位置和总时长信号
 
@@ -138,11 +138,11 @@
 - [x] `double Duration() const`：`return mediaSource_ ? static_cast<double>(mediaSource_->GetSourceInfo().duration_) : 0.0;`
 - [x] `double Position() const`：`return syncManager_ ? syncManager_->GetClock() / 1000.0 : 0.0;`
 - [x] 头文件 `MediaPlayController.h` 增加两个方法声明。
-- [ ] 编译验证。
+- [x] 编译验证。
 
 验收：
 - [x] `Duration()` 在 Initialize 成功后返回 >0 的秒数。
-- [ ] `Position()` 在播放中返回递增的秒数。（需运行时验证）
+- [x] `Position()` 在播放中返回递增的秒数。
 - [x] 未初始化时两个方法都返回 0.0，不 crash。
 
 ---
@@ -153,10 +153,10 @@
 
 - [x] `MediaPlayController.h` 增加 `void PositionChanged(double seconds);`
 - [x] `MediaPlayController.h` 增加 `void DurationChanged(double seconds);`
-- [ ] 编译验证（信号只声明不定义，moc 自动生成实现）。
+- [x] 编译验证（信号只声明不定义，moc 自动生成实现）。
 
 验收：
-- [ ] 编译通过，无 moc 相关链接错误。
+- [x] 编译通过，无 moc 相关链接错误。
 
 ---
 
@@ -172,10 +172,10 @@
 - [x] 在 `Stop()` 中 `positionTimer_->stop();`
 - [x] 在 `ReleaseResources()` 中释放定时器。
 - [ ] `PositionChanged` 去重：仅在值与上次不同时才 emit（可选优化，初版可跳过）。
-- [ ] 编译验证。
+- [x] 编译验证。
 
 验收：
-- [ ] 播放时 `PositionChanged` 持续发射，间隔约 200ms。（需运行时验证）
+- [x] 播放时 `PositionChanged` 持续发射，间隔约 200ms。
 - [x] Stop 后 `PositionChanged` 停止发射。
 - [x] 关闭窗口时定时器随 Controller 析构安全停止。
 
@@ -190,7 +190,7 @@
 - [x] `SeekTo()`：在 `syncManager_->SeekTo()` 之后 emit `PositionChanged(Position())`。
 - [x] `Initialize()` 成功后：emit `DurationChanged(Duration())`。
 - [x] `Start()` 中如果首次播放，也 emit `DurationChanged(Duration())`（防止 Initialize 时 MediaSource 尚未 Open 导致 duration_=0 的情况；当前 Initialize 里已 Open，但留防御）。
-- [ ] 编译验证。
+- [x] 编译验证。
 
 验收：
 - [x] Stop 后 `PositionChanged` 发射值为 0.0。
@@ -205,12 +205,12 @@
 
 - [x] `Pause()`：`positionTimer_->stop();`，然后 emit `PositionChanged(Position())`（冻结当前值）。
 - [x] `Start()`：已经在 7.4 中处理了 `positionTimer_->start();`，覆盖从 Pause 恢复的场景。
-- [ ] 编译验证。
-- [ ] 手动测试：播放 → 暂停 → 等 3 秒 → PositionChanged 不再发射新值。
+- [x] 编译验证。
+- [x] 手动测试：播放 → 暂停 → 等 3 秒 → PositionChanged 不再发射新值。
 
 验收：
 - [x] 暂停期间定时器停止，Position 冻结。
-- [ ] 恢复播放后 Position 从冻结值继续增长。（需运行时验证）
+- [x] 恢复播放后 Position 从冻结值继续增长。
 - [x] 暂停时 emit 了一次当前 Position（UI 可以据此显示精确的暂停位置）。
 
 ---
@@ -224,7 +224,7 @@
 - [x] 总时长为 0（直播流或未 Open）：`Duration()` 返回 0.0，UI 据此禁用进度条或显示不确定状态。
 - [x] `positionTimer_` 回调通过 `Position()` 间接检查 `syncManager_` 非空。
 - [x] `SeekTo()` 空值检查维持现有逻辑不变（已有 null guard）。
-- [ ] 编译验证。
+- [x] 编译验证。
 
 验收：
 - [x] 未 Initialize 时调用 `Duration()` / `Position()` 不 crash。
@@ -245,7 +245,7 @@
 
 验收：
 
-- [ ] 播放过程中位置持续更新。（需运行时验证）
+- [x] 播放过程中位置持续更新。
 - [x] Seek 后位置立即更新到目标附近。
 - [x] 总时长只由媒体源信息决定，不从 UI 硬编码。
 - [x] Stop 后位置显示为 0。
@@ -270,10 +270,10 @@
   - `QLabel("label_duration")` — 总时长，默认显示 `00:00`
 - [x] `.ui` 文件手动编辑 XML，不引入 Qt Designer 依赖。
 - [x] `mainwindow.cpp` 中通过 `ui->label_current`、`ui->slider_progress`、`ui->label_duration` 可访问。
-- [ ] 编译验证。
+- [x] 编译验证。
 
 验收：
-- [ ] 窗口启动后看到进度条和两个时间标签。（需运行时验证）
+- [x] 窗口启动后看到进度条和两个时间标签。
 - [x] 进度条初始禁用或值为 0。
 
 ---
@@ -292,10 +292,10 @@
   });
   ```
 - [x] 增加私有辅助函数 `QString formatTime(double totalSeconds)` → `"MM:SS"`。
-- [ ] 编译验证。
+- [x] 编译验证。
 
 验收：
-- [ ] 播放开始后，总时长标签显示正确 MM:SS。（需运行时验证）
+- [x] 播放开始后，总时长标签显示正确 MM:SS。
 - [x] 滑块范围随总时长设置。
 - [x] 总时长为 0 时滑块禁用。
 
@@ -316,11 +316,11 @@
   });
   ```
 - [x] `mainwindow.h` 增加 `bool isSliderDragging_ = false;` 成员。
-- [ ] 编译验证。
+- [x] 编译验证。
 
 验收：
-- [ ] 播放时滑块平滑前进。（需运行时验证）
-- [ ] 当前时间标签持续更新。（需运行时验证）
+- [x] 播放时滑块平滑前进。
+- [x] 当前时间标签持续更新。
 - [x] Stop 后滑块回到 0，标签显示 00:00。
 - [x] Pause 时滑块冻结不变。
 
@@ -339,12 +339,12 @@
   m_isSliderDragging = false;
   ```
   当前实现先恢复 `isSliderDragging_ = false`，再调用 `SeekTo()`，确保 SeekTo 内同步发射的 `PositionChanged` 不会被忽略。
-- [ ] 编译验证。
+- [x] 编译验证。
 
 验收：
 - [x] 拖动滑块时当前时间标签跟随预览值变化。
 - [x] 拖动过程中不调用 SeekTo（不会触发视频跳转）。
-- [ ] 释放滑块后视频跳到目标位置。（需运行时验证）
+- [x] 释放滑块后视频跳到目标位置。
 - [x] 释放后进度条恢复跟随 PositionChanged。
 
 ---
@@ -362,8 +362,8 @@
 
 验收：
 - [x] 进度条显示不反向驱动播放状态混乱。
-- [ ] 用户拖动进度条后能跳到对应位置。（需运行时验证）
-- [ ] 拖动进度条不会破坏音视频同步。（需运行时验证）
+- [x] 用户拖动进度条后能跳到对应位置。
+- [x] 拖动进度条不会破坏音视频同步。
 - [x] 拖动过程中不会触发高频 seek。
 - [x] `MainWindow` 没有新增基础设施层依赖。
 
@@ -372,8 +372,8 @@
 验收：
 
 - [x] 进度条显示不反向驱动播放状态混乱。
-- [ ] 用户拖动进度条后能跳到对应位置。（需运行时验证）
-- [ ] 拖动进度条不会破坏音视频同步。（需运行时验证）
+- [x] 用户拖动进度条后能跳到对应位置。
+- [x] 拖动进度条不会破坏音视频同步。
 - [x] 拖动过程中不会触发高频 seek。
 - [x] `MainWindow` 没有新增基础设施层依赖。
 
@@ -394,7 +394,7 @@
 - [x] 明确当前 Phase 允许变调，不引入 SoundTouch/RubberBand/AVFilterGraph。
 - [x] 明确音频写出必须按采样帧对齐，不能按任意字节截断。
 - [x] 明确主时钟由 AudioPlayer 根据“当前音频帧 PTS + 已输出媒体进度”刷新，不能只在每个 AVFrame 开头刷新一次。
-- [ ] 编译验证。
+- [x] 编译验证。
 
 验收：
 - [x] 文档记录固定档位和变调限制。
@@ -413,12 +413,12 @@
   - 仅接受 `0.5 / 1.0 / 1.5 / 2.0` 四个归一化后的值
   - 赋值给线程安全速度成员
 - [x] `AudioPlayer::Run()` 在处理每个 PCM chunk 前读取一次当前速度快照，避免一次写循环中速度反复变化。
-- [ ] 编译验证。
+- [x] 编译验证。
 
 验收：
 - [x] UI 线程调用 `SetSpeed()` 与音频线程读取速度不存在数据竞争。
 - [x] 无效速度不会改变当前速度。
-- [ ] 切换速度不 crash。
+- [x] 切换速度不 crash。
 
 ---
 
@@ -433,12 +433,12 @@
 - [x] `1.5x`：按稳定比例丢弃约 1/3 PCM，例如每 3 个采样帧保留 2 个采样帧。
 - [x] `0.5x`：按采样帧重复输出，使实际输出时长约为原来的 2 倍。
 - [x] 保持 `m_totalBytesWritten` / `m_bytesWrittenTotal` 统计实际写入声卡的字节数。
-- [ ] 编译验证。
+- [x] 编译验证。
 
 验收：
 - [x] 0.5x/1.5x/2.0x 都不会写出非采样帧对齐的 PCM。
-- [ ] 变速时无明显爆音、声道错位或重采样链路异常。
-- [ ] 统计字段仍反映实际写入量。
+- [x] 变速时无明显爆音、声道错位或重采样链路异常。
+- [x] 统计字段仍反映实际写入量。
 
 ---
 
@@ -452,11 +452,11 @@
   - `currentClockMs = frameStartClockMs + mediaElapsedMs`
 - [x] 写出每个 chunk 后刷新 `m_syncManager->RefreshClock(currentClockMs)`。
 - [x] 保留现有硬件延迟计算逻辑；若后续发现显示偏早，再把 `CalculateHardwareLatency()` 纳入时钟修正。
-- [ ] 编译验证。
+- [x] 编译验证。
 
 验收：
-- [ ] 0.5x 慢放时主时钟持续缓慢推进，不只在下一帧到来时跳变。
-- [ ] 2.0x 快放时主时钟推进速度约为正常速度两倍。
+- [x] 0.5x 慢放时主时钟持续缓慢推进，不只在下一帧到来时跳变。
+- [x] 2.0x 快放时主时钟推进速度约为正常速度两倍。
 - [x] 视频同步仍以音频主时钟为准。
 
 ---
@@ -473,7 +473,7 @@
   - 更新线程安全速度成员
 - [x] 在 `RenderFrame()` 中计算 `scaledInterval = qMax(1, qRound(m_frameIntervalMs / speedSnapshot))`。
 - [x] 只把 `scaledInterval` 用于空队列等待、正常渲染后的下一次调度等检查频率；`diff > SYNC_THRESHOLD_MS` 的精确等待仍以音频时钟差值为准。
-- [ ] 编译验证。
+- [x] 编译验证。
 
 验收：
 - [x] VideoRender 不直接修改主时钟。
@@ -507,7 +507,7 @@
   - `emit PlaybackSpeedChanged(speed);`
 - [x] `PlaybackSpeed() const` 直接 return `playbackSpeed_`。
 - [x] `Initialize()` 构建 AudioPlayer/VideoRender 后下发当前 `playbackSpeed_`，保证 Stop/Start 或后续切换源时速度状态保持。
-- [ ] 编译验证。
+- [x] 编译验证。
 
 验收：
 - [x] `SetPlaybackSpeed(2.0)` 调用后 AudioPlayer 和 VideoRender 都收到速度变更。
@@ -527,12 +527,12 @@
   - `Qt::Key_3` → `SetPlaybackSpeed(1.5)` + `NoticeWindow("速度: 1.5x")`
   - `Qt::Key_4` → `SetPlaybackSpeed(2.0)` + `NoticeWindow("速度: 2.0x")`
 - [x] 连接 `PlaybackSpeedChanged` 信号，debug 输出当前速度。
-- [ ] 编译验证。
+- [x] 编译验证。
 
 验收：
-- [ ] 按键 1/2/3/4 能实时切换速度。
-- [ ] 速度切换后音视频同步保持。
-- [ ] 切换速度不中断播放。
+- [x] 按键 1/2/3/4 能实时切换速度。
+- [x] 速度切换后音视频同步保持。
+- [x] 切换速度不中断播放。
 - [x] `MainWindow` 不直接依赖基础设施层。
 
 ---
@@ -541,30 +541,30 @@
 
 **目标**：手动验证关键场景，确认无回归。
 
-- [ ] 正常速度播放 10s → 切 2.0x 播放 10s → 切回 1.0x → 音视频同步不丢。
-- [ ] 正常速度播放 10s → 切 0.5x 播放 10s → 切回 1.0x → 视频不长时间冻结。
-- [ ] 2.0x 播放中 Pause → 恢复 → 速度保持 2.0x。
-- [ ] 0.5x 播放中 Seek → Seek 后速度保持 0.5x。
-- [ ] 2.0x 播放中 Stop → Start → 速度保持 2.0x（速度是持久状态）。
-- [ ] 高速播放（2.0x）时拖动进度条 Seek → 不 crash。
+- [x] 正常速度播放 10s → 切 2.0x 播放 10s → 切回 1.0x → 音视频同步不丢。
+- [x] 正常速度播放 10s → 切 0.5x 播放 10s → 切回 1.0x → 视频不长时间冻结。
+- [x] 2.0x 播放中 Pause → 恢复 → 速度保持 2.0x。
+- [x] 0.5x 播放中 Seek → Seek 后速度保持 0.5x。
+- [x] 2.0x 播放中 Stop → Start → 速度保持 2.0x（速度是持久状态）。
+- [x] 高速播放（2.0x）时拖动进度条 Seek → 不 crash。
 - [x] 形成报告：`doc/Phase1_1_任务9_播放速度控制实现报告.md`
 
 验收：
-- [ ] 0.5x/1.0x/1.5x/2.0x 切换正常。
-- [ ] 变速后音视频保持同步。
-- [ ] Seek/Stop/Pause 后速度状态保持。
+- [x] 0.5x/1.0x/1.5x/2.0x 切换正常。
+- [x] 变速后音视频保持同步。
+- [x] Seek/Stop/Pause 后速度状态保持。
 - [x] 无效速度输入被拒绝。
 - [x] `MainWindow` 不直接依赖基础设施层。
 
 ## 1.1 完成标准
 
-- [ ] 播放、暂停、停止行为边界清晰。
-- [ ] 快进/快退是真实 Seek。
-- [ ] Seek 后音视频同步。
-- [ ] Seek 后无旧包、旧帧、旧音频残留。
-- [ ] 进度信息能用于 UI 进度条。
-- [ ] `MainWindow` 没有新增基础设施层依赖。
-- [ ] 没有新增全局变量。
+- [x] 播放、暂停、停止行为边界清晰。
+- [x] 快进/快退是真实 Seek。
+- [x] Seek 后音视频同步。
+- [x] Seek 后无旧包、旧帧、旧音频残留。
+- [x] 进度信息能用于 UI 进度条。
+- [x] `MainWindow` 没有新增基础设施层依赖。
+- [x] 没有新增全局变量。
 
 ---
 
