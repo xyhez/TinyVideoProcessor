@@ -102,6 +102,29 @@
            </property>
           </widget>
          </item>
+         <item>
+          <widget class="QSlider" name="slider_volume">
+           <property name="minimum">
+            <number>0</number>
+           </property>
+           <property name="maximum">
+            <number>100</number>
+           </property>
+           <property name="value">
+            <number>100</number>
+           </property>
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="pushButton_mute">
+           <property name="text">
+            <string>静音</string>
+           </property>
+          </widget>
+         </item>
         </layout>
        </widget>
       </item>

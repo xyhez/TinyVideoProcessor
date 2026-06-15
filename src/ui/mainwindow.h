@@ -129,6 +129,17 @@ private:
     void InitializePlayModeComboBox();
 
     /**
+     * @brief InitializeVolumeControls 初始化音量控件状态
+     */
+    void InitializeVolumeControls();
+
+    /**
+     * @brief UpdateMuteButton 更新静音按钮显示
+     * @param muted 是否静音
+     */
+    void UpdateMuteButton(bool muted);
+
+    /**
      * @brief PlayPrevious 切换到播放列表上一项并播放
      */
     void PlayPrevious();

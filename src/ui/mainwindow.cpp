@@ -20,6 +20,7 @@ MainWindow::MainWindow(QWidget *parent)
     this->setWindowTitle("modernFFplay-V2.0");
     ui->listWidget_files->setSelectionMode(QAbstractItemView::SingleSelection);
     InitializePlayModeComboBox();
+    InitializeVolumeControls();
 
     CreateConnects();
 
@@ -57,6 +58,15 @@ void MainWindow::CreateConnects() {
 
     connect(mediaPlayController_.get(), &MediaPlayController::PlaybackFinished,
             this, &MainWindow::HandlePlaybackFinished);
+
+    connect(mediaPlayController_.get(), &MediaPlayController::VolumeChanged, this, [this](double volume) {
+        const int sliderValue = static_cast<int>(volume * 100.0 + 0.5);
+        QSignalBlocker blocker(ui->slider_volume);
+        ui->slider_volume->setValue(sliderValue);
+    });
+
+    connect(mediaPlayController_.get(), &MediaPlayController::MuteChanged,
+            this, &MainWindow::UpdateMuteButton);
 
     connect(playlistManager_.get(), &PlaylistManager::PlaylistChanged, this, [this]() {
         RefreshPlaylistView();
@@ -97,6 +107,14 @@ void MainWindow::CreateConnects() {
         }
 
         playlistManager_->SetPlayMode(static_cast<PlaylistManager::PlayMode>(modeValue));
+    });
+
+    connect(ui->slider_volume, &QSlider::valueChanged, this, [this](int value) {
+        mediaPlayController_->SetVolume(static_cast<double>(value) / 100.0);
+    });
+
+    connect(ui->pushButton_mute, &QPushButton::clicked, this, [this]() {
+        mediaPlayController_->SetMuted(!mediaPlayController_->IsMuted());
     });
 
     connect(ui->slider_progress,&QSlider::sliderPressed,this,[this](){
@@ -255,6 +273,16 @@ void MainWindow::InitializePlayModeComboBox() {
     if (currentModeIndex >= 0) {
         ui->comboBox_mode->setCurrentIndex(currentModeIndex);
     }
+}
+
+void MainWindow::InitializeVolumeControls() {
+    ui->slider_volume->setRange(0, 100);
+    ui->slider_volume->setValue(static_cast<int>(mediaPlayController_->Volume() * 100.0 + 0.5));
+    UpdateMuteButton(mediaPlayController_->IsMuted());
+}
+
+void MainWindow::UpdateMuteButton(bool muted) {
+    ui->pushButton_mute->setText(muted ? "取消静音" : "静音");
 }
 
 void MainWindow::PlayPrevious() {

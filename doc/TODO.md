@@ -850,21 +850,21 @@
 
 **目标**：让用户可以通过界面设置音量和静音状态。
 
-- [ ] 在 `mainwindow.ui` 增加音量滑块，建议命名为 `slider_volume`。
-- [ ] 音量滑块范围使用 `0` 到 `100`。
-- [ ] 在 `mainwindow.ui` 增加静音按钮，建议命名为 `pushButton_mute`。
-- [ ] `slider_volume::valueChanged` 转换为 `0.0` 到 `1.0` 后调用 `MediaPlayController::SetVolume()`。
-- [ ] `pushButton_mute::clicked` 调用 `MediaPlayController::SetMuted()`。
-- [ ] `VolumeChanged` 同步滑块位置。
-- [ ] `MuteChanged` 同步按钮状态。
-- [ ] 上下键调音量后 UI 滑块同步更新。
+- [x] 在 `mainwindow.ui` 增加音量滑块，建议命名为 `slider_volume`。
+- [x] 音量滑块范围使用 `0` 到 `100`。
+- [x] 在 `mainwindow.ui` 增加静音按钮，建议命名为 `pushButton_mute`。
+- [x] `slider_volume::valueChanged` 转换为 `0.0` 到 `1.0` 后调用 `MediaPlayController::SetVolume()`。
+- [x] `pushButton_mute::clicked` 调用 `MediaPlayController::SetMuted()`。
+- [x] `VolumeChanged` 同步滑块位置。
+- [x] `MuteChanged` 同步按钮状态。
+- [x] 上下键调音量后 UI 滑块同步更新。
 
 验收：
-- [ ] 拖动滑块后实际音量变化。
-- [ ] 静音按钮能切换静音状态。
-- [ ] 取消静音后恢复原音量。
-- [ ] 键盘上下键和滑块显示保持一致。
-- [ ] `MainWindow` 不直接 include 或操作 `AudioPlayer`。
+- [x] 拖动滑块后实际音量变化。
+- [x] 静音按钮能切换静音状态。
+- [x] 取消静音后恢复原音量。
+- [x] 键盘上下键和滑块显示保持一致。
+- [x] `MainWindow` 不直接 include 或操作 `AudioPlayer`。
 
 ---
 
