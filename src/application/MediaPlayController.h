@@ -68,12 +68,17 @@ public:
 
     double Position() const;
 
+    void SetPlaybackSpeed(double speed);
+    double PlaybackSpeed() const;
+
 signals:
     void StateChanged(PlaybackState state);
 
     void PositionChanged(double seconds);
 
     void DurationChanged(double seconds);
+
+    void PlaybackSpeedChanged(double speed);
 
 private:
     // 队列
@@ -105,6 +110,7 @@ private:
     std::unique_ptr<QTimer> positionTimer_ = nullptr;
 
     PlaybackState state_ = PlaybackState::Stopped;
+    double playbackSpeed_ = 1.0;
 
     void ReleaseResources();
     void SetState(PlaybackState state);

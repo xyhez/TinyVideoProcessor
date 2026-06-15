@@ -43,6 +43,10 @@ void MainWindow::CreateConnects() {
         ui->label_duration->setText(formatTime(duration));
     });
 
+    connect(mediaPlayController_.get(),&MediaPlayController::PlaybackSpeedChanged,this,[](double speed){
+        qDebug() << "Playback speed changed:" << speed;
+    });
+
     connect(ui->slider_progress,&QSlider::sliderPressed,this,[this](){
         isSliderDragging_ = true;
     });
@@ -125,6 +129,18 @@ void MainWindow::keyReleaseEvent(QKeyEvent *ev)
         Rewind();
     } else if (ev->key() == Qt::Key_Right) {
         Forward();
+    } else if (ev->key() == Qt::Key_1) {
+        mediaPlayController_->SetPlaybackSpeed(0.5);
+        NoticeWindow("速度: 0.5x");
+    } else if (ev->key() == Qt::Key_2) {
+        mediaPlayController_->SetPlaybackSpeed(1.0);
+        NoticeWindow("速度: 1.0x");
+    } else if (ev->key() == Qt::Key_3) {
+        mediaPlayController_->SetPlaybackSpeed(1.5);
+        NoticeWindow("速度: 1.5x");
+    } else if (ev->key() == Qt::Key_4) {
+        mediaPlayController_->SetPlaybackSpeed(2.0);
+        NoticeWindow("速度: 2.0x");
     }
     QMainWindow::keyReleaseEvent(ev);
 }

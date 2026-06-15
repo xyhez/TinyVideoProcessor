@@ -1,5 +1,19 @@
 ﻿#include "audioplayer.h"
 
+#include <cmath>
+
+namespace {
+constexpr double kSpeedEpsilon = 0.001;
+
+bool IsSupportedSpeed(double speed)
+{
+    return std::fabs(speed - 0.5) < kSpeedEpsilon
+        || std::fabs(speed - 1.0) < kSpeedEpsilon
+        || std::fabs(speed - 1.5) < kSpeedEpsilon
+        || std::fabs(speed - 2.0) < kSpeedEpsilon;
+}
+}
+
 AudioPlayer::AudioPlayer(QObject *p)
     : QObject(p)
     , m_pcmBuffer(192000, 0)
@@ -89,6 +103,110 @@ double AudioPlayer::CalculateHardwareLatency()
 
     m_lastHardwareLatency = qMax(0.0, latency);
     return m_lastHardwareLatency;
+}
+
+int AudioPlayer::BuildSpeedAdjustedPcm(int pcmBytes, int bytesPerSampleFrame, double speed)
+{
+    if (pcmBytes <= 0 || bytesPerSampleFrame <= 0) {
+        return 0;
+    }
+
+    const int sourceFrames = pcmBytes / bytesPerSampleFrame;
+    const int alignedBytes = sourceFrames * bytesPerSampleFrame;
+    const char* source = m_pcmBuffer.constData();
+
+    m_speedPcmBuffer.clear();
+    if (std::fabs(speed - 1.0) < kSpeedEpsilon) {
+        m_speedPcmBuffer.append(source, alignedBytes);
+        return m_speedPcmBuffer.size();
+    }
+
+    int reserveBytes = alignedBytes;
+    if (std::fabs(speed - 0.5) < kSpeedEpsilon) {
+        reserveBytes = alignedBytes * 2;
+    } else if (std::fabs(speed - 1.5) < kSpeedEpsilon) {
+        reserveBytes = alignedBytes * 2 / 3 + bytesPerSampleFrame;
+    } else if (std::fabs(speed - 2.0) < kSpeedEpsilon) {
+        reserveBytes = alignedBytes / 2 + bytesPerSampleFrame;
+    }
+    m_speedPcmBuffer.reserve(reserveBytes);
+
+    for (int frameIndex = 0; frameIndex < sourceFrames; ++frameIndex) {
+        const char* sampleFrame = source + frameIndex * bytesPerSampleFrame;
+
+        if (std::fabs(speed - 0.5) < kSpeedEpsilon) {
+            m_speedPcmBuffer.append(sampleFrame, bytesPerSampleFrame);
+            m_speedPcmBuffer.append(sampleFrame, bytesPerSampleFrame);
+        } else if (std::fabs(speed - 1.5) < kSpeedEpsilon) {
+            if (frameIndex % 3 != 2) {
+                m_speedPcmBuffer.append(sampleFrame, bytesPerSampleFrame);
+            }
+        } else if (std::fabs(speed - 2.0) < kSpeedEpsilon) {
+            if (frameIndex % 2 == 0) {
+                m_speedPcmBuffer.append(sampleFrame, bytesPerSampleFrame);
+            }
+        }
+    }
+
+    return m_speedPcmBuffer.size();
+}
+
+bool AudioPlayer::WritePcmBuffer(const char* data,
+                                 int bytes,
+                                 int bytesPerSampleFrame,
+                                 double speed,
+                                 double frameStartClockMs)
+{
+    if (!data || bytes <= 0 || bytesPerSampleFrame <= 0) {
+        return true;
+    }
+
+    int pcmIndex = 0;
+    qint64 outputSampleFramesWritten = 0;
+
+    while (pcmIndex < bytes) {
+        if (m_stopFlag || m_pauseFlag) {
+            break;
+        }
+
+        if (!m_audioSink || m_audioSink->state() == QAudio::StoppedState) {
+            qWarning() << "AudioPlayer: Audio sink stopped unexpectedly!";
+            return false;
+        }
+
+        int chunk = qMin(bytes - pcmIndex, 32 * 1024);
+        chunk -= chunk % bytesPerSampleFrame;
+        if (chunk <= 0) {
+            break;
+        }
+
+        if (!m_ioDevice) {
+            QThread::usleep(5 * 1000);
+            continue;
+        }
+
+        const qint64 written = m_ioDevice->write(data + pcmIndex, chunk);
+        if (written > 0) {
+            pcmIndex += static_cast<int>(written);
+            m_totalBytesWritten += written;
+            m_bytesWrittenTotal += written;
+
+            const qint64 writtenFrames = written / bytesPerSampleFrame;
+            outputSampleFramesWritten += writtenFrames;
+            if (m_syncManager && writtenFrames > 0 && m_dstRate > 0) {
+                const double mediaElapsedMs =
+                    static_cast<double>(outputSampleFramesWritten) * speed / m_dstRate * 1000.0;
+                m_syncManager->RefreshClock(frameStartClockMs + mediaElapsedMs);
+            }
+        } else if (written < 0) {
+            qWarning() << "AudioPlayer: Write error!";
+            return false;
+        } else {
+            QThread::usleep(5 * 1000);
+        }
+    }
+
+    return true;
 }
 
 void AudioPlayer::StartAudioPlay()
@@ -190,44 +308,27 @@ void AudioPlayer::Run()
             continue;
         }
 
-        double audioclock = tmp->pts * m_audioTimeBase * 1000;
-        // qDebug()<<"audioclock："<<audioclock;
-        if (m_syncManager) {
-            m_syncManager->RefreshClock(audioclock);
-        }
-
         int pcmBytes = converted * m_dstChannels * m_bytesPerSample;
-        int pcmIndex = 0;
+        const int bytesPerSampleFrame = m_dstChannels * m_bytesPerSample;
+        const double speedSnapshot = m_speed.load();
+        const int speedAdjustedBytes = BuildSpeedAdjustedPcm(pcmBytes, bytesPerSampleFrame, speedSnapshot);
 
-        while (pcmIndex < pcmBytes) {
-            if (m_stopFlag) {
-                break;
-            }
-
-            if (m_pauseFlag) {
-                break;
-            }
-
-            if (!m_audioSink || m_audioSink->state() == QAudio::StoppedState) {
-                qWarning() << "AudioPlayer: Audio sink stopped unexpectedly!";
-                break;
-            }
-
-            int chunk = qMin(pcmBytes - pcmIndex, 32*1024);
-            if (chunk > 0 && m_ioDevice) {
-                int written = m_ioDevice->write(m_pcmBuffer.constData() + pcmIndex, chunk);
-                if (written > 0) {
-                    pcmIndex += written;
-                    m_totalBytesWritten += written;
-                    m_bytesWrittenTotal += written;
-                } else if (written < 0) {
-                    qWarning() << "AudioPlayer: Write error!";
-                    break;
-                }
-            } else {
-                QThread::usleep(5 * 1000);
-            }
+        double frameStartClockMs = 0.0;
+        if (tmp->pts != AV_NOPTS_VALUE) {
+            frameStartClockMs = tmp->pts * m_audioTimeBase * 1000.0;
+        } else if (m_syncManager) {
+            frameStartClockMs = m_syncManager->GetClock();
         }
+
+        if (m_syncManager) {
+            m_syncManager->RefreshClock(frameStartClockMs);
+        }
+
+        WritePcmBuffer(m_speedPcmBuffer.constData(),
+                       speedAdjustedBytes,
+                       bytesPerSampleFrame,
+                       speedSnapshot,
+                       frameStartClockMs);
 
         av_frame_unref(tmp);
         av_frame_free(&tmp);
@@ -251,6 +352,17 @@ void AudioPlayer::Start()
     m_stopFlag = false;
     m_pauseFlag = false;
     qDebug() << "AudioPlayer started";
+}
+
+void AudioPlayer::SetSpeed(double speed)
+{
+    if (!std::isfinite(speed) || !IsSupportedSpeed(speed)) {
+        qWarning() << "AudioPlayer rejected unsupported speed:" << speed;
+        return;
+    }
+
+    m_speed.store(speed);
+    qDebug() << "AudioPlayer speed set to" << speed;
 }
 
 void AudioPlayer::Stop()

@@ -379,61 +379,114 @@
 
 ## 任务 9: 播放速度控制
 
-> 预研已完成，方案见 `doc/Phase1_1_任务9_播放速度控制预研报告.md`。
-> 核心思路：缩放音频 PCM 写输出 → 帧消费速度改变 → 主时钟推进速度自然跟随 → 视频同步逻辑无需改动。
+> 预研已修订，方案见 `doc/Phase1_1_任务9_播放速度控制预研报告.md`。
+> 核心思路：固定档位变速 → 音频 PCM 按采样帧对齐处理 → AudioPlayer 按实际输出进度刷新主时钟 → VideoRender 继续以音频主时钟同步，只调整自调度检查频率。
 > 每步编译验证。
 
 ---
 
-### 9.1 AudioPlayer 增加速度控制
+### 9.1 明确支持范围和时钟策略
 
-**目标**：新增 `SetSpeed(double)` 方法，缩放每次写入 `QAudioSink` 的 PCM 数据量。
+**目标**：先固定任务边界，避免任意倍速导致 PCM 处理和时钟推进不可控。
 
-- [ ] `audioplayer.h` 增加成员 `double m_speed = 1.0;`
-- [ ] `audioplayer.h` 增加方法声明 `void SetSpeed(double speed);`
-- [ ] `audioplayer.cpp` 实现 `SetSpeed()`：
-  - 边界保护：speed ≤ 0 或非有限数直接 return
-  - 精度截断到 0.05：`qRound(speed * 20.0) / 20.0`
-  - 赋值 `m_speed = speed;`
-- [ ] `audioplayer.cpp` 修改 `Run()` 中写 PCM 循环（第199-230行）：
-  - 计算有效 chunk：`effectiveChunk = chunk / m_speed`
-  - speed > 1.0：只写 `effectiveChunk` 字节，跳过 `chunk - effectiveChunk` 字节（快放采样丢弃）
-  - speed < 1.0：写 `effectiveChunk` 字节，但循环重复写 `qRound(1.0/m_speed)` 次（慢放采样重复）
-  - speed == 1.0：行为不变
-  - 同步推进 `totalBytesWritten` 逻辑（保持实际写入量，以维护延迟计算准确）
+- [x] 支持固定档位：`0.5x / 1.0x / 1.5x / 2.0x`。
+- [x] 不支持任意 `0.05` 精度倍速；输入值由 Controller 拒绝。
+- [x] 明确当前 Phase 允许变调，不引入 SoundTouch/RubberBand/AVFilterGraph。
+- [x] 明确音频写出必须按采样帧对齐，不能按任意字节截断。
+- [x] 明确主时钟由 AudioPlayer 根据“当前音频帧 PTS + 已输出媒体进度”刷新，不能只在每个 AVFrame 开头刷新一次。
 - [ ] 编译验证。
 
 验收：
-- [ ] `SetSpeed(2.0)` 后音频播放速度翻倍（音调升高，可接受已知限制）。
-- [ ] `SetSpeed(0.5)` 后音频播放速度减半（音调降低）。
-- [ ] 切换速度不 crash，不破坏重采样链路。
+- [x] 文档记录固定档位和变调限制。
+- [x] 文档记录主时钟推进策略，慢放时不会长期停在同一个 PTS。
 
 ---
 
-### 9.2 VideoRender 增加速度控制
+### 9.2 AudioPlayer 增加线程安全速度控制
 
-**目标**：新增 `SetSpeed(double)` 方法，按速度缩放帧间隔。
+**目标**：新增 `SetSpeed(double)` 方法，提供线程安全的播放速度状态。
 
-- [ ] `videorender.h` 增加成员 `double m_speed = 1.0;`。
-- [ ] `videorender.h` 增加方法声明 `void SetSpeed(double speed);`
-- [ ] `videorender.cpp` 实现 `SetSpeed()`：
-  - 边界保护同 9.1。
-  - 更新 `m_speed = speed;`
-- [ ] `videorender.cpp` 修改 `RenderFrame()` 中 `ScheduleNextFrame(m_frameIntervalMs)` 改为 `ScheduleNextFrame(scaledInterval)`，其中 `scaledInterval = qMax(1, qRound(m_frameIntervalMs / m_speed))`。
+- [x] `audioplayer.h` 增加线程安全速度成员，优先使用 `std::atomic<double> m_speed {1.0};`；如编译环境不适合，则使用 `QMutex` 保护。
+- [x] `audioplayer.h` 增加方法声明 `void SetSpeed(double speed);`
+- [x] `audioplayer.cpp` 实现 `SetSpeed()`：
+  - 边界保护：speed <= 0 或非有限数直接 return
+  - 仅接受 `0.5 / 1.0 / 1.5 / 2.0` 四个归一化后的值
+  - 赋值给线程安全速度成员
+- [x] `AudioPlayer::Run()` 在处理每个 PCM chunk 前读取一次当前速度快照，避免一次写循环中速度反复变化。
 - [ ] 编译验证。
 
 验收：
-- [ ] 2.0x 时帧间隔减半（`m_frameIntervalMs/2`），视频渲染频率翻倍。
-- [ ] 0.5x 时帧间隔加倍，视频渲染频率减半。
-- [ ] 音视频同步保持（主时钟由音频驱动，自然跟随）。
+- [x] UI 线程调用 `SetSpeed()` 与音频线程读取速度不存在数据竞争。
+- [x] 无效速度不会改变当前速度。
+- [ ] 切换速度不 crash。
 
 ---
 
-### 9.3 MediaPlayController 增加 SetPlaybackSpeed 入口
+### 9.3 AudioPlayer 按采样帧对齐处理 PCM
+
+**目标**：真正改变音频输出速度，同时保证 PCM 不被截断到单个采样帧中间。
+
+- [x] 计算 `bytesPerSampleFrame = m_dstChannels * m_bytesPerSample`。
+- [x] 每次写入、跳过、重复的字节数都向下对齐到 `bytesPerSampleFrame` 的整数倍。
+- [x] `1.0x`：保持现有写出逻辑。
+- [x] `2.0x`：按采样帧丢弃一半 PCM，例如每 2 个采样帧保留 1 个采样帧。
+- [x] `1.5x`：按稳定比例丢弃约 1/3 PCM，例如每 3 个采样帧保留 2 个采样帧。
+- [x] `0.5x`：按采样帧重复输出，使实际输出时长约为原来的 2 倍。
+- [x] 保持 `m_totalBytesWritten` / `m_bytesWrittenTotal` 统计实际写入声卡的字节数。
+- [ ] 编译验证。
+
+验收：
+- [x] 0.5x/1.5x/2.0x 都不会写出非采样帧对齐的 PCM。
+- [ ] 变速时无明显爆音、声道错位或重采样链路异常。
+- [ ] 统计字段仍反映实际写入量。
+
+---
+
+### 9.4 AudioPlayer 按输出进度刷新主时钟
+
+**目标**：避免慢放时主时钟长时间停留在同一个 AVFrame PTS，导致视频等待或抖动。
+
+- [x] 在处理每个音频 AVFrame 时记录 `frameStartClockMs = tmp->pts * m_audioTimeBase * 1000`。
+- [x] 在写 PCM 的过程中，根据已写出的输出采样帧数和当前速度估算媒体时间推进：
+  - `mediaElapsedMs = outputSampleFramesWritten * speed / m_dstRate * 1000`
+  - `currentClockMs = frameStartClockMs + mediaElapsedMs`
+- [x] 写出每个 chunk 后刷新 `m_syncManager->RefreshClock(currentClockMs)`。
+- [x] 保留现有硬件延迟计算逻辑；若后续发现显示偏早，再把 `CalculateHardwareLatency()` 纳入时钟修正。
+- [ ] 编译验证。
+
+验收：
+- [ ] 0.5x 慢放时主时钟持续缓慢推进，不只在下一帧到来时跳变。
+- [ ] 2.0x 快放时主时钟推进速度约为正常速度两倍。
+- [x] 视频同步仍以音频主时钟为准。
+
+---
+
+### 9.5 VideoRender 增加速度感知的调度频率
+
+**目标**：新增 `SetSpeed(double)` 方法，仅用于调整自调度检查频率，不承担主同步语义。
+
+- [x] `videorender.h` 增加线程安全速度成员，优先使用 `std::atomic<double> m_speed {1.0};`；如编译环境不适合，则使用 `QMutex` 保护。
+- [x] `videorender.h` 增加方法声明 `void SetSpeed(double speed);`
+- [x] `videorender.cpp` 实现 `SetSpeed()`：
+  - 边界保护同 AudioPlayer
+  - 仅接受 `0.5 / 1.0 / 1.5 / 2.0`
+  - 更新线程安全速度成员
+- [x] 在 `RenderFrame()` 中计算 `scaledInterval = qMax(1, qRound(m_frameIntervalMs / speedSnapshot))`。
+- [x] 只把 `scaledInterval` 用于空队列等待、正常渲染后的下一次调度等检查频率；`diff > SYNC_THRESHOLD_MS` 的精确等待仍以音频时钟差值为准。
+- [ ] 编译验证。
+
+验收：
+- [x] VideoRender 不直接修改主时钟。
+- [x] 视频仍通过 `videoPts - audioClock` 做同步判断。
+- [x] 倍速只影响自调度检查频率，不破坏 seek/暂停/停止流程。
+
+---
+
+### 9.6 MediaPlayController 增加 SetPlaybackSpeed 入口
 
 **目标**：应用层统一入口，输入验证，下发到 AudioPlayer + VideoRender 两个组件。
 
-- [ ] `MediaPlayController.h` 增加：
+- [x] `MediaPlayController.h` 增加：
   ```cpp
   public:
       void SetPlaybackSpeed(double speed);
@@ -443,67 +496,65 @@
   private:
       double playbackSpeed_ = 1.0;
   ```
-- [ ] `MediaPlayController.cpp` 实现 `SetPlaybackSpeed()`：
+- [x] `MediaPlayController.cpp` 实现 `SetPlaybackSpeed()`：
   - `speed <= 0.0 || !std::isfinite(speed)` → qWarning + return
-  - 精度截断到 0.05
-  - `if (qFuzzyCompare(playbackSpeed_, speed)) return;` 去重
+  - 仅允许 `0.5 / 1.0 / 1.5 / 2.0`
+  - 输入值不在支持列表时拒绝，或显式归一化到最近档位并打印日志
+  - `if (std::fabs(playbackSpeed_ - speed) < kSpeedEpsilon) return;` 去重
   - `playbackSpeed_ = speed;`
-  - `audioplay_->SetSpeed(speed);`
-  - `videoRender_->SetSpeed(speed);`
+  - 若 `audioplay_` 已初始化，则 `audioplay_->SetSpeed(speed);`
+  - 若 `videoRender_` 已初始化，则 `videoRender_->SetSpeed(speed);`
   - `emit PlaybackSpeedChanged(speed);`
-- [ ] `PlaybackSpeed() const` 直接 return `playbackSpeed_`。
+- [x] `PlaybackSpeed() const` 直接 return `playbackSpeed_`。
+- [x] `Initialize()` 构建 AudioPlayer/VideoRender 后下发当前 `playbackSpeed_`，保证 Stop/Start 或后续切换源时速度状态保持。
 - [ ] 编译验证。
 
 验收：
-- [ ] `SetPlaybackSpeed(2.0)` 调用后 AudioPlayer 和 VideoRender 都收到速度变更。
-- [ ] 重复设相同速度不会重复下发（去重生效）。
-- [ ] 无效值（0、-1、NaN）被拒绝，不影响当前播放。
+- [x] `SetPlaybackSpeed(2.0)` 调用后 AudioPlayer 和 VideoRender 都收到速度变更。
+- [x] 重复设相同速度不会重复下发（去重生效）。
+- [x] 无效值（0、-1、NaN）被拒绝，不影响当前播放。
+- [x] 速度状态不因 Stop/Start 或后续 SwitchSource 重置。
 
 ---
 
-### 9.4 MainWindow 绑定速度控制快捷键（可选）
+### 9.7 MainWindow 绑定速度控制快捷键
 
 **目标**：用键盘快速切换播放速度，验证整个链路。
 
-- [ ] `keyReleaseEvent` 增加快捷键：
+- [x] `keyReleaseEvent` 增加快捷键：
   - `Qt::Key_1` → `SetPlaybackSpeed(0.5)` + `NoticeWindow("速度: 0.5x")`
   - `Qt::Key_2` → `SetPlaybackSpeed(1.0)` + `NoticeWindow("速度: 1.0x")`
   - `Qt::Key_3` → `SetPlaybackSpeed(1.5)` + `NoticeWindow("速度: 1.5x")`
   - `Qt::Key_4` → `SetPlaybackSpeed(2.0)` + `NoticeWindow("速度: 2.0x")`
-- [ ] 连接 `PlaybackSpeedChanged` 信号，debug 输出当前速度。
+- [x] 连接 `PlaybackSpeedChanged` 信号，debug 输出当前速度。
 - [ ] 编译验证。
 
 验收：
 - [ ] 按键 1/2/3/4 能实时切换速度。
 - [ ] 速度切换后音视频同步保持。
 - [ ] 切换速度不中断播放。
+- [x] `MainWindow` 不直接依赖基础设施层。
 
 ---
 
-### 9.5 边界测试
+### 9.8 边界测试与报告
 
 **目标**：手动验证关键场景，确认无回归。
 
 - [ ] 正常速度播放 10s → 切 2.0x 播放 10s → 切回 1.0x → 音视频同步不丢。
+- [ ] 正常速度播放 10s → 切 0.5x 播放 10s → 切回 1.0x → 视频不长时间冻结。
 - [ ] 2.0x 播放中 Pause → 恢复 → 速度保持 2.0x。
 - [ ] 0.5x 播放中 Seek → Seek 后速度保持 0.5x。
 - [ ] 2.0x 播放中 Stop → Start → 速度保持 2.0x（速度是持久状态）。
 - [ ] 高速播放（2.0x）时拖动进度条 Seek → 不 crash。
+- [x] 形成报告：`doc/Phase1_1_任务9_播放速度控制实现报告.md`
 
 验收：
-- [ ] Speed 不因 Pause/Seek/Stop 而意外重置。
-- [ ] 所有速度切换不 crash。
-- [ ] `MainWindow` 不直接依赖基础设施层。
-
----
-
-验收：
-
 - [ ] 0.5x/1.0x/1.5x/2.0x 切换正常。
 - [ ] 变速后音视频保持同步。
 - [ ] Seek/Stop/Pause 后速度状态保持。
-- [ ] 无效速度输入被拒绝。
-- [ ] `MainWindow` 不直接依赖基础设施层。
+- [x] 无效速度输入被拒绝。
+- [x] `MainWindow` 不直接依赖基础设施层。
 
 ## 1.1 完成标准
 

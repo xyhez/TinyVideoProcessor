@@ -14,6 +14,7 @@
 #include <QVector>
 #include <memory>
 #include <QWaitCondition>
+#include <atomic>
 
 #include "infrastructure/syncmanager.h"
 #include "core/queue.h"
@@ -73,6 +74,12 @@ public:
      * @brief StartAudioPlay
      */
     void StartAudioPlay();
+
+    /**
+     * @brief SetSpeed 设置播放速度
+     * @param speed 支持 0.5 / 1.0 / 1.5 / 2.0
+     */
+    void SetSpeed(double speed);
 signals:
     /**
      * @brief VolumeChanged 返回当前的音量
@@ -102,6 +109,7 @@ private:
 
     AVFrame* m_frame = nullptr;
     QByteArray m_pcmBuffer;
+    QByteArray m_speedPcmBuffer;
 
     qint64 m_bytesWrittenTotal = 0;
     QElapsedTimer m_statusTimer;
@@ -112,11 +120,18 @@ private:
     QWaitCondition m_queueNotEmpty;
 
     qreal m_volume = 1.0;
+    std::atomic<double> m_speed {1.0};
 
 private:
     void InitResampler();
     void InitAudioOutput();
     double CalculateHardwareLatency();
+    int BuildSpeedAdjustedPcm(int pcmBytes, int bytesPerSampleFrame, double speed);
+    bool WritePcmBuffer(const char* data,
+                        int bytes,
+                        int bytesPerSampleFrame,
+                        double speed,
+                        double frameStartClockMs);
     void Run();
 
 signals:

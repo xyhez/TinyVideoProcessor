@@ -1,221 +1,287 @@
 # Phase 1.1 任务 9: 播放速度控制预研报告
 
-## 1. 当前链路分析
+## 1. 目标
 
-### 1.1 AudioPlayer (`src/infrastructure/audioplayer.cpp`)
+在不引入新第三方 DSP 库的前提下，为当前本地播放器补齐基础倍速播放能力。
 
-音频播放流程：
+本任务只支持固定档位：
+
+- `0.5x`
+- `1.0x`
+- `1.5x`
+- `2.0x`
+
+当前 Phase 允许变调，不追求“不变调变速”。后续如果需要更高质量的音频变速，再评估 SoundTouch、Rubber Band 或 FFmpeg `atempo` filter。
+
+## 2. 架构边界
+
+继续遵循 `doc/架构指导.md`：
+
+- `MainWindow` 只负责快捷键或 UI 事件转发。
+- `MediaPlayController` 负责统一播放速度入口、状态保存和下发。
+- `AudioPlayer` 负责音频 PCM 变速和音频主时钟刷新。
+- `VideoRender` 负责视频帧渲染和自调度检查频率调整。
+- `syncmanager` 保持主时钟存取职责，不引入倍速概念。
+- 不新增全局变量。
+- 不从 `AVFrame::time_base` 推导同步时间。
+
+## 3. 当前链路
+
+### 3.1 AudioPlayer
+
+当前音频链路：
+
+```text
+AFrame queue
+  -> Pop AVFrame
+  -> swr_convert 重采样到 S16 PCM
+  -> QAudioSink::write
+  -> syncmanager::RefreshClock
 ```
-帧队列.Pop() → swr_convert(重采样) → QAudioSink.write(PCM) → RefreshClock(audioclock)
-```
 
-时钟计算（第193行）：
+当前主时钟刷新方式：
+
 ```cpp
-double audioclock = tmp->pts * m_audioTimeBase * 1000;  // ms
+double audioclock = tmp->pts * m_audioTimeBase * 1000;
 m_syncManager->RefreshClock(audioclock);
 ```
 
-关键约束：`QAudioSink` 以固定采样率输出（44100Hz），无法让声卡"加速播放"。音频实际输出的速度由写数据速度决定 —— 丢弃样本 = 变快，重复样本 = 变慢。
+这个方式在正常速度下可用，但在慢放时会有问题：如果同一个音频帧被重复输出，主时钟仍停留在该帧开头 PTS，视频会等待或抖动。因此倍速实现不能只改变 PCM 写出量，还要按输出进度刷新音频主时钟。
 
-### 1.2 VideoRender (`src/infrastructure/videorender.cpp`)
+### 3.2 VideoRender
 
-视频渲染流程：
+当前视频链路是 `QTimer::singleShot` 自调度：
+
+```text
+RenderFrame
+  -> Front 查看队首帧
+  -> videoPts - audioClock
+  -> 太早则等待 diff
+  -> 太晚则丢帧追赶
+  -> 同步窗口内渲染
+  -> ScheduleNextFrame
 ```
-QTimer(m_frameInterval) → RenderFrame() → Front(队列看预览帧)
-  → 计算 diff = videoPTS - audioClock
-  → diff > 40ms: 等待 (setInterval(waitMs))
-  → diff < -40ms: 丢帧 (TryPop + av_frame_free)
-  → 正常: TryPop + uploadTexture + update()
-```
 
-帧间隔计算（第35行）：
+视频同步核心仍然是音频主时钟。倍速后，VideoRender 不应该直接修改主时钟，也不应该绕开 `videoPts - audioClock` 的同步判断。
+
+### 3.3 syncmanager
+
+`syncmanager` 只保存主时钟：
+
+- `RefreshClock(double clock)`：更新主时钟，单位毫秒。
+- `GetClock()`：返回主时钟，单位毫秒。
+- `SeekTo(double clockMs)`：seek 后重置主时钟，单位毫秒。
+
+倍速不应该让 `syncmanager` 变复杂。主时钟推进策略放在 AudioPlayer。
+
+## 4. 修订后的方案
+
+### 4.1 固定档位，不做任意精度
+
+旧方案计划把速度截断到 `0.05` 精度，这会让 PCM 抽样、重复和时钟推进都变复杂。
+
+本阶段只支持四个固定档位：
+
+| 档位 | 策略 | 说明 |
+|------|------|------|
+| 0.5x | 重复采样帧 | 音调降低，可接受 |
+| 1.0x | 原样输出 | 默认 |
+| 1.5x | 每 3 个采样帧保留 2 个 | 音调升高，可接受 |
+| 2.0x | 每 2 个采样帧保留 1 个 | 音调升高，可接受 |
+
+输入值由 `MediaPlayController` 统一校验。可以选择“只接受完全匹配的档位”，也可以选择“归一化到最近档位并打印日志”。为了行为明确，推荐第一版直接拒绝不支持的值。
+
+### 4.2 AudioPlayer 线程安全速度状态
+
+`SetSpeed()` 通常由 UI 主线程经 Controller 调用，`AudioPlayer::Run()` 在音频线程中读取速度。速度成员必须线程安全。
+
+推荐：
+
 ```cpp
-m_frameInterval = qRound(1000.0 / frameRate);  // ms
+std::atomic<double> m_speed {1.0};
 ```
 
-同步阈值：`SYNC_THRESHOLD_MS = 40`（第5行）
+如果当前 MSVC/Qt 环境对 `std::atomic<double>` 支持不理想，则改用 `QMutex` 保护。
 
-### 1.3 syncmanager (`src/infrastructure/syncmanager.cpp`)
+`Run()` 中不要在一个 chunk 内多次读取速度。应在处理一个 PCM chunk 前读取一次 speed snapshot，保证该 chunk 内行为稳定。
 
-主时钟为音频驱动：
+### 4.3 PCM 必须按采样帧对齐
+
+当前输出格式是交错 PCM。一次完整采样帧大小为：
+
 ```cpp
-RefreshClock(double clock) → mainclock = clock;  // 纯赋值，单位 ms
-GetClock() → return mainclock;
-SeekTo(double clockMs) → mainclock = clockMs;
+bytesPerSampleFrame = m_dstChannels * m_bytesPerSample;
 ```
 
-时钟本身不引入速度概念。音频帧以什么速率被消费，时钟就以什么速率推进。
+所有写入、跳过、重复都必须按 `bytesPerSampleFrame` 对齐。不能直接用任意字节数做 `chunk / speed`，否则可能截断单个采样帧，造成噪声、爆音或声道错位。
 
----
+建议先把重采样后的 PCM 按采样帧处理：
 
-## 2. 方案设计
+- `1.0x`：原样写出。
+- `2.0x`：每 2 个采样帧保留 1 个。
+- `1.5x`：每 3 个采样帧保留 2 个。
+- `0.5x`：每个采样帧输出 2 次。
 
-### 2.1 核心思路：缩放音频写输出 + 缩放视频帧间隔
+这不是高质量变速算法，但实现清晰、依赖干净，适合 Phase 1。
 
-不修改 syncmanager 时钟逻辑。利用"音频帧消费速度决定时钟推进速度"的天然特性：
+### 4.4 AudioPlayer 按输出进度刷新主时钟
 
-```
-speed=2.0: 每帧只写 50% PCM → 帧队列消耗速度翻倍 → 时钟以 2x 推进 → 视频自然跟随
-speed=0.5: 每帧写 200% PCM（重复样本）→ 帧队列消耗速度减半 → 时钟以 0.5x 推进
-```
+倍速后的主时钟不能只取当前 AVFrame 的起始 PTS。建议在写 PCM 时估算当前媒体时间：
 
-### 2.2 三方改动
-
-#### AudioPlayer
-
-| 速度 | PCM 写策略 | 音质 |
-|------|-----------|------|
-| 0.5x | 每样本写两次（重复） | 降调 |
-| 1.0x | 正常 | 正常 |
-| 1.5x | 写 2/3，丢弃 1/3 | 升调 |
-| 2.0x | 写 1/2，丢弃 1/2 | 升调（chipmunk） |
-
-已知限制：**会变调**，这是不引入外部 DSP 库（SoundTouch/rubberband）的必然代价。如果后续需要不变调变速，需要引入 SoundTouch 或 libsamplerate。
-
-新增成员和方法：
 ```cpp
-// audioplayer.h
-public:
-    void SetSpeed(double speed);   // 设置播放速度
-private:
-    double m_speed = 1.0;          // 播放速度因子
+frameStartClockMs = tmp->pts * m_audioTimeBase * 1000;
+mediaElapsedMs = outputSampleFramesWritten * speed / m_dstRate * 1000;
+currentClockMs = frameStartClockMs + mediaElapsedMs;
+m_syncManager->RefreshClock(currentClockMs);
 ```
 
-写 PCM 循环修改（`audioplayer.cpp:199-230`）：
+含义：
+
+- `outputSampleFramesWritten` 是当前音频帧已经实际写给声卡的输出采样帧数。
+- `speed` 用来把“输出时间”换算回“媒体时间”。
+- 0.5x 时，输出 1 秒音频只推进 0.5 秒媒体时间。
+- 2.0x 时，输出 0.5 秒音频推进 1 秒媒体时间。
+
+这样慢放时主时钟会持续推进，不会长时间卡在同一个 PTS。
+
+硬件延迟 `CalculateHardwareLatency()` 暂不纳入第一版倍速时钟修正，避免一次改动过大。如果运行测试发现画面稳定偏早，再单独处理延迟补偿。
+
+### 4.5 VideoRender 只调整检查频率
+
+VideoRender 可以增加 `SetSpeed(double)`，但它不负责同步语义。
+
+它只做一件事：调整自调度检查频率。
+
 ```cpp
-int effectiveChunk = static_cast<int>(chunk / m_speed);
-if (m_speed < 1.0) {
-    // 慢放：重复写入补齐
-    int repeats = qRound(1.0 / m_speed);
-    for (int r = 0; r < repeats && written > 0; r++) {
-        m_ioDevice->write(pcmPtr, effectiveChunk);
-    }
-} else {
-    // 快放：跳过部分样本
-    int skip = static_cast<int>(chunk * (1.0 - 1.0/m_speed));
-    m_ioDevice->write(pcmPtr, effectiveChunk); // 只写 effectiveChunk
-    pcmIndex += skip; // 跳过丢弃样本
-}
+scaledInterval = qMax(1, qRound(m_frameIntervalMs / speedSnapshot));
 ```
 
-#### VideoRender
+使用范围：
 
-新增方法和成员：
+- 队列空时的下一次检查。
+- 正常渲染一帧后的下一次检查。
+- 其他纯“回退等待”的调度。
+
+不使用范围：
+
+- `diff > SYNC_THRESHOLD_MS` 时的精确等待仍然使用 `diff`。
+- `diff < -SYNC_THRESHOLD_MS` 时仍按原逻辑丢帧追赶。
+- 不修改 `syncmanager` 主时钟。
+
+这样可以让高倍速下视频检查更勤快，但不会抢走音频主时钟的同步职责。
+
+## 5. 组件改动
+
+### 5.1 AudioPlayer
+
+新增：
+
 ```cpp
-// videorender.h
-public:
-    void SetSpeed(double speed);
-
-private:
-    double m_speed = 1.0;
-    int baseFrameInterval_; // 替代 m_frameInterval，存原始值
-
-// videorender.cpp
-void VideoRender::SetSpeed(double speed) {
-    m_speed = speed;
-    m_frameInterval = qMax(1, qRound(baseFrameInterval_ / speed));
-    if (m_timer && m_timer->isActive()) {
-        m_timer->setInterval(m_frameInterval);
-    }
-}
+void SetSpeed(double speed);
 ```
 
-同步阈值不缩放，保留 `SYNC_THRESHOLD_MS = 40`。速度为 2x 时音频时钟推进快，`diff < -40` 自然触发丢帧，无需特殊处理。
+新增线程安全成员：
 
-#### MediaPlayController
-
-新增接口：
 ```cpp
-// MediaPlayController.h
-public:
-    void SetPlaybackSpeed(double speed);
-    double PlaybackSpeed() const;
-
-signals:
-    void PlaybackSpeedChanged(double speed);
-
-private:
-    double playbackSpeed_ = 1.0;
+std::atomic<double> m_speed {1.0};
 ```
 
-实现：
+核心改动：
+
+- `SetSpeed()` 校验固定档位。
+- PCM 写出按采样帧对齐。
+- 0.5x 重复采样帧。
+- 1.5x/2.0x 丢弃采样帧。
+- 每个输出 chunk 后按输出进度刷新主时钟。
+
+### 5.2 VideoRender
+
+新增：
+
 ```cpp
-void MediaPlayController::SetPlaybackSpeed(double speed) {
-    // 边界保护
-    if (speed <= 0.0 || !std::isfinite(speed)) {
-        qWarning() << "Invalid speed:" << speed;
-        return;
-    }
-    // 精度截断到 0.05
-    speed = qRound(speed * 20.0) / 20.0;
-
-    if (qFuzzyCompare(playbackSpeed_, speed)) return;
-
-    playbackSpeed_ = speed;
-    audioplay_->SetSpeed(speed);
-    videoRender_->SetSpeed(speed);
-
-    emit PlaybackSpeedChanged(speed);
-}
+void SetSpeed(double speed);
 ```
 
----
+新增线程安全成员：
 
-## 3. 速度与现有操作的交互
-
-| 操作 | 交互行为 | 需要改动? |
-|------|---------|:---:|
-| Seek | 先暂停管线 → seek → 恢复播放，速度不变 | 否 |
-| Stop | 停止整个管线，下次 Start 速度重新生效 | 否 |
-| Pause | 暂停，恢复后速度不变 | 否 |
-| Start | `SetSpeed()` 已下发到组件，启动时生效 | 否 |
-| Rewind/Forward | 调用 `SeekRelative`，不涉及速度 | 否 |
-
-速度是持久状态，不受播放控制操作影响。只在 `SetPlaybackSpeed()` 被调用时才改变。
-
----
-
-## 4. 支持范围
-
-| 速度 | 支持 | 策略 |
-|------|:---:|------|
-| 0.5x | ✅ | 每样本写两次，降调 |
-| 1.0x | ✅ | 正常（默认） |
-| 1.5x | ✅ | 写 2/3 PCM，降采样升调 |
-| 2.0x | ✅ | 写 1/2 PCM，降采样升调 |
-| 0.25x | ⚠️ | 可选但 PCM 重复量极大，体验差 |
-| 4.0x | ⚠️ | 可选但丢 3/4 样本，音质极差 |
-| ≤0 | ❌ | 无效输入，SetPlaybackSpeed 拒收 |
-| NaN/Inf | ❌ | `std::isfinite` 过滤 |
-
----
-
-## 5. 编码顺序
-
-```
-Step 1 — syncmanager: 无改动
-Step 2 — AudioPlayer: 加 m_speed + SetSpeed() + PCM 写缩放
-Step 3 — VideoRender: 加 m_speed + SetSpeed() + 帧间隔缩放
-Step 4 — MediaPlayController: SetPlaybackSpeed() + signal
-Step 5 — MainWindow: 绑定快捷键（如数字键 0.5/1/2）
+```cpp
+std::atomic<double> m_speed {1.0};
 ```
 
-## 6. 未来升级路径（不变调变速）
+核心改动：
 
-当前方案缺点：变速会改变音调。如需不变调变速，可引入：
+- `SetSpeed()` 校验固定档位。
+- 在 `RenderFrame()` 内读取速度快照。
+- 用速度快照缩放普通调度间隔。
+- 保留现有音视频同步判断。
 
-1. **SoundTouch** — 轻量级，MIT 协议，支持 ±50% 变速 + 变调独立控制
-2. **Rubber Band** — 专业级，GPL，质量更高
-3. **FFmpeg atempo filter** — 软实现，需要额外 AVFilterGraph
+### 5.3 MediaPlayController
 
-这些库需要额外集成，当前 Phase 1 暂不引入，保持依赖干净。
+新增：
 
----
+```cpp
+void SetPlaybackSpeed(double speed);
+double PlaybackSpeed() const;
+```
 
-## 7. 验收标准
+新增信号：
 
-- [ ] 0.5x/1.0x/1.5x/2.0x 切换正常，播放不 crash
-- [ ] 变速后音视频保持同步
-- [ ] Seek/Stop/Pause 后速度状态保持
-- [ ] 无效速度输入被拒绝
-- [ ] `MainWindow` 不直接依赖基础设施层
+```cpp
+void PlaybackSpeedChanged(double speed);
+```
+
+新增状态：
+
+```cpp
+double playbackSpeed_ = 1.0;
+```
+
+职责：
+
+- 校验固定档位。
+- 保存当前速度。
+- 下发到 `AudioPlayer` 和 `VideoRender`。
+- 初始化播放管线后重新下发当前速度，保证 Stop/Start 或后续切换源时速度状态保持。
+- 对外发射 `PlaybackSpeedChanged`。
+
+### 5.4 MainWindow
+
+只做事件转发：
+
+- `1` -> `SetPlaybackSpeed(0.5)`
+- `2` -> `SetPlaybackSpeed(1.0)`
+- `3` -> `SetPlaybackSpeed(1.5)`
+- `4` -> `SetPlaybackSpeed(2.0)`
+
+`MainWindow` 不直接依赖 `AudioPlayer`、`VideoRender` 或 `syncmanager`。
+
+## 6. 与现有播放控制的交互
+
+| 操作 | 预期行为 |
+|------|----------|
+| Start | 使用当前 `playbackSpeed_` 播放 |
+| Pause | 暂停后恢复，速度保持 |
+| Stop | 回到起点，速度状态保持 |
+| Seek | Seek 后速度保持 |
+| Rewind/Forward | 只改变位置，不改变速度 |
+| 后续 SwitchSource | 新管线初始化后重新下发当前速度 |
+
+速度是播放状态的一部分，不因 Pause/Seek/Stop 自动重置。
+
+## 7. 风险和限制
+
+- 音频会变调，这是当前 Phase 的已知限制。
+- 0.5x 通过重复采样帧实现，音质一般，但实现依赖干净。
+- 1.5x/2.0x 通过丢弃采样帧实现，音质一般。
+- 不支持任意倍速输入，避免抽样比例和时钟估算过早复杂化。
+- 硬件延迟暂不纳入第一版倍速时钟修正，必要时后续单独优化。
+
+## 8. 验收标准
+
+- [ ] 0.5x/1.0x/1.5x/2.0x 可以切换。
+- [ ] 无效速度输入被拒绝或明确归一化。
+- [ ] PCM 写入始终按采样帧对齐。
+- [ ] 0.5x 慢放时主时钟持续推进，视频不长时间冻结。
+- [ ] 1.5x/2.0x 快放时视频能跟随音频主时钟。
+- [ ] Pause/Seek/Stop 后速度状态保持。
+- [ ] `MainWindow` 不直接依赖基础设施层。

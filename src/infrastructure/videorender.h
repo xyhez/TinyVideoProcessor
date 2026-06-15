@@ -8,6 +8,7 @@
 #include <QTimer>
 #include <QMutex>
 #include <memory>
+#include <atomic>
 
 #include "infrastructure/syncmanager.h"
 #include "core/queue.h"
@@ -43,6 +44,7 @@ public:
     void StartRendering();
     void StopRendering();
     void Pause() { StopRendering(); }
+    void SetSpeed(double speed);
 
 private slots:
     void RenderFrame();
@@ -71,6 +73,7 @@ private:
 
     int m_frameIntervalMs = 33;
     double m_videoTimeBase = 0.0;
+    std::atomic<double> m_speed {1.0};
     bool m_hasFrame = false;
     bool m_running = false;
 

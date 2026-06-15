@@ -5,9 +5,19 @@
 #include "MediaPlayController.h"
 #include <QDebug>
 #include <qlayout.h>
+#include <cmath>
 
 namespace {
 constexpr double kSeekStepSeconds = 10.0;
+constexpr double kSpeedEpsilon = 0.001;
+
+bool IsSupportedPlaybackSpeed(double speed)
+{
+    return std::fabs(speed - 0.5) < kSpeedEpsilon
+        || std::fabs(speed - 1.0) < kSpeedEpsilon
+        || std::fabs(speed - 1.5) < kSpeedEpsilon
+        || std::fabs(speed - 2.0) < kSpeedEpsilon;
+}
 }
 
 MediaPlayController::MediaPlayController(QObject *parent)
@@ -64,6 +74,8 @@ bool MediaPlayController::Initialize(std::shared_ptr<IMediaSource> mediaSource, 
     audioplay_->InitAudioPlay(demuxer_->ReAcoderPar(), AFrame_, syncManager_, sourceInfo.A_timeBase);
     audioplay_->moveToThread(audioplayTH_.get());
     videoRender_->InitVideoRender(VFrame_, syncManager_, sourceInfo.FrameRate, sourceInfo.V_timeBase);
+    audioplay_->SetSpeed(playbackSpeed_);
+    videoRender_->SetSpeed(playbackSpeed_);
 
     //6.设置videorender
     if (rendererContainer) {
@@ -148,6 +160,31 @@ double MediaPlayController::Duration() const {
 
 double MediaPlayController::Position() const {
     return syncManager_ ? syncManager_->GetClock() / 1000.0 : 0.0;
+}
+
+double MediaPlayController::PlaybackSpeed() const {
+    return playbackSpeed_;
+}
+
+void MediaPlayController::SetPlaybackSpeed(double speed) {
+    if (!std::isfinite(speed) || !IsSupportedPlaybackSpeed(speed)) {
+        qWarning() << "Unsupported playback speed:" << speed;
+        return;
+    }
+
+    if (std::fabs(playbackSpeed_ - speed) < kSpeedEpsilon) {
+        return;
+    }
+
+    playbackSpeed_ = speed;
+    if (audioplay_) {
+        audioplay_->SetSpeed(playbackSpeed_);
+    }
+    if (videoRender_) {
+        videoRender_->SetSpeed(playbackSpeed_);
+    }
+
+    emit PlaybackSpeedChanged(playbackSpeed_);
 }
 
 void MediaPlayController::SetState(PlaybackState state) {

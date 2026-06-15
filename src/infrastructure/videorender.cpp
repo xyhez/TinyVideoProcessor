@@ -1,7 +1,21 @@
 ﻿#include "videorender.h"
 #include <QOpenGLPixelTransferOptions>
+#include <QDebug>
+#include <cmath>
 
 static const int SYNC_THRESHOLD_MS = 40;
+
+namespace {
+constexpr double kSpeedEpsilon = 0.001;
+
+bool IsSupportedSpeed(double speed)
+{
+    return std::fabs(speed - 0.5) < kSpeedEpsilon
+        || std::fabs(speed - 1.0) < kSpeedEpsilon
+        || std::fabs(speed - 1.5) < kSpeedEpsilon
+        || std::fabs(speed - 2.0) < kSpeedEpsilon;
+}
+}
 
 VideoRender::VideoRender(QWidget* parent)
     : QOpenGLWidget(parent)
@@ -51,14 +65,27 @@ void VideoRender::StopRendering()
     }
 }
 
+void VideoRender::SetSpeed(double speed)
+{
+    if (!std::isfinite(speed) || !IsSupportedSpeed(speed)) {
+        qWarning() << "VideoRender rejected unsupported speed:" << speed;
+        return;
+    }
+
+    m_speed.store(speed);
+}
+
 void VideoRender::RenderFrame()
 {
     if (!m_running || !m_frameQueue || !m_syncManager) return;
 
+    const double speedSnapshot = m_speed.load();
+    const int scaledInterval = qMax(1, qRound(m_frameIntervalMs / speedSnapshot));
+
     // 1. 查看队首帧
     AVFrame* nextFrame = nullptr;
     if (!m_frameQueue->Front(nextFrame) || !nextFrame) {
-        ScheduleNextFrame(m_frameIntervalMs);
+        ScheduleNextFrame(scaledInterval);
         return;
     }
 
@@ -87,7 +114,7 @@ void VideoRender::RenderFrame()
     // 4. 在同步窗口内 → 渲染
     AVFrame* newFrame = nullptr;
     if (!m_frameQueue->TryPop(newFrame) || !newFrame) {
-        ScheduleNextFrame(m_frameIntervalMs);
+        ScheduleNextFrame(scaledInterval);
         return;
     }
 
@@ -104,7 +131,7 @@ void VideoRender::RenderFrame()
     update();
 
     // 5. 调度下一次：按帧间隔
-    ScheduleNextFrame(m_frameIntervalMs);
+    ScheduleNextFrame(scaledInterval);
 }
 
 void VideoRender::ScheduleNextFrame(int delayMs)
