@@ -124,6 +124,16 @@ private:
     void ClearPlaylist();
 
     /**
+     * @brief PlayPrevious 切换到播放列表上一项并播放
+     */
+    void PlayPrevious();
+
+    /**
+     * @brief PlayNext 切换到播放列表下一项并播放
+     */
+    void PlayNext();
+
+    /**
      * @brief RefreshPlaylistView 刷新播放列表显示
      */
     void RefreshPlaylistView();

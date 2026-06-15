@@ -69,6 +69,10 @@ void MainWindow::CreateConnects() {
         SwitchToPlaylistIndex(index, true);
     });
 
+    connect(ui->pushButton_prev, &QPushButton::clicked, this, &MainWindow::PlayPrevious);
+
+    connect(ui->pushButton_next, &QPushButton::clicked, this, &MainWindow::PlayNext);
+
     connect(ui->slider_progress,&QSlider::sliderPressed,this,[this](){
         isSliderDragging_ = true;
     });
@@ -106,6 +110,12 @@ void MainWindow::keyReleaseEvent(QKeyEvent *ev)
         VolumeUp();
     } else if (ev->key() == Qt::Key_Down) {
         VolumeDown();
+    } else if (ev->key() == Qt::Key_Left && ev->modifiers().testFlag(Qt::ControlModifier)) {
+        PlayPrevious();
+        ev->accept();
+    } else if (ev->key() == Qt::Key_Right && ev->modifiers().testFlag(Qt::ControlModifier)) {
+        PlayNext();
+        ev->accept();
     } else if (ev->key() == Qt::Key_Left) {
         Rewind();
     } else if (ev->key() == Qt::Key_Right) {
@@ -151,8 +161,11 @@ void MainWindow::Pause() {
 
 void MainWindow::UpdatePlaybackControls(MediaPlayController::PlaybackState state) {
     const bool playing = state == MediaPlayController::PlaybackState::Playing;
+    const bool hasPlaylistItem = playlistManager_ && playlistManager_->Count() > 0;
     ui->pushButton_play->setEnabled(!playing);
     ui->pushButton_pause->setEnabled(playing);
+    ui->pushButton_prev->setEnabled(hasPlaylistItem);
+    ui->pushButton_next->setEnabled(hasPlaylistItem);
 }
 
 void MainWindow::OpenFile() {
@@ -204,6 +217,32 @@ void MainWindow::ClearPlaylist() {
     mediaPlayController_->Shutdown();
 }
 
+void MainWindow::PlayPrevious() {
+    const int originalIndex = playlistManager_->CurrentIndex();
+    if (!playlistManager_->MovePrevious()) {
+        return;
+    }
+
+    if (!SwitchToPlaylistIndex(playlistManager_->CurrentIndex(), true)
+        && originalIndex >= 0
+        && originalIndex < playlistManager_->Count()) {
+        playlistManager_->SetCurrentIndex(originalIndex);
+    }
+}
+
+void MainWindow::PlayNext() {
+    const int originalIndex = playlistManager_->CurrentIndex();
+    if (!playlistManager_->MoveNext()) {
+        return;
+    }
+
+    if (!SwitchToPlaylistIndex(playlistManager_->CurrentIndex(), true)
+        && originalIndex >= 0
+        && originalIndex < playlistManager_->Count()) {
+        playlistManager_->SetCurrentIndex(originalIndex);
+    }
+}
+
 void MainWindow::RefreshPlaylistView() {
     ui->listWidget_files->clear();
 
@@ -217,6 +256,10 @@ void MainWindow::RefreshPlaylistView() {
     if (currentIndex >= 0 && currentIndex < ui->listWidget_files->count()) {
         ui->listWidget_files->setCurrentRow(currentIndex);
     }
+
+    const bool hasPlaylistItem = playlistManager_->Count() > 0;
+    ui->pushButton_prev->setEnabled(hasPlaylistItem);
+    ui->pushButton_next->setEnabled(hasPlaylistItem);
 }
 
 bool MainWindow::SwitchToPlaylistIndex(int index, bool autoStart) {
