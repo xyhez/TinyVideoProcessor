@@ -86,6 +86,31 @@ public:
     void VolumeDown();
 
     /**
+     * @brief SetVolume 设置用户音量
+     * @param volume 音量值，范围 0.0-1.0
+     */
+    void SetVolume(qreal volume);
+
+    /**
+     * @brief Volume 获取当前用户音量
+     * @return 当前用户音量，范围 0.0-1.0
+     */
+    qreal Volume() const;
+
+    /**
+     * @brief SetMuted 设置静音状态
+     * @param muted 是否静音
+     */
+    void SetMuted(bool muted);
+
+    /**
+     * @brief IsMuted 获取当前静音状态
+     * @return true 已静音
+     * @return false 未静音
+     */
+    bool IsMuted() const;
+
+    /**
      * @brief StartAudioPlay 音频播放线程入口
      */
     void StartAudioPlay();
@@ -101,6 +126,12 @@ signals:
      * @param volume 当前音量
      */
     void VolumeChanged(qreal volume);
+
+    /**
+     * @brief MuteChanged 静音状态变化信号
+     * @param muted 是否静音
+     */
+    void MuteChanged(bool muted);
 
 private:
     std::shared_ptr<SyncQueue<AVFrame*>> m_audioFrameQueue;
@@ -136,6 +167,8 @@ private:
     QWaitCondition m_queueNotEmpty;
 
     qreal m_volume = 1.0;
+    bool m_muted = false;
+    mutable QMutex m_volumeMutex;
     std::atomic<double> m_speed {1.0};
 
 private:
@@ -148,6 +181,11 @@ private:
      * @brief InitAudioOutput 初始化 Qt 音频输出设备
      */
     void InitAudioOutput();
+
+    /**
+     * @brief ApplyOutputVolume 将用户音量和静音状态应用到音频输出设备
+     */
+    void ApplyOutputVolume();
 
     /**
      * @brief CalculateHardwareLatency 估算音频硬件缓冲延迟

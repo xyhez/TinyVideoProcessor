@@ -1,9 +1,13 @@
 ﻿#include "audioplayer.h"
 
+#include <algorithm>
 #include <cmath>
+#include <QMutexLocker>
 
 namespace {
 constexpr double kSpeedEpsilon = 0.001;
+constexpr qreal kVolumeStep = 0.05;
+constexpr qreal kVolumeEpsilon = 0.0001;
 
 bool IsSupportedSpeed(double speed)
 {
@@ -77,9 +81,23 @@ void AudioPlayer::InitAudioOutput()
     }
 
     m_audioSink = new QAudioSink(dev, fmt, this);
+    ApplyOutputVolume();
 
     qDebug() << "AudioPlayer: Audio output initialized -"
              << m_dstRate << "Hz," << m_dstChannels << "channels";
+}
+
+void AudioPlayer::ApplyOutputVolume()
+{
+    qreal outputVolume = 1.0;
+    {
+        QMutexLocker locker(&m_volumeMutex);
+        outputVolume = m_muted ? 0.0 : m_volume;
+    }
+
+    if (m_audioSink) {
+        m_audioSink->setVolume(outputVolume);
+    }
 }
 
 double AudioPlayer::CalculateHardwareLatency()
@@ -396,21 +414,52 @@ void AudioPlayer::Forward() {
 }
 
 void AudioPlayer::VolumeUp() {
-    qDebug()<<"增大音量";
-    if(m_volume>0.95) {
-        m_volume = 1.0;
-    }else{
-        m_volume+=0.05;
-    }
-    emit VolumeChanged(m_volume);
+    SetVolume(Volume() + kVolumeStep);
 }
 
 void AudioPlayer::VolumeDown(){
-    qDebug()<<"减小音量";
-    if(m_volume>0.05){
-        m_volume-=0.05;
-    }else{
-        m_volume = 0.0;
+    SetVolume(Volume() - kVolumeStep);
+}
+
+void AudioPlayer::SetVolume(qreal volume)
+{
+    const qreal clampedVolume = std::clamp(volume, 0.0, 1.0);
+    {
+        QMutexLocker locker(&m_volumeMutex);
+        if (std::fabs(m_volume - clampedVolume) < kVolumeEpsilon) {
+            return;
+        }
+
+        m_volume = clampedVolume;
     }
-    emit VolumeChanged(m_volume);
+
+    ApplyOutputVolume();
+    emit VolumeChanged(clampedVolume);
+}
+
+qreal AudioPlayer::Volume() const
+{
+    QMutexLocker locker(&m_volumeMutex);
+    return m_volume;
+}
+
+void AudioPlayer::SetMuted(bool muted)
+{
+    {
+        QMutexLocker locker(&m_volumeMutex);
+        if (m_muted == muted) {
+            return;
+        }
+
+        m_muted = muted;
+    }
+
+    ApplyOutputVolume();
+    emit MuteChanged(muted);
+}
+
+bool AudioPlayer::IsMuted() const
+{
+    QMutexLocker locker(&m_volumeMutex);
+    return m_muted;
 }
