@@ -9,6 +9,7 @@
 #include <memory>
 
 #include "application/MediaPlayController.h"
+#include "domain/PlaylistManager.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -36,12 +37,6 @@ public:
      * @brief CreateConnects 创建 UI 与 Controller 的信号槽连接
      */
     void CreateConnects();
-
-    /**
-     * @brief NoticeWindow 显示短提示信息
-     * @param message 提示内容
-     */
-    void NoticeWindow(QString message);
 
     /**
      * @brief closeEvent 窗口关闭事件，负责退出前释放播放资源
@@ -105,12 +100,42 @@ private:
     Ui::MainWindow *ui;
 
     std::unique_ptr<MediaPlayController> mediaPlayController_ = nullptr;
+    std::unique_ptr<PlaylistManager> playlistManager_ = nullptr;
 
     /**
      * @brief UpdatePlaybackControls 根据播放状态更新按钮可用状态
      * @param state 当前播放状态
      */
     void UpdatePlaybackControls(MediaPlayController::PlaybackState state);
+
+    /**
+     * @brief OpenFile 打开文件选择框并添加文件到播放列表
+     */
+    void OpenFile();
+
+    /**
+     * @brief RemoveSelectedPlaylistItem 删除当前选中的播放列表条目
+     */
+    void RemoveSelectedPlaylistItem();
+
+    /**
+     * @brief ClearPlaylist 清空播放列表
+     */
+    void ClearPlaylist();
+
+    /**
+     * @brief RefreshPlaylistView 刷新播放列表显示
+     */
+    void RefreshPlaylistView();
+
+    /**
+     * @brief SwitchToPlaylistIndex 切换到播放列表指定索引
+     * @param index 播放列表索引
+     * @param autoStart 切换成功后是否立即播放
+     * @return true 切换成功
+     * @return false 切换失败
+     */
+    bool SwitchToPlaylistIndex(int index, bool autoStart);
 
     bool isSliderDragging_ = false;
 

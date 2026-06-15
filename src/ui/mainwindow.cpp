@@ -2,22 +2,27 @@
 #include "ui_mainwindow.h"
 #include "domain/FileMediaSource.h"
 
+#include <QAbstractItemView>
 #include <QDebug>
+#include <QFileDialog>
+#include <QListWidgetItem>
+#include <QTimer>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
     , mediaPlayController_(std::make_unique<MediaPlayController>())
+    , playlistManager_(std::make_unique<PlaylistManager>())
 {
     ui->setupUi(this);
     this->setWindowTitle("modernFFplay-V2.0");
+    ui->listWidget_files->setSelectionMode(QAbstractItemView::SingleSelection);
 
     CreateConnects();
 
-    //1.应用层初始化
     QString filepath = "D:\\githubProject\\TinyVideoProcessor\\resource\\动物发现自己被绿.mp4";
-    std::shared_ptr<IMediaSource> mediaSource = std::make_shared<FileMediaSource>(filepath);
-    if (!mediaPlayController_->Initialize(mediaSource, ui->video_widget)) {
+    playlistManager_->AddFile(filepath);
+    if (!SwitchToPlaylistIndex(playlistManager_->CurrentIndex(), false)) {
         qCritical() << "Controller 初始化失败";
         return;
     }
@@ -47,6 +52,23 @@ void MainWindow::CreateConnects() {
         qDebug() << "Playback speed changed:" << speed;
     });
 
+    connect(playlistManager_.get(), &PlaylistManager::PlaylistChanged, this, [this]() {
+        RefreshPlaylistView();
+    });
+
+    connect(playlistManager_.get(), &PlaylistManager::CurrentIndexChanged, this, [this](int index) {
+        if (index >= 0 && index < ui->listWidget_files->count()) {
+            ui->listWidget_files->setCurrentRow(index);
+        } else {
+            ui->listWidget_files->clearSelection();
+        }
+    });
+
+    connect(ui->listWidget_files, &QListWidget::itemDoubleClicked, this, [this](QListWidgetItem* item) {
+        const int index = ui->listWidget_files->row(item);
+        SwitchToPlaylistIndex(index, true);
+    });
+
     connect(ui->slider_progress,&QSlider::sliderPressed,this,[this](){
         isSliderDragging_ = true;
     });
@@ -62,47 +84,6 @@ void MainWindow::CreateConnects() {
     });
 }
 
-void MainWindow::NoticeWindow(QString message)
-{
-    QLabel *toast = new QLabel(this);
-    toast->setText(message);
-    toast->setStyleSheet(
-        "QLabel {"
-        "    background-color: rgba(0, 0, 0, 180);"
-        "    color: white;"
-        "    padding: 8px 16px;"
-        "    border-radius: 4px;"
-        "    font-size: 14px;"
-        "}"
-        );
-    toast->setAlignment(Qt::AlignCenter);
-    toast->adjustSize();
-
-    int x = (this->width() - toast->width()) / 2;
-    int y = this->height() / 3;
-    toast->move(x, y);
-
-    toast->show();
-
-    QPropertyAnimation *animation = new QPropertyAnimation(toast, "windowOpacity");
-    animation->setDuration(500);
-    animation->setStartValue(0);
-    animation->setEndValue(1);
-    animation->start();
-
-    QTimer::singleShot(2000, [toast, animation]() {
-        QPropertyAnimation *fadeOut = new QPropertyAnimation(toast, "windowOpacity");
-        fadeOut->setDuration(500);
-        fadeOut->setStartValue(1);
-        fadeOut->setEndValue(0);
-        fadeOut->start();
-
-        QObject::connect(fadeOut, &QPropertyAnimation::finished, [toast, animation]() {
-            toast->deleteLater();
-            animation->deleteLater();
-        });
-    });
-}
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
@@ -131,16 +112,21 @@ void MainWindow::keyReleaseEvent(QKeyEvent *ev)
         Forward();
     } else if (ev->key() == Qt::Key_1) {
         mediaPlayController_->SetPlaybackSpeed(0.5);
-        NoticeWindow("速度: 0.5x");
     } else if (ev->key() == Qt::Key_2) {
         mediaPlayController_->SetPlaybackSpeed(1.0);
-        NoticeWindow("速度: 1.0x");
     } else if (ev->key() == Qt::Key_3) {
         mediaPlayController_->SetPlaybackSpeed(1.5);
-        NoticeWindow("速度: 1.5x");
     } else if (ev->key() == Qt::Key_4) {
         mediaPlayController_->SetPlaybackSpeed(2.0);
-        NoticeWindow("速度: 2.0x");
+    } else if (ev->key() == Qt::Key_O && ev->modifiers().testFlag(Qt::ControlModifier)) {
+        OpenFile();
+        ev->accept();
+    } else if (ev->key() == Qt::Key_Delete && ev->modifiers().testFlag(Qt::ControlModifier)) {
+        ClearPlaylist();
+        ev->accept();
+    } else if (ev->key() == Qt::Key_Delete) {
+        RemoveSelectedPlaylistItem();
+        ev->accept();
     }
     QMainWindow::keyReleaseEvent(ev);
 }
@@ -169,6 +155,91 @@ void MainWindow::UpdatePlaybackControls(MediaPlayController::PlaybackState state
     ui->pushButton_pause->setEnabled(playing);
 }
 
+void MainWindow::OpenFile() {
+    const int previousCount = playlistManager_->Count();
+    const QStringList filePaths = QFileDialog::getOpenFileNames(
+        this,
+        "选择视频文件",
+        QString(),
+        "Video Files (*.mp4 *.mkv *.avi *.mov *.flv);;All Files (*.*)");
+
+    if (filePaths.isEmpty()) {
+        return;
+    }
+
+    playlistManager_->AddFiles(filePaths);
+    if (previousCount == 0 && playlistManager_->Count() > 0) {
+        SwitchToPlaylistIndex(playlistManager_->CurrentIndex(), false);
+    }
+}
+
+void MainWindow::RemoveSelectedPlaylistItem() {
+    const int selectedIndex = ui->listWidget_files->currentRow();
+    if (selectedIndex < 0) {
+        return;
+    }
+
+    const bool removedCurrent = selectedIndex == playlistManager_->CurrentIndex();
+    const bool wasPlaying = mediaPlayController_->State() == MediaPlayController::PlaybackState::Playing;
+
+    playlistManager_->RemoveAt(selectedIndex);
+
+    if (!removedCurrent) {
+        return;
+    }
+
+    if (playlistManager_->CurrentItem().has_value()) {
+        SwitchToPlaylistIndex(playlistManager_->CurrentIndex(), wasPlaying);
+    } else {
+        mediaPlayController_->Shutdown();
+    }
+}
+
+void MainWindow::ClearPlaylist() {
+    if (playlistManager_->Count() == 0) {
+        return;
+    }
+
+    playlistManager_->Clear();
+    mediaPlayController_->Shutdown();
+}
+
+void MainWindow::RefreshPlaylistView() {
+    ui->listWidget_files->clear();
+
+    const QList<PlaylistItem> items = playlistManager_->Items();
+    for (const PlaylistItem& item : items) {
+        auto* listItem = new QListWidgetItem(item.displayName, ui->listWidget_files);
+        listItem->setData(Qt::UserRole, item.filePath);
+    }
+
+    const int currentIndex = playlistManager_->CurrentIndex();
+    if (currentIndex >= 0 && currentIndex < ui->listWidget_files->count()) {
+        ui->listWidget_files->setCurrentRow(currentIndex);
+    }
+}
+
+bool MainWindow::SwitchToPlaylistIndex(int index, bool autoStart) {
+    const QList<PlaylistItem> items = playlistManager_->Items();
+    if (index < 0 || index >= items.size()) {
+        return false;
+    }
+
+    const int previousIndex = playlistManager_->CurrentIndex();
+    const PlaylistItem item = items.at(index);
+    std::shared_ptr<IMediaSource> mediaSource = std::make_shared<FileMediaSource>(item.filePath);
+    if (!mediaPlayController_->SwitchSource(mediaSource, ui->video_widget, autoStart)) {
+        qWarning() << "Switch playlist item failed:" << item.filePath;
+        if (previousIndex >= 0 && previousIndex < playlistManager_->Count()) {
+            playlistManager_->SetCurrentIndex(previousIndex);
+        }
+        return false;
+    }
+
+    playlistManager_->SetCurrentIndex(index);
+    return true;
+}
+
 void MainWindow::VolumeUp() {
     mediaPlayController_->VolumeUp();
 
@@ -181,12 +252,10 @@ void MainWindow::VolumeDown() {
 
 void MainWindow::Rewind() {
     mediaPlayController_->Rewind();
-    NoticeWindow("快退：10秒");
 }
 
 void MainWindow::Forward() {
     mediaPlayController_->Forward();
-    NoticeWindow("快进：10秒");
 }
 
 void MainWindow::on_pushButton_play_clicked()
