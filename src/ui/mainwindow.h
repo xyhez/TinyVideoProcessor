@@ -145,6 +145,26 @@ private:
     void UpdatePlaybackSpeedComboBox(double speed);
 
     /**
+     * @brief ToggleFullScreen 切换普通窗口和全屏模式
+     */
+    void ToggleFullScreen();
+
+    /**
+     * @brief EnterFullScreen 进入全屏模式
+     */
+    void EnterFullScreen();
+
+    /**
+     * @brief ExitFullScreen 退出全屏模式
+     */
+    void ExitFullScreen();
+
+    /**
+     * @brief UpdateFullScreenButton 根据全屏状态更新按钮文本
+     */
+    void UpdateFullScreenButton();
+
+    /**
      * @brief UpdateMuteButton 更新静音按钮显示
      * @param muted 是否静音
      */
@@ -180,6 +200,7 @@ private:
     bool SwitchToPlaylistIndex(int index, bool autoStart);
 
     bool isSliderDragging_ = false;
+    bool isFullScreenMode_ = false;
 
     /**
      * @brief formatTime 将秒数格式化为 UI 时间字符串

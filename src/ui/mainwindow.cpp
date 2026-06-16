@@ -127,6 +127,9 @@ void MainWindow::CreateConnects() {
         mediaPlayController_->SetPlaybackSpeed(speed);
     });
 
+    connect(ui->pushButton_fullscreen, &QPushButton::clicked,
+            this, &MainWindow::ToggleFullScreen);
+
     connect(ui->slider_progress,&QSlider::sliderPressed,this,[this](){
         isSliderDragging_ = true;
     });
@@ -159,6 +162,12 @@ void MainWindow::keyReleaseEvent(QKeyEvent *ev)
         } else {
             Start();
         }
+        ev->accept();
+    } else if (ev->key() == Qt::Key_F || ev->key() == Qt::Key_F11) {
+        ToggleFullScreen();
+        ev->accept();
+    } else if (ev->key() == Qt::Key_Escape && isFullScreenMode_) {
+        ExitFullScreen();
         ev->accept();
     } else if (ev->key() == Qt::Key_Up) {
         VolumeUp();
@@ -308,6 +317,38 @@ void MainWindow::UpdatePlaybackSpeedComboBox(double speed) {
 
     QSignalBlocker blocker(ui->comboBox_speed);
     ui->comboBox_speed->setCurrentIndex(index);
+}
+
+void MainWindow::ToggleFullScreen() {
+    if (isFullScreenMode_) {
+        ExitFullScreen();
+    } else {
+        EnterFullScreen();
+    }
+}
+
+void MainWindow::EnterFullScreen() {
+    if (isFullScreenMode_) {
+        return;
+    }
+
+    isFullScreenMode_ = true;
+    showFullScreen();
+    UpdateFullScreenButton();
+}
+
+void MainWindow::ExitFullScreen() {
+    if (!isFullScreenMode_) {
+        return;
+    }
+
+    isFullScreenMode_ = false;
+    showNormal();
+    UpdateFullScreenButton();
+}
+
+void MainWindow::UpdateFullScreenButton() {
+    ui->pushButton_fullscreen->setText(isFullScreenMode_ ? "退出全屏" : "全屏");
 }
 
 void MainWindow::UpdateMuteButton(bool muted) {
