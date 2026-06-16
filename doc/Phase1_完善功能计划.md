@@ -131,7 +131,7 @@ void PlaybackSpeedChanged(double speed);
 
 ### 当前剩余任务
 
-1. 完成 Phase 1.4 UI 总体验收报告。
+Phase 1.4 当前计划内 UI 改进已完成，后续只保留运行测试和问题修复。
 
 ### 注意事项
 

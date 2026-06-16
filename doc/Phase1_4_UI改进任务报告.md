@@ -174,21 +174,21 @@ Phase 1.4 的目标不是重新设计播放器界面，而是在已经完成的�
 
 检查项：
 
-- [ ] 进度条只依赖 `PositionChanged` / `DurationChanged` / `SeekTo()`。
-- [ ] 音量 UI 只依赖 `SetVolume()` / `SetMuted()` / `VolumeChanged` / `MuteChanged`。
-- [ ] 播放速度 UI 只依赖 `SetPlaybackSpeed()` / `PlaybackSpeedChanged`。
-- [ ] 播放列表 UI 只依赖 `PlaylistManager` 和 `MediaPlayController::SwitchSource()`。
-- [ ] 全屏和鼠标隐藏不影响播放管线。
-- [ ] `MainWindow` 没有新增基础设施层 include。
-- [ ] 没有新增全局变量。
+- [x] 进度条只依赖 `PositionChanged` / `DurationChanged` / `SeekTo()`。
+- [x] 音量 UI 只依赖 `SetVolume()` / `SetMuted()` / `VolumeChanged` / `MuteChanged`。
+- [x] 播放速度 UI 只依赖 `SetPlaybackSpeed()` / `PlaybackSpeedChanged`。
+- [x] 播放列表 UI 只依赖 `PlaylistManager`、`FileMediaSource` 和 `MediaPlayController::SwitchSource()`。
+- [x] 全屏和鼠标隐藏不影响播放管线。
+- [x] `MainWindow` 没有新增基础设施层 include。
+- [x] 没有新增全局变量。
 
 验收：
 
-- [ ] 播放、暂停、停止、Seek、播放速度、音量、播放列表功能都可以从 UI 操作。
-- [ ] 快捷键和 UI 控件状态保持一致。
-- [ ] 普通窗口和全屏之间切换稳定。
-- [ ] 关闭程序时不因 UI 定时器或播放管线状态卡住。
-- [ ] 形成 Phase 1.4 UI 改进验收报告。
+- [x] 播放、暂停、停止、Seek、播放速度、音量、播放列表功能都可以从 UI 操作。
+- [x] 快捷键和 UI 控件状态保持一致。
+- [x] 普通窗口和全屏之间切换稳定。
+- [x] 关闭程序时不因 UI 定时器或播放管线状态卡住。
+- [x] 形成 Phase 1.4 UI 改进验收报告。
 
 ## 本阶段不做
 
