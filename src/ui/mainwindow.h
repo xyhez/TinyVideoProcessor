@@ -134,6 +134,17 @@ private:
     void InitializeVolumeControls();
 
     /**
+     * @brief InitializePlaybackSpeedComboBox 初始化播放速度下拉框
+     */
+    void InitializePlaybackSpeedComboBox();
+
+    /**
+     * @brief UpdatePlaybackSpeedComboBox 根据当前速度同步播放速度下拉框
+     * @param speed 当前播放速度
+     */
+    void UpdatePlaybackSpeedComboBox(double speed);
+
+    /**
      * @brief UpdateMuteButton 更新静音按钮显示
      * @param muted 是否静音
      */

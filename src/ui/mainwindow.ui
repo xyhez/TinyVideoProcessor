@@ -125,6 +125,9 @@
            </property>
           </widget>
          </item>
+         <item>
+          <widget class="QComboBox" name="comboBox_speed"/>
+         </item>
         </layout>
        </widget>
       </item>

@@ -21,6 +21,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->listWidget_files->setSelectionMode(QAbstractItemView::SingleSelection);
     InitializePlayModeComboBox();
     InitializeVolumeControls();
+    InitializePlaybackSpeedComboBox();
 
     CreateConnects();
 
@@ -52,9 +53,8 @@ void MainWindow::CreateConnects() {
         ui->label_duration->setText(formatTime(duration));
     });
 
-    connect(mediaPlayController_.get(),&MediaPlayController::PlaybackSpeedChanged,this,[](double speed){
-        qDebug() << "Playback speed changed:" << speed;
-    });
+    connect(mediaPlayController_.get(), &MediaPlayController::PlaybackSpeedChanged,
+            this, &MainWindow::UpdatePlaybackSpeedComboBox);
 
     connect(mediaPlayController_.get(), &MediaPlayController::PlaybackFinished,
             this, &MainWindow::HandlePlaybackFinished);
@@ -115,6 +115,16 @@ void MainWindow::CreateConnects() {
 
     connect(ui->pushButton_mute, &QPushButton::clicked, this, [this]() {
         mediaPlayController_->SetMuted(!mediaPlayController_->IsMuted());
+    });
+
+    connect(ui->comboBox_speed, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int index) {
+        bool ok = false;
+        const double speed = ui->comboBox_speed->itemData(index).toDouble(&ok);
+        if (!ok) {
+            return;
+        }
+
+        mediaPlayController_->SetPlaybackSpeed(speed);
     });
 
     connect(ui->slider_progress,&QSlider::sliderPressed,this,[this](){
@@ -279,6 +289,25 @@ void MainWindow::InitializeVolumeControls() {
     ui->slider_volume->setRange(0, 100);
     ui->slider_volume->setValue(static_cast<int>(mediaPlayController_->Volume() * 100.0 + 0.5));
     UpdateMuteButton(mediaPlayController_->IsMuted());
+}
+
+void MainWindow::InitializePlaybackSpeedComboBox() {
+    ui->comboBox_speed->clear();
+    ui->comboBox_speed->addItem("0.5x", 0.5);
+    ui->comboBox_speed->addItem("1.0x", 1.0);
+    ui->comboBox_speed->addItem("1.5x", 1.5);
+    ui->comboBox_speed->addItem("2.0x", 2.0);
+    UpdatePlaybackSpeedComboBox(mediaPlayController_->PlaybackSpeed());
+}
+
+void MainWindow::UpdatePlaybackSpeedComboBox(double speed) {
+    const int index = ui->comboBox_speed->findData(speed);
+    if (index < 0 || ui->comboBox_speed->currentIndex() == index) {
+        return;
+    }
+
+    QSignalBlocker blocker(ui->comboBox_speed);
+    ui->comboBox_speed->setCurrentIndex(index);
 }
 
 void MainWindow::UpdateMuteButton(bool muted) {
