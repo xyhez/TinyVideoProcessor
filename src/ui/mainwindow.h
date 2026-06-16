@@ -4,8 +4,10 @@
 #include <QMainWindow>
 #include <QDebug>
 #include <QKeyEvent>
+#include <QMouseEvent>
 #include <QPropertyAnimation>
 #include <QLabel>
+#include <QTimer>
 #include <memory>
 
 #include "application/MediaPlayController.h"
@@ -49,6 +51,21 @@ public:
      * @param ev 键盘事件
      */
     void keyReleaseEvent(QKeyEvent *ev) override;
+
+    /**
+     * @brief mouseMoveEvent 鼠标移动事件，全屏时恢复鼠标显示
+     * @param event 鼠标事件
+     */
+    void mouseMoveEvent(QMouseEvent *event) override;
+
+    /**
+     * @brief eventFilter 捕获子控件鼠标移动事件
+     * @param watched 事件来源对象
+     * @param event 事件对象
+     * @return true 事件已处理
+     * @return false 继续默认事件处理
+     */
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
     /**
      * @brief Start 转发播放命令
@@ -101,6 +118,7 @@ private:
 
     std::unique_ptr<MediaPlayController> mediaPlayController_ = nullptr;
     std::unique_ptr<PlaylistManager> playlistManager_ = nullptr;
+    std::unique_ptr<QTimer> cursorHideTimer_ = nullptr;
 
     /**
      * @brief UpdatePlaybackControls 根据播放状态更新按钮可用状态
@@ -139,6 +157,11 @@ private:
     void InitializePlaybackSpeedComboBox();
 
     /**
+     * @brief InitializeCursorHideTimer 初始化全屏鼠标隐藏定时器
+     */
+    void InitializeCursorHideTimer();
+
+    /**
      * @brief UpdatePlaybackSpeedComboBox 根据当前速度同步播放速度下拉框
      * @param speed 当前播放速度
      */
@@ -163,6 +186,26 @@ private:
      * @brief UpdateFullScreenButton 根据全屏状态更新按钮文本
      */
     void UpdateFullScreenButton();
+
+    /**
+     * @brief ShowCursor 显示鼠标
+     */
+    void ShowCursor();
+
+    /**
+     * @brief HideCursorIfFullScreen 全屏状态下隐藏鼠标
+     */
+    void HideCursorIfFullScreen();
+
+    /**
+     * @brief RestartCursorHideTimer 全屏状态下重启鼠标隐藏定时器
+     */
+    void RestartCursorHideTimer();
+
+    /**
+     * @brief HandleFullScreenMouseActivity 全屏状态下处理鼠标活动
+     */
+    void HandleFullScreenMouseActivity();
 
     /**
      * @brief UpdateMuteButton 更新静音按钮显示
@@ -201,6 +244,7 @@ private:
 
     bool isSliderDragging_ = false;
     bool isFullScreenMode_ = false;
+    bool isCursorHidden_ = false;
 
     /**
      * @brief formatTime 将秒数格式化为 UI 时间字符串

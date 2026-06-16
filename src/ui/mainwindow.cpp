@@ -5,6 +5,7 @@
 #include <QAbstractItemView>
 #include <QComboBox>
 #include <QDebug>
+#include <QEvent>
 #include <QFileDialog>
 #include <QListWidgetItem>
 #include <QSignalBlocker>
@@ -19,9 +20,19 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
     this->setWindowTitle("modernFFplay-V2.0");
     ui->listWidget_files->setSelectionMode(QAbstractItemView::SingleSelection);
+    setMouseTracking(true);
+    ui->centralwidget->setMouseTracking(true);
+    ui->video_widget->setMouseTracking(true);
+    ui->widget_func->setMouseTracking(true);
+    ui->listWidget_files->setMouseTracking(true);
+    ui->centralwidget->installEventFilter(this);
+    ui->video_widget->installEventFilter(this);
+    ui->widget_func->installEventFilter(this);
+    ui->listWidget_files->installEventFilter(this);
     InitializePlayModeComboBox();
     InitializeVolumeControls();
     InitializePlaybackSpeedComboBox();
+    InitializeCursorHideTimer();
 
     CreateConnects();
 
@@ -150,6 +161,10 @@ void MainWindow::closeEvent(QCloseEvent *event)
 {
     Q_UNUSED(event);
 
+    ShowCursor();
+    if (cursorHideTimer_) {
+        cursorHideTimer_->stop();
+    }
     mediaPlayController_->Shutdown();
 
 }
@@ -202,6 +217,21 @@ void MainWindow::keyReleaseEvent(QKeyEvent *ev)
         ev->accept();
     }
     QMainWindow::keyReleaseEvent(ev);
+}
+
+void MainWindow::mouseMoveEvent(QMouseEvent *event) {
+    HandleFullScreenMouseActivity();
+    QMainWindow::mouseMoveEvent(event);
+}
+
+bool MainWindow::eventFilter(QObject *watched, QEvent *event) {
+    Q_UNUSED(watched);
+
+    if (event->type() == QEvent::MouseMove) {
+        HandleFullScreenMouseActivity();
+    }
+
+    return QMainWindow::eventFilter(watched, event);
 }
 
 MainWindow::~MainWindow()
@@ -309,6 +339,14 @@ void MainWindow::InitializePlaybackSpeedComboBox() {
     UpdatePlaybackSpeedComboBox(mediaPlayController_->PlaybackSpeed());
 }
 
+void MainWindow::InitializeCursorHideTimer() {
+    cursorHideTimer_ = std::make_unique<QTimer>(this);
+    cursorHideTimer_->setInterval(2000);
+    cursorHideTimer_->setSingleShot(true);
+    connect(cursorHideTimer_.get(), &QTimer::timeout,
+            this, &MainWindow::HideCursorIfFullScreen);
+}
+
 void MainWindow::UpdatePlaybackSpeedComboBox(double speed) {
     const int index = ui->comboBox_speed->findData(speed);
     if (index < 0 || ui->comboBox_speed->currentIndex() == index) {
@@ -335,6 +373,8 @@ void MainWindow::EnterFullScreen() {
     isFullScreenMode_ = true;
     showFullScreen();
     UpdateFullScreenButton();
+    ShowCursor();
+    RestartCursorHideTimer();
 }
 
 void MainWindow::ExitFullScreen() {
@@ -343,12 +383,51 @@ void MainWindow::ExitFullScreen() {
     }
 
     isFullScreenMode_ = false;
+    if (cursorHideTimer_) {
+        cursorHideTimer_->stop();
+    }
+    ShowCursor();
     showNormal();
     UpdateFullScreenButton();
 }
 
 void MainWindow::UpdateFullScreenButton() {
     ui->pushButton_fullscreen->setText(isFullScreenMode_ ? "退出全屏" : "全屏");
+}
+
+void MainWindow::ShowCursor() {
+    if (!isCursorHidden_) {
+        return;
+    }
+
+    unsetCursor();
+    isCursorHidden_ = false;
+}
+
+void MainWindow::HideCursorIfFullScreen() {
+    if (!isFullScreenMode_ || isCursorHidden_) {
+        return;
+    }
+
+    setCursor(Qt::BlankCursor);
+    isCursorHidden_ = true;
+}
+
+void MainWindow::RestartCursorHideTimer() {
+    if (!isFullScreenMode_ || !cursorHideTimer_) {
+        return;
+    }
+
+    cursorHideTimer_->start();
+}
+
+void MainWindow::HandleFullScreenMouseActivity() {
+    if (!isFullScreenMode_) {
+        return;
+    }
+
+    ShowCursor();
+    RestartCursorHideTimer();
 }
 
 void MainWindow::UpdateMuteButton(bool muted) {
