@@ -127,16 +127,16 @@ MainWindow
 
 ### 3.1.3-b 准备 Pipeline 侧队列常量和 deleter
 
-- [ ] 在 `MediaPipeline.cpp` 内部准备 `kPacketQueueMax`。
-- [ ] 在 `MediaPipeline.cpp` 内部准备 `kFrameQueueMax`。
-- [ ] 在 `MediaPipeline.cpp` 内部准备 packet deleter。
-- [ ] 在 `MediaPipeline.cpp` 内部准备 frame deleter。
-- [ ] 暂时保留 `MediaPlayController.h` 中旧常量和 deleter。
+- [x] 在 `MediaPipeline.cpp` 内部准备 `kPacketQueueMax`。
+- [x] 在 `MediaPipeline.cpp` 内部准备 `kFrameQueueMax`。
+- [x] 在 `MediaPipeline.cpp` 内部准备 packet deleter。
+- [x] 在 `MediaPipeline.cpp` 内部准备 frame deleter。
+- [x] 暂时保留 `MediaPlayController.h` 中旧常量和 deleter。
 
 **验收标准**：
 
-- [ ] Pipeline 侧后续可以独立创建音视频队列。
-- [ ] Controller 侧现有逻辑不受影响。
+- [x] Pipeline 侧后续可以独立创建音视频队列。
+- [x] Controller 侧现有逻辑不受影响。
 
 ### 3.1.3-c 最终清理 Controller 资源成员
 

@@ -1,5 +1,22 @@
 #include "MediaPipeline.h"
 
+namespace {
+constexpr size_t kPacketQueueMax = 30;
+constexpr size_t kFrameQueueMax = 30;
+
+auto packetDeleter = [](AVPacket* packet) {
+    if (packet) {
+        av_packet_free(&packet);
+    }
+};
+
+auto frameDeleter = [](AVFrame* frame) {
+    if (frame) {
+        av_frame_free(&frame);
+    }
+};
+}
+
 MediaPipeline::MediaPipeline(QObject* parent)
     : QObject(parent)
 {
