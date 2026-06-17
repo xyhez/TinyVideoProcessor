@@ -1,378 +1,292 @@
-# TODO: Phase 3.1 单路 MediaPipeline 抽取
+# TODO: Phase 3.2 多路管理设计
 
 ## 阶段目标
 
-把当前 `MediaPlayController` 中属于单路播放管线的资源和生命周期迁移到 `MediaPipeline`。
+在 Phase 3.1 单路 `MediaPipeline` 已稳定的基础上，引入 `MultiStreamManager`，让系统具备管理多路播放管线的架构能力。
 
-本阶段只抽取单路管线，不做多路播放，不新增 UI，不引入 `MultiStreamManager`。
-
-目标结构：
+本阶段第一目标不是复杂 UI，而是多路管理边界正确：
 
 ```text
 MainWindow
-    -> PlaylistManager
     -> MediaPlayController
-    -> MediaPipeline
-    -> demuxer / decoder / AudioPlayer / VideoRender / syncmanager / queues / threads
+    -> MultiStreamManager
+        -> MediaPipeline #1
+        -> MediaPipeline #2
+        -> MediaPipeline #3
 ```
 
 ## 架构边界
 
-- [x] `MainWindow` 不直接访问 `MediaPipeline`。
-- [x] `MainWindow` 不直接访问 demuxer、decoder、AudioPlayer、VideoRender、syncmanager。
-- [x] `MediaPlayController` 保留应用层对外接口和播放状态。
-- [x] `MediaPlayController` 不再直接持有播放管线基础设施资源。
-- [x] `MediaPipeline` 只管理一路媒体源的播放资源。
-- [x] `MediaPipeline` 不引入 pipeline id。
-- [x] 不引入 `MultiStreamManager`。
-- [x] 不新增多路播放 UI。
-- [x] 保持 Phase 3.0 无音频流支持能力。
+- [ ] `MainWindow` 不直接访问 `MediaPipeline`。
+- [ ] `MainWindow` 不直接访问 `MultiStreamManager` 内部资源。
+- [ ] `MediaPlayController` 作为 UI 对外入口。
+- [ ] `MediaPlayController` 不直接持有多个 `MediaPipeline`。
+- [ ] `MultiStreamManager` 管理多个 `MediaPipeline`。
+- [ ] `MediaPipeline` 继续保持单路职责。
+- [ ] `MediaPipeline` 不引入 id 字段。
+- [ ] `StreamId` 只属于 `MultiStreamManager` 外层管理。
+- [ ] 第一版不引入 `MultiViewRenderer`。
+- [ ] 第一版不新增复杂多路 UI。
+- [ ] 第一版使用文件源验证多路管理能力。
 
 ## 参考文档
 
 - `doc/架构指导.md`
 - `doc/Phase3_多路播放架构预研报告.md`
-- `doc/Phase3_0_无音频流支持实现报告.md`
-- `doc/Phase3_1_单路MediaPipeline抽取计划.md`
+- `doc/Phase3_1_单路MediaPipeline抽取实现报告.md`
+- `doc/Phase3_2_多路管理架构预研报告.md`
+- `doc/Phase3_2_多路管理实施计划.md`
 
-## 3.1.1 抽取边界预研
+## 3.2.1 多路管理边界预研
 
-**目标**：先确认迁移边界，不直接改代码。
+**目标**：先确认 `MultiStreamManager` 的职责边界，不直接改代码。
 
-- [x] 梳理 `MediaPlayController` 当前字段。
-- [x] 标记应迁入 `MediaPipeline` 的字段。
-- [x] 标记应留在 `MediaPlayController` 的字段。
-- [x] 梳理 `MediaPlayController` 当前方法。
-- [x] 标记应迁入 `MediaPipeline` 的方法。
-- [x] 标记应留在 `MediaPlayController` 的方法。
-- [x] 明确 Pipeline 信号和 Controller 转发关系。
-- [x] 明确音量/静音接口在单路 Pipeline 中的临时归属。
-- [x] 明确后续多路阶段音频策略可能上移。
-- [x] 形成边界报告。
+- [x] 梳理 Phase 3.1 后的单路架构现状。
+- [x] 明确 `MainWindow`、`MediaPlayController`、`MultiStreamManager`、`MediaPipeline` 职责。
+- [x] 明确 `StreamId` 只属于 Manager。
+- [x] 明确 `MediaPipeline` 不感知 id。
+- [x] 明确 active stream 和 active audio stream 概念。
+- [x] 明确第一版使用多个 `VideoRender`。
+- [x] 明确第一版不做 `MultiViewRenderer`。
+- [x] 明确文件源验证策略。
+- [x] 明确不做范围。
 
 **产出**：
 
-- [x] `doc/Phase3_1_任务1_MediaPipeline边界报告.md`
+- [x] `doc/Phase3_2_多路管理架构预研报告.md`
+- [x] `doc/Phase3_2_多路管理实施计划.md`
 
 **验收标准**：
 
-- [x] 能清楚说明 Controller 和 Pipeline 的职责边界。
-- [x] 能作为后续代码迁移依据。
-- [x] 没有把多路概念提前引入单路抽取阶段。
+- [x] 能说明 Manager 和 Pipeline 的边界。
+- [x] 能说明 Manager 和 Controller 的关系。
+- [x] 能说明为什么不直接让 MainWindow 管多个 Pipeline。
 
-## 3.1.2 新增 MediaPipeline 空壳
+## 3.2.2 MultiStreamManager 空壳
 
-**目标**：新增类和接口，不迁移播放逻辑。
+**目标**：新增类和接口，不接入 Controller，不创建真实 Pipeline。
 
-- [x] 新增 `src/domain/MediaPipeline.h`。
-- [x] 新增 `src/domain/MediaPipeline.cpp`。
-- [x] `MediaPipeline` 继承 `QObject`。
-- [x] 定义 `Initialize()`。
-- [x] 定义 `Shutdown()`。
-- [x] 定义 `Start()`。
-- [x] 定义 `Pause()`。
-- [x] 定义 `Stop()`。
-- [x] 定义 `SeekTo()`。
-- [x] 定义 `SeekRelative()`。
-- [x] 定义 `Duration()`。
-- [x] 定义 `Position()`。
-- [x] 定义 `SetPlaybackSpeed()`。
-- [x] 定义 `SetVolume()`。
-- [x] 定义 `SetMuted()`。
-- [x] 定义 `PositionChanged` 信号。
-- [x] 定义 `DurationChanged` 信号。
-- [x] 定义 `PlaybackFinished` 信号。
-- [x] 定义 `VolumeChanged` 信号。
-- [x] 定义 `MuteChanged` 信号。
-- [x] 定义 `ErrorOccurred` 信号。
-- [x] 加入构建系统。
-- [x] 暂不让 Controller 使用 `MediaPipeline`。
+- [ ] 新增 `src/domain/MultiStreamManager.h`。
+- [ ] 新增 `src/domain/MultiStreamManager.cpp`。
+- [ ] `MultiStreamManager` 继承 `QObject`。
+- [ ] 定义 `StreamId` 类型。
+- [ ] 定义无效 StreamId 常量。
+- [ ] 定义 `AddStream()`。
+- [ ] 定义 `RemoveStream()`。
+- [ ] 定义 `HasStream()`。
+- [ ] 定义 `StreamIds()`。
+- [ ] 定义 `ActiveStream()`。
+- [ ] 定义 `SetActiveStream()`。
+- [ ] 定义 `ActiveAudioStream()`。
+- [ ] 定义 `SetActiveAudioStream()`。
+- [ ] 定义 `ShutdownAll()`。
+- [ ] 定义 `StreamAdded` 信号。
+- [ ] 定义 `StreamRemoved` 信号。
+- [ ] 定义 `ActiveStreamChanged` 信号。
+- [ ] 定义 `ActiveAudioStreamChanged` 信号。
+- [ ] 定义 `StreamErrorOccurred` 信号。
+- [ ] 加入构建系统。
+- [ ] 暂不让 Controller 使用 `MultiStreamManager`。
 
 **验收标准**：
 
-- [x] 新增空壳不改变现有播放行为。
-- [x] `MediaPipeline` 不依赖 UI 层。
-- [x] `MediaPipeline` 不引入多路 id。
+- [ ] 新类加入构建系统。
+- [ ] 当前单路播放行为不变。
+- [ ] `MediaPipeline` 不出现 id 字段。
+- [ ] 不新增 UI。
 
-## 3.1.3 资源承载准备
+## 3.2.3 Manager 持有多个 Pipeline
 
-**目标**：先让 `MediaPipeline` 具备承载单路播放资源的成员结构，但暂不迁移 Controller 运行逻辑。
+**目标**：让 `MultiStreamManager` 可以创建和释放多个 `MediaPipeline`。
 
-### 3.1.3-a 在 MediaPipeline 中声明资源成员
-
-- [x] 在 `MediaPipeline` 中声明 `APacket_`。
-- [x] 在 `MediaPipeline` 中声明 `VPacket_`。
-- [x] 在 `MediaPipeline` 中声明 `AFrame_`。
-- [x] 在 `MediaPipeline` 中声明 `VFrame_`。
-- [x] 在 `MediaPipeline` 中声明 `mediaSource_`。
-- [x] 在 `MediaPipeline` 中声明 `syncManager_`。
-- [x] 在 `MediaPipeline` 中声明 `demuxer_`。
-- [x] 在 `MediaPipeline` 中声明 `Adecoder_`。
-- [x] 在 `MediaPipeline` 中声明 `Vdecoder_`。
-- [x] 在 `MediaPipeline` 中声明 `audioplay_`。
-- [x] 在 `MediaPipeline` 中声明 `videoRender_`。
-- [x] 在 `MediaPipeline` 中声明 `demuxerTH_`。
-- [x] 在 `MediaPipeline` 中声明 `AdecoderTH_`。
-- [x] 在 `MediaPipeline` 中声明 `VdecoderTH_`。
-- [x] 在 `MediaPipeline` 中声明 `audioplayTH_`。
-- [x] 在 `MediaPipeline` 中声明 `positionTimer_`。
-- [x] 暂不删除 `MediaPlayController` 中的旧资源成员。
-- [x] 暂不让 `MediaPlayController` 使用 `MediaPipeline`。
+- [ ] 定义 `StreamSlot`。
+- [ ] 使用容器保存 `StreamId -> StreamSlot`。
+- [ ] `AddStream()` 分配新的 `StreamId`。
+- [ ] `AddStream()` 创建 `MediaPipeline`。
+- [ ] `AddStream()` 初始化媒体源和 renderer container。
+- [ ] `AddStream()` 失败时完整回滚。
+- [ ] `RemoveStream()` 调用 Pipeline `Shutdown()`。
+- [ ] `RemoveStream()` 删除 slot。
+- [ ] `ShutdownAll()` 释放全部 Pipeline。
+- [ ] 删除 active stream 时更新 active stream。
+- [ ] 删除 active audio stream 时更新 active audio stream。
 
 **验收标准**：
 
-- [x] `MediaPipeline` 已具备单路播放资源承载结构。
-- [x] Controller 行为不变。
-- [x] UI 行为不变。
+- [ ] 可以添加一路文件源。
+- [ ] 可以移除一路文件源。
+- [ ] 可以添加多路但暂不接 UI 播放。
+- [ ] 移除不存在的 id 不崩溃。
 
-### 3.1.3-b 准备 Pipeline 侧队列常量和 deleter
+## 3.2.4 Manager 转发 Pipeline 信号
 
-- [x] 在 `MediaPipeline.cpp` 内部准备 `kPacketQueueMax`。
-- [x] 在 `MediaPipeline.cpp` 内部准备 `kFrameQueueMax`。
-- [x] 在 `MediaPipeline.cpp` 内部准备 packet deleter。
-- [x] 在 `MediaPipeline.cpp` 内部准备 frame deleter。
-- [x] 暂时保留 `MediaPlayController.h` 中旧常量和 deleter。
+**目标**：让 Manager 对外暴露带 `StreamId` 的信号。
 
-**验收标准**：
-
-- [x] Pipeline 侧后续可以独立创建音视频队列。
-- [x] Controller 侧现有逻辑不受影响。
-
-### 3.1.3-c 最终清理 Controller 资源成员
-
-> 注意：本小节必须等 3.1.4、3.1.5、3.1.6 完成后再做。
-
-- [x] 删除 `MediaPlayController` 中的队列成员。
-- [x] 删除 `MediaPlayController` 中的媒体源成员。
-- [x] 删除 `MediaPlayController` 中的 syncmanager 成员。
-- [x] 删除 `MediaPlayController` 中的基础设施组件成员。
-- [x] 删除 `MediaPlayController` 中的线程成员。
-- [x] 删除 `MediaPlayController` 中的 position timer 成员。
-- [x] 删除 `MediaPlayController.h` 对基础设施层播放组件的 include。
-- [x] Controller 新增并只保留 `std::unique_ptr<MediaPipeline> pipeline_`。
+- [ ] 转发 Pipeline 的 `PositionChanged`。
+- [ ] 转发 Pipeline 的 `DurationChanged`。
+- [ ] 转发 Pipeline 的 `PlaybackFinished`。
+- [ ] 转发 Pipeline 的 `VolumeChanged`。
+- [ ] 转发 Pipeline 的 `MuteChanged`。
+- [ ] 转发 Pipeline 的 `ErrorOccurred`。
+- [ ] 所有转发信号携带 `StreamId`。
+- [ ] RemoveStream 后旧信号不会访问已删除 slot。
 
 **验收标准**：
 
-- [x] `MediaPlayController.h` 不再 include 基础设施层播放组件。
-- [x] `MediaPlayController` 不再直接持有播放队列、组件和线程。
-- [x] UI 调用方式不变。
+- [ ] 任意一路 Pipeline 的信号能标识来源。
+- [ ] 删除一路后无悬空回调。
+- [ ] 当前单路 Controller 信号转发不受影响。
 
-## 3.1.4 迁移初始化和释放
+## 3.2.5 Manager 单路控制能力
 
-**目标**：把管线初始化、连接和释放迁入 `MediaPipeline`。
+**目标**：Manager 可以控制指定一路 Pipeline。
 
-### 3.1.4-a 补齐 MediaPipeline 私有辅助接口
-
-- [x] 声明资源创建入口。
-- [x] 声明信号连接入口。
-- [x] 声明资源释放入口。
-- [x] 声明播放完成处理入口。
-- [x] 声明队列清理入口。
-- [x] 声明 decoder flush 入口。
-- [x] 不迁移业务逻辑。
-
-**验收标准**：
-
-- [x] `MediaPipeline` 具备后续函数级迁移入口。
-- [x] `MediaPlayController` 现有逻辑不受影响。
-- [x] 当前播放行为不变。
-
-### 3.1.4-b 迁移资源创建逻辑
-
-- [x] 将 `InitializeOpenedMediaSource()` 中的队列创建逻辑迁入 `MediaPipeline::Initialize()`。
-- [x] 将 demuxer 创建逻辑迁入 `MediaPipeline::Initialize()`。
-- [x] 将 audio/video decoder 创建逻辑迁入 `MediaPipeline::Initialize()`。
-- [x] 将 audio player 创建逻辑迁入 `MediaPipeline::Initialize()`。
-- [x] 将 video render 创建逻辑迁入 `MediaPipeline::Initialize()`。
-- [x] 将 syncmanager 创建逻辑迁入 `MediaPipeline::Initialize()`。
-- [x] 将 position timer 创建逻辑迁入 `MediaPipeline::Initialize()`。
-- [x] 将线程创建逻辑迁入 `MediaPipeline::Initialize()`。
-- [x] 保持无音频流初始化能力。
+- [ ] 定义 `StartStream(StreamId id)`。
+- [ ] 定义 `PauseStream(StreamId id)`。
+- [ ] 定义 `StopStream(StreamId id)`。
+- [ ] 定义 `SeekStreamTo(StreamId id, double seconds)`。
+- [ ] 定义 `SeekStreamRelative(StreamId id, double seconds)`。
+- [ ] 定义 `SetStreamPlaybackSpeed(StreamId id, double speed)`。
+- [ ] 定义 `SetStreamVolume(StreamId id, double volume)`。
+- [ ] 定义 `SetStreamMuted(StreamId id, bool muted)`。
+- [ ] id 不存在时安全返回。
 
 **验收标准**：
 
-- [x] `MediaPipeline` 能独立创建单路播放资源。
-- [x] 有音频文件初始化路径不退化。
-- [x] 无音频视频初始化路径不退化。
+- [ ] 指定 id 存在时操作生效。
+- [ ] 指定 id 不存在时不崩溃。
+- [ ] 无音频视频设置音量和静音不崩溃。
 
-### 3.1.4-c 迁移信号连接逻辑
+## 3.2.6 Manager 全局控制能力
 
-- [x] 将 demuxer 线程启动连接迁入 `MediaPipeline`。
-- [x] 将 audio decoder 线程启动连接迁入 `MediaPipeline`。
-- [x] 将 video decoder 线程启动连接迁入 `MediaPipeline`。
-- [x] 将 audio player 线程启动连接迁入 `MediaPipeline`。
-- [x] 将 demux finished 连接迁入 `MediaPipeline`。
-- [x] 将 position timer 连接迁入 `MediaPipeline`。
-- [x] 将 AudioPlayer 音量/静音信号转发迁入 `MediaPipeline`。
+**目标**：Manager 可以对全部 Pipeline 执行批量控制。
 
-**验收标准**：
-
-- [x] Pipeline 侧已具备内部组件连接能力。
-- [x] Pipeline 能对外发出位置、播放完成、音量、静音信号。
-- [x] 有音频和无音频路径连接完整。
-- [x] Controller 不再直接连接基础设施层播放组件。
-
-### 3.1.4-d 迁移释放逻辑
-
-- [x] 将 `ReleaseResources()` 逻辑迁入 `MediaPipeline::Shutdown()`。
-- [x] 将停止 position timer 逻辑迁入 `MediaPipeline`。
-- [x] 将 RequestStop 逻辑迁入 `MediaPipeline`。
-- [x] 将 demuxer/decoder/audio/render 停止逻辑迁入 `MediaPipeline`。
-- [x] 将线程退出和等待逻辑迁入 `MediaPipeline`。
-- [x] 将基础设施对象 reset/delete 逻辑迁入 `MediaPipeline`。
-- [x] 将媒体源关闭逻辑迁入 `MediaPipeline`。
-- [x] 将 `HandleDemuxFinished()` 逻辑迁入 `MediaPipeline`。
-- [x] 将 `ClearQueues()` 逻辑迁入 `MediaPipeline`。
-- [x] 将 `FlushDecoders()` 逻辑迁入 `MediaPipeline`。
+- [ ] 定义 `StartAll()`。
+- [ ] 定义 `PauseAll()`。
+- [ ] 定义 `StopAll()`。
+- [ ] 定义 `ShutdownAll()`。
+- [ ] 全局控制跳过无效 slot。
 
 **验收标准**：
 
-- [x] 启动后关闭正常。
-- [x] 暂停后关闭正常。
-- [x] 播放中关闭正常。
-- [x] 播放完成后关闭正常。
-- [x] 切换文件时旧 Pipeline 能完整释放。
+- [ ] 多路启动不崩溃。
+- [ ] 多路暂停不阻塞。
+- [ ] 多路停止可以清空各自状态。
+- [ ] 程序关闭时可以释放全部资源。
 
-### 3.1.4-e Controller 接入 MediaPipeline
+## 3.2.7 Active Stream 状态设计
 
-#### 3.1.4-e1 Controller 持有 Pipeline 并转发信号
+**目标**：确定 UI 当前显示哪一路状态。
 
-- [x] Controller 新增 `std::unique_ptr<MediaPipeline> pipeline_`。
-- [x] Controller 构造时创建单个 `MediaPipeline`。
-- [x] Controller 转发 Pipeline 的 `DurationChanged`。
-- [x] Controller 转发 Pipeline 的 `PositionChanged`。
-- [x] Controller 转发 Pipeline 的 `PlaybackFinished`。
-- [x] Controller 转发 Pipeline 的 `VolumeChanged`。
-- [x] Controller 转发 Pipeline 的 `MuteChanged`。
-- [x] 暂不切换初始化、释放主路径。
-
-#### 3.1.4-e2 Initialize / SwitchSource / Shutdown 委托 Pipeline
-
-- [x] Controller `Initialize()` 调用 `pipeline_->Initialize()`。
-- [x] Controller `SwitchSource()` 先关闭旧 Pipeline，再初始化新 Pipeline。
-- [x] Controller `Shutdown()` 调用 `pipeline_->Shutdown()`。
-- [x] Controller 在切换源后重新下发 speed/volume/muted。
-- [x] 保留 Controller 应用层状态编排。
-
-#### 3.1.4-e3 清理初始化释放旧路径
-
-- [x] 停用 `InitializeOpenedMediaSource()` 主路径。
-- [x] 停用 `ReleaseResources()` 主路径。
-- [x] Controller 不再直接创建 demuxer/decoder/queue/audio/render/sync/thread。
-- [x] Controller 不再直接连接基础设施层播放组件。
+- [ ] Manager 保存 `activeStreamId_`。
+- [ ] `SetActiveStream()` 校验 id 是否存在。
+- [ ] active stream 被删除时自动选择下一个可用 stream 或置为无效。
+- [ ] Controller 后续从 active stream 读取 `Position()`。
+- [ ] Controller 后续从 active stream 读取 `Duration()`。
+- [ ] 没有 active stream 时返回 0 或无效状态。
 
 **验收标准**：
 
-- [x] 打开文件正常。
-- [x] 切换文件正常。
-- [x] 关闭程序正常。
-- [x] 无音频视频仍可初始化。
-- [x] 普通音视频文件仍可初始化。
+- [ ] 切换 active stream 后 UI 状态语义明确。
+- [ ] 删除 active stream 不崩溃。
+- [ ] 没有 active stream 时行为可解释。
 
-## 3.1.5 迁移播放控制
+## 3.2.8 Active Audio Stream 策略
 
-**目标**：把播放控制流程迁入 `MediaPipeline`，Controller 只保留应用层状态编排。
+**目标**：避免多路同时输出音频。
 
-### 3.1.5-a Pipeline 侧 Start/Pause/Stop 最小实现
-
-- [x] 将 `Start()` 内部管线启动逻辑迁入 `MediaPipeline::Start()`。
-- [x] 将 `Pause()` 内部管线暂停逻辑迁入 `MediaPipeline::Pause()`。
-- [x] 将 `Stop()` 内部管线重置逻辑迁入 `MediaPipeline::Stop()`。
-- [x] 将 `SuspendPipelineAndWait()` 迁入 `MediaPipeline`。
-- [x] 将 `ResetPipelineToStart()` 迁入 `MediaPipeline`。
-- [x] 复用 Pipeline 内部 `ClearQueues()`。
-- [x] 复用 Pipeline 内部 `FlushDecoders()`。
-- [x] 暂不切换 Controller 播放控制主路径。
-
-### 3.1.5-b Pipeline 侧 Seek 实现
-
-- [x] 将 `SeekTo()` 内部管线 seek 逻辑迁入 `MediaPipeline::SeekTo()`。
-- [x] 将 `SeekRelative()` 内部位置计算迁入或委托给 `MediaPipeline`。
-- [x] 将 `RestorePlaybackState()` 中对管线的恢复调用改为调用 Pipeline。
-
-### 3.1.5-c Controller 播放控制委托 Pipeline
-
-- [x] Controller `Start()` 只设置状态并调用 `pipeline_->Start()`。
-- [x] Controller `Pause()` 只设置状态并调用 `pipeline_->Pause()`。
-- [x] Controller `Stop()` 只设置状态并调用 `pipeline_->Stop()`。
-- [x] Controller `SeekTo()` 只做目标边界和状态恢复编排，管线细节委托 Pipeline。
+- [ ] Manager 保存 `activeAudioStreamId_`。
+- [ ] 第一条有音频流默认成为 active audio stream。
+- [ ] 非 active audio stream 默认静音。
+- [ ] 切换 active audio stream 时旧路静音。
+- [ ] 切换 active audio stream 时新路恢复当前 volume/muted。
+- [ ] 无音频流不能成为有效 active audio stream。
 
 **验收标准**：
 
-- [x] Start/Pause/Stop 行为不变。
-- [x] Seek 行为不变。
-- [x] 快进/快退行为不变。
-- [x] 无音频视频行为不退化。
-- [x] 普通音视频文件行为不退化。
+- [ ] 多路播放时最多一路有声音。
+- [ ] 切换 active audio stream 后音频输出符合预期。
+- [ ] 无音频视频不影响音频策略。
 
-## 3.1.6 迁移用户级参数下发
+## 3.2.9 Controller 接入 Manager
 
-**目标**：Controller 保存用户级状态，Pipeline 承接具体下发。
+**目标**：让 `MediaPlayController` 从持有单个 Pipeline 过渡到持有 Manager。
 
-### 3.1.6-a Pipeline 侧参数下发最小实现
-
-- [x] Controller 继续持有 `playbackSpeed_`。
-- [x] Controller 继续持有 `volume_`。
-- [x] Controller 继续持有 `muted_`。
-- [x] `MediaPipeline::SetPlaybackSpeed()` 下发到 AudioPlayer 和 VideoRender。
-- [x] `MediaPipeline::SetVolume()` 下发到 AudioPlayer。
-- [x] `MediaPipeline::SetMuted()` 下发到 AudioPlayer。
-- [x] 无音频流时 `SetVolume()` 发出 `VolumeChanged`，不访问 AudioPlayer。
-- [x] 无音频流时 `SetMuted()` 发出 `MuteChanged`，不访问 AudioPlayer。
-
-### 3.1.6-b Controller 参数重新下发
-
-- [x] Controller 切换源后把当前 speed/volume/muted 重新下发给 Pipeline。
+- [ ] Controller 新增 `std::unique_ptr<MultiStreamManager> multiStreamManager_`。
+- [ ] 保留当前单路 UI 接口不变。
+- [ ] `Initialize()` 创建第一路 stream。
+- [ ] `SwitchSource()` 替换 active stream。
+- [ ] `Start()` 委托 Manager 操作 active stream。
+- [ ] `Pause()` 委托 Manager 操作 active stream。
+- [ ] `Stop()` 委托 Manager 操作 active stream。
+- [ ] `SeekTo()` 委托 Manager 操作 active stream。
+- [ ] `SeekRelative()` 委托 Manager 操作 active stream。
+- [ ] Controller 继续保存 playbackSpeed / volume / muted。
+- [ ] Controller 不直接持有多个 Pipeline。
 
 **验收标准**：
 
-- [x] 切换文件后播放速度保持。
-- [x] 切换文件后音量保持。
-- [x] 切换文件后静音状态保持。
-- [x] 无音频视频设置音量/静音不崩溃。
+- [ ] 现有 UI 行为不变。
+- [ ] 播放列表切换不退化。
+- [ ] Controller 不直接持有多个 Pipeline。
 
-## 3.1.7 回归验收和报告
+## 3.2.10 最小多路文件源验证
 
-**目标**：收口 Phase 3.1，确认抽取没有改变外部行为。
+**目标**：用本地文件源验证 Manager 能管理多路。
 
-- [x] 普通音视频文件播放正常。
-- [x] 无音频视频播放正常。
-- [x] Start/Pause/Stop 正常。
-- [x] Seek 正常。
-- [x] 快进/快退正常。
-- [x] 播放速度正常。
-- [x] 音量和静音正常。
-- [x] 播放列表切换正常。
-- [x] 播放完成后关闭正常。
-- [x] 播放中关闭不阻塞。
-- [x] 暂停后关闭不阻塞。
-- [x] `MediaPlayController` 不直接持有基础设施层播放资源。
-- [x] 形成 `doc/Phase3_1_单路MediaPipeline抽取实现报告.md`。
+- [ ] 添加两路普通文件。
+- [ ] 添加一路普通文件和一路无音频文件。
+- [ ] 启动所有路。
+- [ ] 暂停所有路。
+- [ ] 停止所有路。
+- [ ] 移除其中一路。
+- [ ] 关闭程序。
+- [ ] 验证最多一路有声音。
 
 **验收标准**：
 
-- [x] UI 行为不变。
-- [x] Phase 3.0 无音频能力不退化。
-- [x] Controller 和 Pipeline 边界清晰。
-- [x] 后续可以进入真正多路管理设计。
+- [ ] 多路生命周期稳定。
+- [ ] 无音频流不崩溃。
+- [ ] 音频最多一路输出。
+- [ ] 关闭程序不阻塞。
 
-## 3.1 不做范围
+## 3.2.11 Phase 3.2 验收报告
 
-- [ ] 不做多路播放。
-- [ ] 不做多路 UI。
-- [ ] 不引入 `MultiStreamManager`。
-- [ ] 不引入 pipeline id。
-- [ ] 不做多路音频源选择。
+**目标**：收口多路管理阶段。
+
+- [ ] 形成 `doc/Phase3_2_多路管理实现报告.md`。
+- [ ] 记录 Manager 最终职责。
+- [ ] 记录 Controller 和 Manager 边界。
+- [ ] 记录 Pipeline 是否保持单路无 id。
+- [ ] 记录文件源多路验证结果。
+- [ ] 记录已知限制。
+- [ ] 记录下一阶段建议。
+
+**验收标准**：
+
+- [ ] Manager 边界清晰。
+- [ ] Controller 不直接持有多个 Pipeline。
+- [ ] Pipeline 保持单路职责。
+- [ ] 后续可以进入多路 UI 或多路渲染优化。
+
+## Phase 3.2 不做范围
+
+- [ ] 不做完整多路 UI。
+- [ ] 不做多路布局切换。
+- [ ] 不引入 `MultiViewRenderer`。
+- [ ] 不做统一 OpenGL 多纹理渲染。
 - [ ] 不做摄像头枚举。
 - [ ] 不做 RTSP/RTMP。
-- [ ] 不支持音频-only 文件。
-- [ ] 不重写渲染器。
+- [ ] 不做工业相机 SDK。
+- [ ] 不做图像处理。
+- [ ] 不做多路性能优化。
 
-## Phase 3.1 完成标准
+## Phase 3.2 完成标准
 
-- [x] `MediaPlayController` 回到应用层协调角色。
-- [x] 单路播放资源集中在 `MediaPipeline`。
-- [x] UI 行为不变。
-- [x] 有音频文件播放不退化。
-- [x] 无音频视频播放不退化。
-- [x] 后续可以进入多路管理设计。
+- [ ] `MultiStreamManager` 可以管理多个 `MediaPipeline`。
+- [ ] `StreamId` 只存在于 Manager 层。
+- [ ] `MediaPipeline` 继续保持单路无 id。
+- [ ] Controller 可以通过 Manager 操作 active stream。
+- [ ] 文件源多路生命周期验证通过。
+- [ ] 无音频视频多路验证通过。
+- [ ] 多路音频策略不混乱。
