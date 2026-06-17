@@ -286,8 +286,8 @@ MainWindow
 
 ### 3.1.5-b Pipeline 侧 Seek 实现
 
-- [ ] 将 `SeekTo()` 内部管线 seek 逻辑迁入 `MediaPipeline::SeekTo()`。
-- [ ] 将 `SeekRelative()` 内部位置计算迁入或委托给 `MediaPipeline`。
+- [x] 将 `SeekTo()` 内部管线 seek 逻辑迁入 `MediaPipeline::SeekTo()`。
+- [x] 将 `SeekRelative()` 内部位置计算迁入或委托给 `MediaPipeline`。
 - [ ] 将 `RestorePlaybackState()` 中对管线的恢复调用改为调用 Pipeline。
 
 ### 3.1.5-c Controller 播放控制委托 Pipeline

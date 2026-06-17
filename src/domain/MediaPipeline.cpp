@@ -129,14 +129,56 @@ void MediaPipeline::Stop()
 
 bool MediaPipeline::SeekTo(double seconds)
 {
-    Q_UNUSED(seconds);
-    return false;
+    if (!demuxer_ || !Vdecoder_ || !syncManager_) {
+        qWarning() << "MediaPipeline seek failed: playback pipeline is not initialized";
+        emit ErrorOccurred("Playback pipeline is not initialized");
+        return false;
+    }
+
+    double targetSeconds = seconds;
+    if (targetSeconds < 0.0) {
+        targetSeconds = 0.0;
+    }
+
+    const double durationSeconds = Duration();
+    if (durationSeconds > 0.0 && targetSeconds > durationSeconds) {
+        targetSeconds = durationSeconds;
+    }
+
+    if (!SuspendPipelineAndWait()) {
+        qWarning() << "MediaPipeline seek failed: playback pipeline suspend failed";
+        emit ErrorOccurred("Playback pipeline suspend failed");
+        return false;
+    }
+
+    ClearQueues();
+
+    const int seekResult = demuxer_->SeekTo(targetSeconds);
+    if (seekResult != 0) {
+        qWarning() << "MediaPipeline seek failed: demuxer rejected target" << targetSeconds;
+        emit ErrorOccurred("Demuxer rejected seek target");
+        return false;
+    }
+
+    FlushDecoders();
+    Vdecoder_->SetDiscardBefore(targetSeconds);
+    ClearQueues();
+    syncManager_->SeekTo(targetSeconds * 1000.0);
+
+    emit PositionChanged(Position());
+
+    return true;
 }
 
 bool MediaPipeline::SeekRelative(double seconds)
 {
-    Q_UNUSED(seconds);
-    return false;
+    if (!demuxer_) {
+        qWarning() << "MediaPipeline seek failed: demuxer is not initialized";
+        emit ErrorOccurred("Demuxer is not initialized");
+        return false;
+    }
+
+    return SeekTo(demuxer_->Position() + seconds);
 }
 
 double MediaPipeline::Duration() const
