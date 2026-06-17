@@ -135,18 +135,18 @@
 
 **目标**：同步系统显式支持音频主时钟和视频主时钟。
 
-- [ ] 在 `syncmanager` 中增加 `SetSyncType(SYNCTYPE type)`。
-- [ ] 在 `syncmanager` 中增加 `SyncType() const`。
-- [ ] 保持默认同步模式为 `SYNCTYPE::AUDIO`。
-- [ ] Controller 初始化时，有音频设置为 `SYNCTYPE::AUDIO`。
-- [ ] Controller 初始化时，无音频设置为 `SYNCTYPE::VIDEO`。
-- [ ] `Position()` 继续读取 `syncManager_->GetClock()`，不把同步模式暴露给 UI。
+- [x] 在 `syncmanager` 中增加 `SetSyncType(SYNCTYPE type)`。
+- [x] 在 `syncmanager` 中增加 `SyncType() const`。
+- [x] 保持默认同步模式为 `SYNCTYPE::AUDIO`。
+- [x] Controller 初始化时，有音频设置为 `SYNCTYPE::AUDIO`。
+- [x] Controller 初始化时，无音频设置为 `SYNCTYPE::VIDEO`。
+- [x] `Position()` 继续读取 `syncManager_->GetClock()`，不把同步模式暴露给 UI。
 
 **验收标准**：
 
 - [ ] 有音频文件仍由 `AudioPlayer` 推进主时钟。
 - [ ] 无音频视频由视频渲染链路推进主时钟。
-- [ ] UI 不需要知道当前同步模式。
+- [x] UI 不需要知道当前同步模式。
 
 ## 3.0.7 VideoRender 支持视频主时钟
 

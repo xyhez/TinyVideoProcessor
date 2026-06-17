@@ -24,6 +24,16 @@ double syncmanager::GetClock() const {
     return mainclock;
 }
 
+void syncmanager::SetSyncType(SYNCTYPE type) {
+    QMutexLocker locker(&mutex);
+    currentSYNCTYPE = type;
+}
+
+SYNCTYPE syncmanager::SyncType() const {
+    QMutexLocker locker(&mutex);
+    return currentSYNCTYPE;
+}
+
 int syncmanager::SeekTo(double clockMs) {
     QMutexLocker locker(&mutex);
     mainclock = clockMs;

@@ -114,6 +114,7 @@ bool MediaPlayController::InitializeOpenedMediaSource(std::shared_ptr<IMediaSour
     }
     videoRender_ = new VideoRender(rendererContainer);
     syncManager_ = std::make_shared<syncmanager>();
+    syncManager_->SetSyncType(hasAudio ? SYNCTYPE::AUDIO : SYNCTYPE::VIDEO);
     positionTimer_ = std::make_unique<QTimer>();
     positionTimer_->setInterval(200); // 间隔200毫秒
 

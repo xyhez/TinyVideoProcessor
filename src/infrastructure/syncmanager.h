@@ -44,6 +44,18 @@ public:
     double GetClock() const;
 
     /**
+     * @brief SetSyncType 设置当前同步模式
+     * @param type 同步模式
+     */
+    void SetSyncType(SYNCTYPE type);
+
+    /**
+     * @brief SyncType 获取当前同步模式
+     * @return 当前同步模式
+     */
+    SYNCTYPE SyncType() const;
+
+    /**
      * @brief SeekTo 将主时钟重置到指定时间
      * @param clockMs 目标时钟，单位毫秒(ms)
      * @return 0 成功
