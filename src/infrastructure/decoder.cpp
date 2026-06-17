@@ -212,6 +212,19 @@ int decoder::InitDecoder(std::shared_ptr<SyncQueue<AVPacket*>> packetVec
                          ,std::shared_ptr<SyncQueue<AVFrame*>> framevec
                          , AVCodecParameters *coderPar
                          , AVRational time_base) {
+    if (!coderPar) {
+        qWarning() << "decoder init failed: codec parameters are null";
+        return -1;
+    }
+    if (!packetVec) {
+        qWarning() << "decoder init failed: packet queue is null";
+        return -1;
+    }
+    if (!framevec) {
+        qWarning() << "decoder init failed: frame queue is null";
+        return -1;
+    }
+
     m_PacketVec = packetVec;
     m_FrameVec = framevec;
     m_time_base = time_base;

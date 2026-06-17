@@ -71,15 +71,15 @@
 
 **目标**：基础设施层对非法初始化参数保持防御，避免空 codec 参数直接崩溃。
 
-- [ ] 在 `decoder::InitDecoder()` 开头检查 `coderPar` 是否为空。
-- [ ] `coderPar == nullptr` 时返回失败并输出清晰日志。
-- [ ] 检查 packet 队列和 frame 队列是否为空。
-- [ ] 队列为空时返回失败并输出清晰日志。
-- [ ] 保持视频 decoder 和音频 decoder 的正常初始化行为不变。
+- [x] 在 `decoder::InitDecoder()` 开头检查 `coderPar` 是否为空。
+- [x] `coderPar == nullptr` 时返回失败并输出清晰日志。
+- [x] 检查 packet 队列和 frame 队列是否为空。
+- [x] 队列为空时返回失败并输出清晰日志。
+- [x] 保持视频 decoder 和音频 decoder 的正常初始化行为不变。
 
 **验收标准**：
 
-- [ ] 即使上层误传空 codec 参数，也不会访问 `par->codec_id` 崩溃。
+- [x] 即使上层误传空 codec 参数，也不会访问 `par->codec_id` 崩溃。
 - [ ] 正常音视频文件初始化行为不变。
 
 ## 3.0.4 MediaPlayController 支持可选音频链路
