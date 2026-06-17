@@ -87,3 +87,31 @@ void MediaPipeline::SetMuted(bool muted)
 {
     Q_UNUSED(muted);
 }
+
+bool MediaPipeline::CreatePipelineResources(std::shared_ptr<IMediaSource> mediaSource,
+                                            QWidget* rendererContainer)
+{
+    Q_UNUSED(mediaSource);
+    Q_UNUSED(rendererContainer);
+    return false;
+}
+
+void MediaPipeline::CreateConnects()
+{
+}
+
+void MediaPipeline::ReleaseResources()
+{
+}
+
+void MediaPipeline::HandleDemuxFinished()
+{
+}
+
+void MediaPipeline::ClearQueues()
+{
+}
+
+void MediaPipeline::FlushDecoders()
+{
+}

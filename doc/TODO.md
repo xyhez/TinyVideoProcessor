@@ -161,12 +161,83 @@ MainWindow
 
 **目标**：把管线初始化、连接和释放迁入 `MediaPipeline`。
 
-- [ ] 将 `InitializeOpenedMediaSource()` 逻辑迁入 `MediaPipeline::Initialize()`。
-- [ ] 将 `CreateConnects()` 逻辑迁入 `MediaPipeline`。
+### 3.1.4-a 补齐 MediaPipeline 私有辅助接口
+
+- [x] 声明资源创建入口。
+- [x] 声明信号连接入口。
+- [x] 声明资源释放入口。
+- [x] 声明播放完成处理入口。
+- [x] 声明队列清理入口。
+- [x] 声明 decoder flush 入口。
+- [x] 不迁移业务逻辑。
+
+**验收标准**：
+
+- [x] `MediaPipeline` 具备后续函数级迁移入口。
+- [x] `MediaPlayController` 现有逻辑不受影响。
+- [x] 当前播放行为不变。
+
+### 3.1.4-b 迁移资源创建逻辑
+
+- [ ] 将 `InitializeOpenedMediaSource()` 中的队列创建逻辑迁入 `MediaPipeline::Initialize()`。
+- [ ] 将 demuxer 创建逻辑迁入 `MediaPipeline::Initialize()`。
+- [ ] 将 audio/video decoder 创建逻辑迁入 `MediaPipeline::Initialize()`。
+- [ ] 将 audio player 创建逻辑迁入 `MediaPipeline::Initialize()`。
+- [ ] 将 video render 创建逻辑迁入 `MediaPipeline::Initialize()`。
+- [ ] 将 syncmanager 创建逻辑迁入 `MediaPipeline::Initialize()`。
+- [ ] 将 position timer 创建逻辑迁入 `MediaPipeline::Initialize()`。
+- [ ] 将线程创建逻辑迁入 `MediaPipeline::Initialize()`。
+- [ ] 保持无音频流初始化能力。
+
+**验收标准**：
+
+- [ ] `MediaPipeline` 能独立创建单路播放资源。
+- [ ] 有音频文件初始化路径不退化。
+- [ ] 无音频视频初始化路径不退化。
+
+### 3.1.4-c 迁移信号连接逻辑
+
+- [ ] 将 demuxer 线程启动连接迁入 `MediaPipeline`。
+- [ ] 将 audio decoder 线程启动连接迁入 `MediaPipeline`。
+- [ ] 将 video decoder 线程启动连接迁入 `MediaPipeline`。
+- [ ] 将 audio player 线程启动连接迁入 `MediaPipeline`。
+- [ ] 将 demux finished 连接迁入 `MediaPipeline`。
+- [ ] 将 position timer 连接迁入 `MediaPipeline`。
+- [ ] 将 AudioPlayer 音量/静音信号转发迁入 `MediaPipeline`。
+
+**验收标准**：
+
+- [ ] Controller 不再直接连接基础设施层播放组件。
+- [ ] Pipeline 能向 Controller 转发位置、播放完成、音量、静音信号。
+- [ ] 有音频和无音频路径连接完整。
+
+### 3.1.4-d 迁移释放逻辑
+
 - [ ] 将 `ReleaseResources()` 逻辑迁入 `MediaPipeline::Shutdown()`。
+- [ ] 将停止 position timer 逻辑迁入 `MediaPipeline`。
+- [ ] 将 RequestStop 逻辑迁入 `MediaPipeline`。
+- [ ] 将 demuxer/decoder/audio/render 停止逻辑迁入 `MediaPipeline`。
+- [ ] 将线程退出和等待逻辑迁入 `MediaPipeline`。
+- [ ] 将基础设施对象 reset/delete 逻辑迁入 `MediaPipeline`。
+- [ ] 将媒体源关闭逻辑迁入 `MediaPipeline`。
 - [ ] 将 `HandleDemuxFinished()` 逻辑迁入 `MediaPipeline`。
+- [ ] 将 `ClearQueues()` 逻辑迁入 `MediaPipeline`。
+- [ ] 将 `FlushDecoders()` 逻辑迁入 `MediaPipeline`。
+
+**验收标准**：
+
+- [ ] 启动后关闭正常。
+- [ ] 暂停后关闭正常。
+- [ ] 播放中关闭正常。
+- [ ] 播放完成后关闭正常。
+- [ ] 切换文件时旧 Pipeline 能完整释放。
+
+### 3.1.4-e Controller 接入 MediaPipeline
+
+- [ ] Controller 新增 `std::unique_ptr<MediaPipeline> pipeline_`。
 - [ ] Controller `Initialize()` 调用 `pipeline_->Initialize()`。
 - [ ] Controller `SwitchSource()` 先关闭旧 Pipeline，再初始化新 Pipeline。
+- [ ] Controller `Shutdown()` 调用 `pipeline_->Shutdown()`。
 - [ ] Controller 转发 Pipeline 的 `DurationChanged`。
 - [ ] Controller 转发 Pipeline 的 `PositionChanged`。
 - [ ] Controller 转发 Pipeline 的 `PlaybackFinished`。

@@ -149,6 +149,41 @@ signals:
     void ErrorOccurred(QString message);
 
 private:
+    /**
+     * @brief CreatePipelineResources 创建当前媒体源对应的单路播放资源
+     * @param mediaSource 已打开或待接入的媒体源抽象
+     * @param rendererContainer 视频渲染容器
+     * @return true 创建成功
+     * @return false 创建失败
+     */
+    bool CreatePipelineResources(std::shared_ptr<IMediaSource> mediaSource,
+                                 QWidget* rendererContainer);
+
+    /**
+     * @brief CreateConnects 创建 Pipeline 内部信号槽连接
+     */
+    void CreateConnects();
+
+    /**
+     * @brief ReleaseResources 释放当前 Pipeline 持有的播放资源
+     */
+    void ReleaseResources();
+
+    /**
+     * @brief HandleDemuxFinished 处理媒体源自然播放结束
+     */
+    void HandleDemuxFinished();
+
+    /**
+     * @brief ClearQueues 清空音视频包队列和帧队列
+     */
+    void ClearQueues();
+
+    /**
+     * @brief FlushDecoders 清理解码器内部缓存
+     */
+    void FlushDecoders();
+
     std::shared_ptr<SyncQueue<AVPacket*>> APacket_ = nullptr;
     std::shared_ptr<SyncQueue<AVPacket*>> VPacket_ = nullptr;
     std::shared_ptr<SyncQueue<AVFrame*>> AFrame_ = nullptr;
