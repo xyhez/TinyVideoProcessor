@@ -168,14 +168,18 @@ void MediaPlayController::CreateConnects() {
     connect(demuxerTH_.get(),  &QThread::started,
         demuxer_.get(), &demuxer::StartDemuxer);
 
-    connect(AdecoderTH_.get(), &QThread::started,
-        Adecoder_.get(), &decoder::StartDecoder);
+    if (AdecoderTH_ && Adecoder_) {
+        connect(AdecoderTH_.get(), &QThread::started,
+            Adecoder_.get(), &decoder::StartDecoder);
+    }
 
     connect(VdecoderTH_.get(), &QThread::started,
         Vdecoder_.get(), &decoder::StartDecoder);
 
-    connect(audioplayTH_.get(), &QThread::started,
-        audioplay_.get(), &AudioPlayer::StartAudioPlay);
+    if (audioplayTH_ && audioplay_) {
+        connect(audioplayTH_.get(), &QThread::started,
+            audioplay_.get(), &AudioPlayer::StartAudioPlay);
+    }
 
     connect(demuxer_.get(), &demuxer::DemuxFinished,
             this, &MediaPlayController::HandleDemuxFinished);
@@ -184,15 +188,17 @@ void MediaPlayController::CreateConnects() {
         emit PositionChanged(Position());
     });
 
-    connect(audioplay_.get(), &AudioPlayer::VolumeChanged, this, [this](qreal volume) {
-        volume_ = static_cast<double>(volume);
-        emit VolumeChanged(volume_);
-    });
+    if (audioplay_) {
+        connect(audioplay_.get(), &AudioPlayer::VolumeChanged, this, [this](qreal volume) {
+            volume_ = static_cast<double>(volume);
+            emit VolumeChanged(volume_);
+        });
 
-    connect(audioplay_.get(), &AudioPlayer::MuteChanged, this, [this](bool muted) {
-        muted_ = muted;
-        emit MuteChanged(muted_);
-    });
+        connect(audioplay_.get(), &AudioPlayer::MuteChanged, this, [this](bool muted) {
+            muted_ = muted;
+            emit MuteChanged(muted_);
+        });
+    }
 }
 
 void MediaPlayController::ReleaseResources() {
@@ -292,8 +298,14 @@ void MediaPlayController::SetState(PlaybackState state) {
 }
 
 void MediaPlayController::Start() {
-    if (!demuxer_ || !Adecoder_ || !Vdecoder_ || !audioplay_ || !videoRender_ || !positionTimer_) {
+    if (!demuxer_ || !Vdecoder_ || !videoRender_ || !positionTimer_ || !demuxerTH_ || !VdecoderTH_) {
         qWarning() << "Start failed: playback pipeline is not initialized";
+        return;
+    }
+
+    const bool hasAudio = Adecoder_ || audioplay_ || AdecoderTH_ || audioplayTH_;
+    if (hasAudio && (!Adecoder_ || !audioplay_ || !AdecoderTH_ || !audioplayTH_)) {
+        qWarning() << "Start failed: audio pipeline is incomplete";
         return;
     }
 
@@ -304,19 +316,23 @@ void MediaPlayController::Start() {
     emit DurationChanged(Duration());
 
     demuxerTH_->start();
-    AdecoderTH_->start();
     VdecoderTH_->start();
-    audioplayTH_->start();
+    if (hasAudio) {
+        AdecoderTH_->start();
+        audioplayTH_->start();
+    }
 
     demuxer_->Start();
-    Adecoder_->Start();
     Vdecoder_->Start();
-    audioplay_->Start();
+    if (hasAudio) {
+        Adecoder_->Start();
+        audioplay_->Start();
+    }
     videoRender_->StartRendering();
 }
 
 void MediaPlayController::Stop() {
-    if (!demuxer_ || !Adecoder_ || !Vdecoder_ || !syncManager_ || !positionTimer_) {
+    if (!demuxer_ || !Vdecoder_ || !syncManager_ || !positionTimer_) {
         SetState(PlaybackState::Stopped);
         return;
     }
@@ -355,7 +371,7 @@ void MediaPlayController::HandleDemuxFinished() {
 }
 
 void MediaPlayController::Pause() {
-    if (!demuxer_ || !Adecoder_ || !Vdecoder_ || !audioplay_ || !videoRender_ || !positionTimer_) {
+    if (!demuxer_ || !Vdecoder_ || !videoRender_ || !positionTimer_) {
         qWarning() << "Pause failed: playback pipeline is not initialized";
         return;
     }
@@ -363,9 +379,13 @@ void MediaPlayController::Pause() {
     SetState(PlaybackState::Paused);
     emit PositionChanged(Position());
     demuxer_->Pause();
-    Adecoder_->Pause();
+    if (Adecoder_) {
+        Adecoder_->Pause();
+    }
     Vdecoder_->Pause();
-    audioplay_->Pause();
+    if (audioplay_) {
+        audioplay_->Pause();
+    }
     videoRender_->Pause();
     positionTimer_->stop();
 }
@@ -414,7 +434,7 @@ bool MediaPlayController::IsMuted() const {
 }
 
 void MediaPlayController::SeekTo(double seconds) {
-    if (!demuxer_ || !Adecoder_ || !Vdecoder_ || !syncManager_) {
+    if (!demuxer_ || !Vdecoder_ || !syncManager_) {
         qWarning() << "Seek failed: playback pipeline is not initialized";
         return;
     }

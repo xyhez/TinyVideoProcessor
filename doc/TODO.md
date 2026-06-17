@@ -108,19 +108,19 @@
 
 **目标**：Start/Pause/Stop/Seek/Release 等控制逻辑按“必选视频链路 + 可选音频链路”运行。
 
-- [ ] `Start()` 的必选检查移除对音频组件的硬依赖。
-- [ ] `Start()` 有音频时启动音频 decoder 线程和 AudioPlayer 线程。
-- [ ] `Start()` 无音频时只启动 demuxer、视频 decoder、VideoRender。
-- [ ] `Pause()` 有音频时暂停 `AudioPlayer`。
-- [ ] `Pause()` 无音频时只暂停 demuxer、视频 decoder、VideoRender。
-- [ ] `SeekTo()` 不再要求 `Adecoder_` 必须存在。
-- [ ] `SeekTo()` 有音频时 flush 音频 decoder。
-- [ ] `SeekTo()` 无音频时只 flush 视频 decoder。
-- [ ] `SuspendPipelineAndWait()` 有音频线程时等待音频 decoder 安全点。
-- [ ] `SuspendPipelineAndWait()` 无音频时跳过音频 decoder。
-- [ ] `CreateConnects()` 有音频时连接音频线程和音量/静音信号。
-- [ ] `CreateConnects()` 无音频时不连接不存在的音频对象。
-- [ ] `ReleaseResources()` 保持所有音频对象空指针安全释放。
+- [x] `Start()` 的必选检查移除对音频组件的硬依赖。
+- [x] `Start()` 有音频时启动音频 decoder 线程和 AudioPlayer 线程。
+- [x] `Start()` 无音频时只启动 demuxer、视频 decoder、VideoRender。
+- [x] `Pause()` 有音频时暂停 `AudioPlayer`。
+- [x] `Pause()` 无音频时只暂停 demuxer、视频 decoder、VideoRender。
+- [x] `SeekTo()` 不再要求 `Adecoder_` 必须存在。
+- [x] `SeekTo()` 有音频时 flush 音频 decoder。
+- [x] `SeekTo()` 无音频时只 flush 视频 decoder。
+- [x] `SuspendPipelineAndWait()` 有音频线程时等待音频 decoder 安全点。
+- [x] `SuspendPipelineAndWait()` 无音频时跳过音频 decoder。
+- [x] `CreateConnects()` 有音频时连接音频线程和音量/静音信号。
+- [x] `CreateConnects()` 无音频时不连接不存在的音频对象。
+- [x] `ReleaseResources()` 保持所有音频对象空指针安全释放。
 
 **验收标准**：
 
