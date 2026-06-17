@@ -235,15 +235,31 @@ MainWindow
 
 ### 3.1.4-e Controller 接入 MediaPipeline
 
-- [ ] Controller 新增 `std::unique_ptr<MediaPipeline> pipeline_`。
+#### 3.1.4-e1 Controller 持有 Pipeline 并转发信号
+
+- [x] Controller 新增 `std::unique_ptr<MediaPipeline> pipeline_`。
+- [x] Controller 构造时创建单个 `MediaPipeline`。
+- [x] Controller 转发 Pipeline 的 `DurationChanged`。
+- [x] Controller 转发 Pipeline 的 `PositionChanged`。
+- [x] Controller 转发 Pipeline 的 `PlaybackFinished`。
+- [x] Controller 转发 Pipeline 的 `VolumeChanged`。
+- [x] Controller 转发 Pipeline 的 `MuteChanged`。
+- [x] 暂不切换初始化、释放主路径。
+
+#### 3.1.4-e2 Initialize / SwitchSource / Shutdown 委托 Pipeline
+
 - [ ] Controller `Initialize()` 调用 `pipeline_->Initialize()`。
 - [ ] Controller `SwitchSource()` 先关闭旧 Pipeline，再初始化新 Pipeline。
 - [ ] Controller `Shutdown()` 调用 `pipeline_->Shutdown()`。
-- [ ] Controller 转发 Pipeline 的 `DurationChanged`。
-- [ ] Controller 转发 Pipeline 的 `PositionChanged`。
-- [ ] Controller 转发 Pipeline 的 `PlaybackFinished`。
-- [ ] Controller 转发 Pipeline 的 `VolumeChanged`。
-- [ ] Controller 转发 Pipeline 的 `MuteChanged`。
+- [ ] Controller 在切换源后重新下发 speed/volume/muted。
+- [ ] 保留 Controller 应用层状态编排。
+
+#### 3.1.4-e3 清理初始化释放旧路径
+
+- [ ] 停用 `InitializeOpenedMediaSource()` 主路径。
+- [ ] 停用 `ReleaseResources()` 主路径。
+- [ ] Controller 不再直接创建 demuxer/decoder/queue/audio/render/sync/thread。
+- [ ] Controller 不再直接连接基础设施层播放组件。
 
 **验收标准**：
 

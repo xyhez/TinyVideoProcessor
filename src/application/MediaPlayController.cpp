@@ -3,6 +3,8 @@
 //
 
 #include "MediaPlayController.h"
+#include "domain/MediaPipeline.h"
+
 #include <algorithm>
 #include <QDebug>
 #include <qlayout.h>
@@ -25,8 +27,9 @@ bool IsSupportedPlaybackSpeed(double speed)
 
 MediaPlayController::MediaPlayController(QObject *parent)
     : QObject(parent)
+    , pipeline_(std::make_unique<MediaPipeline>())
 {
-
+    ConnectPipelineSignals();
 }
 
 MediaPlayController::~MediaPlayController() {
@@ -250,6 +253,33 @@ void MediaPlayController::ReleaseResources() {
     }
     mediaSource_.reset();
     positionTimer_.reset();
+}
+
+void MediaPlayController::ConnectPipelineSignals()
+{
+    if (!pipeline_) {
+        return;
+    }
+
+    connect(pipeline_.get(), &MediaPipeline::DurationChanged,
+            this, &MediaPlayController::DurationChanged);
+    connect(pipeline_.get(), &MediaPipeline::PositionChanged,
+            this, &MediaPlayController::PositionChanged);
+
+    connect(pipeline_.get(), &MediaPipeline::PlaybackFinished, this, [this]() {
+        SetState(PlaybackState::Stopped);
+        emit PlaybackFinished();
+    });
+
+    connect(pipeline_.get(), &MediaPipeline::VolumeChanged, this, [this](double volume) {
+        volume_ = volume;
+        emit VolumeChanged(volume_);
+    });
+
+    connect(pipeline_.get(), &MediaPipeline::MuteChanged, this, [this](bool muted) {
+        muted_ = muted;
+        emit MuteChanged(muted_);
+    });
 }
 
 MediaPlayController::PlaybackState MediaPlayController::State() const {

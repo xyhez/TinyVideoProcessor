@@ -15,6 +15,8 @@
 #include "infrastructure/syncmanager.h"
 #include "infrastructure/videorender.h"
 
+class MediaPipeline;
+
 constexpr size_t kPacketQueueMax = 30;
 constexpr size_t kFrameQueueMax  = 30;
 
@@ -253,6 +255,8 @@ private:
     // 定时向主线程中提供当前视频播放进度
     std::unique_ptr<QTimer> positionTimer_ = nullptr;
 
+    std::unique_ptr<MediaPipeline> pipeline_;
+
     PlaybackState state_ = PlaybackState::Stopped;
     double playbackSpeed_ = 1.0;
     double volume_ = 1.0;
@@ -262,6 +266,11 @@ private:
      * @brief ReleaseResources 释放当前播放管线资源
      */
     void ReleaseResources();
+
+    /**
+     * @brief ConnectPipelineSignals 创建 Controller 与 MediaPipeline 的信号转发连接
+     */
+    void ConnectPipelineSignals();
 
     /**
      * @brief InitializeOpenedMediaSource 使用已打开的媒体源初始化播放管线
