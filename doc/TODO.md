@@ -214,16 +214,16 @@ MainWindow
 
 ### 3.1.4-d 迁移释放逻辑
 
-- [ ] 将 `ReleaseResources()` 逻辑迁入 `MediaPipeline::Shutdown()`。
-- [ ] 将停止 position timer 逻辑迁入 `MediaPipeline`。
-- [ ] 将 RequestStop 逻辑迁入 `MediaPipeline`。
-- [ ] 将 demuxer/decoder/audio/render 停止逻辑迁入 `MediaPipeline`。
-- [ ] 将线程退出和等待逻辑迁入 `MediaPipeline`。
-- [ ] 将基础设施对象 reset/delete 逻辑迁入 `MediaPipeline`。
-- [ ] 将媒体源关闭逻辑迁入 `MediaPipeline`。
-- [ ] 将 `HandleDemuxFinished()` 逻辑迁入 `MediaPipeline`。
-- [ ] 将 `ClearQueues()` 逻辑迁入 `MediaPipeline`。
-- [ ] 将 `FlushDecoders()` 逻辑迁入 `MediaPipeline`。
+- [x] 将 `ReleaseResources()` 逻辑迁入 `MediaPipeline::Shutdown()`。
+- [x] 将停止 position timer 逻辑迁入 `MediaPipeline`。
+- [x] 将 RequestStop 逻辑迁入 `MediaPipeline`。
+- [x] 将 demuxer/decoder/audio/render 停止逻辑迁入 `MediaPipeline`。
+- [x] 将线程退出和等待逻辑迁入 `MediaPipeline`。
+- [x] 将基础设施对象 reset/delete 逻辑迁入 `MediaPipeline`。
+- [x] 将媒体源关闭逻辑迁入 `MediaPipeline`。
+- [x] 将 `HandleDemuxFinished()` 逻辑迁入 `MediaPipeline`。
+- [x] 将 `ClearQueues()` 逻辑迁入 `MediaPipeline`。
+- [x] 将 `FlushDecoders()` 逻辑迁入 `MediaPipeline`。
 
 **验收标准**：
 

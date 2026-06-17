@@ -50,6 +50,7 @@ bool MediaPipeline::Initialize(std::shared_ptr<IMediaSource> mediaSource,
 
 void MediaPipeline::Shutdown()
 {
+    ReleaseResources();
 }
 
 void MediaPipeline::Start()
@@ -78,12 +79,12 @@ bool MediaPipeline::SeekRelative(double seconds)
 
 double MediaPipeline::Duration() const
 {
-    return 0.0;
+    return mediaSource_ ? static_cast<double>(mediaSource_->GetSourceInfo().duration_) : 0.0;
 }
 
 double MediaPipeline::Position() const
 {
-    return 0.0;
+    return syncManager_ ? syncManager_->GetClock() / 1000.0 : 0.0;
 }
 
 void MediaPipeline::SetPlaybackSpeed(double speed)
@@ -200,16 +201,96 @@ void MediaPipeline::CreateConnects()
 
 void MediaPipeline::ReleaseResources()
 {
+    if (positionTimer_) {
+        positionTimer_->stop();
+    }
+
+    if (APacket_) { APacket_->RequestStop(); }
+    if (VPacket_) { VPacket_->RequestStop(); }
+    if (AFrame_)  { AFrame_->RequestStop();  }
+    if (VFrame_)  { VFrame_->RequestStop();  }
+
+    if (demuxer_) {
+        demuxer_->Stop();
+    }
+    if (Adecoder_) {
+        Adecoder_->Stop();
+    }
+    if (Vdecoder_) {
+        Vdecoder_->Stop();
+    }
+    if (audioplay_) {
+        audioplay_->Stop();
+    }
+    if (videoRender_) {
+        videoRender_->StopRendering();
+    }
+
+    auto stopThread = [](std::unique_ptr<QThread>& thread) {
+        if (thread) {
+            thread->quit();
+            thread->wait();
+            thread.reset();
+        }
+    };
+    stopThread(demuxerTH_);
+    stopThread(AdecoderTH_);
+    stopThread(VdecoderTH_);
+    stopThread(audioplayTH_);
+
+    demuxer_.reset();
+    Adecoder_.reset();
+    Vdecoder_.reset();
+    audioplay_.reset();
+    if (videoRender_) {
+        delete videoRender_;
+        videoRender_ = nullptr;
+    }
+
+    APacket_.reset();
+    VPacket_.reset();
+    AFrame_.reset();
+    VFrame_.reset();
+    syncManager_.reset();
+    if (mediaSource_) {
+        mediaSource_->Close();
+    }
+    mediaSource_.reset();
+    positionTimer_.reset();
 }
 
 void MediaPipeline::HandleDemuxFinished()
 {
+    if (APacket_) {
+        APacket_->RequestStop();
+    }
+    if (VPacket_) {
+        VPacket_->RequestStop();
+    }
+    if (positionTimer_) {
+        positionTimer_->stop();
+    }
+
+    emit PositionChanged(Duration());
+    emit PlaybackFinished();
 }
 
 void MediaPipeline::ClearQueues()
 {
+    if (APacket_) { APacket_->ClearAndWake(); }
+    if (VPacket_) { VPacket_->ClearAndWake(); }
+    if (AFrame_)  { AFrame_->ClearAndWake();  }
+    if (VFrame_)  { VFrame_->ClearAndWake();  }
 }
 
 void MediaPipeline::FlushDecoders()
 {
+    if (Adecoder_) {
+        Adecoder_->ClearDiscardBefore();
+        Adecoder_->Flush();
+    }
+    if (Vdecoder_) {
+        Vdecoder_->ClearDiscardBefore();
+        Vdecoder_->Flush();
+    }
 }
