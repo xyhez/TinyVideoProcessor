@@ -17,9 +17,15 @@ enum class MediaSourceType {
 
 struct Fileinfo {
     QString filepath_ = "NON";
+    bool hasVideo_ = false;
+    bool hasAudio_ = false;
+    int videoStreamIndex_ = -1;
+    int audioStreamIndex_ = -1;
     int width_ = 0;
     int height_ = 0;
     AVCodecID CodecId_ = AV_CODEC_ID_NONE;
+    AVCodecID videoCodecId_ = AV_CODEC_ID_NONE;
+    AVCodecID audioCodecId_ = AV_CODEC_ID_NONE;
     int duration_ = 0;          ///< 秒
     double FrameRate = 30.0;
     double A_timeBase = 0.0;
@@ -40,9 +46,11 @@ struct Fileinfo {
      */
     Fileinfo(QString filepath, int width, int height, AVCodecID CodecId, int duration)
         : filepath_(filepath)
+        , hasVideo_(true)
         , width_(width)
         , height_(height)
         , CodecId_(CodecId)
+        , videoCodecId_(CodecId)
         , duration_(duration)
     {
     }
