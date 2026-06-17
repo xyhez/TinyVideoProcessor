@@ -94,33 +94,68 @@ MainWindow
 - [x] `MediaPipeline` 不依赖 UI 层。
 - [x] `MediaPipeline` 不引入多路 id。
 
-## 3.1.3 迁移资源所有权
+## 3.1.3 资源承载准备
 
-**目标**：把单路播放资源从 Controller 成员迁移到 Pipeline 成员。
+**目标**：先让 `MediaPipeline` 具备承载单路播放资源的成员结构，但暂不迁移 Controller 运行逻辑。
 
-- [ ] 将 `APacket_` 迁入 `MediaPipeline`。
-- [ ] 将 `VPacket_` 迁入 `MediaPipeline`。
-- [ ] 将 `AFrame_` 迁入 `MediaPipeline`。
-- [ ] 将 `VFrame_` 迁入 `MediaPipeline`。
-- [ ] 将 `mediaSource_` 迁入 `MediaPipeline`。
-- [ ] 将 `syncManager_` 迁入 `MediaPipeline`。
-- [ ] 将 `demuxer_` 迁入 `MediaPipeline`。
-- [ ] 将 `Adecoder_` 迁入 `MediaPipeline`。
-- [ ] 将 `Vdecoder_` 迁入 `MediaPipeline`。
-- [ ] 将 `audioplay_` 迁入 `MediaPipeline`。
-- [ ] 将 `videoRender_` 迁入 `MediaPipeline`。
-- [ ] 将 `demuxerTH_` 迁入 `MediaPipeline`。
-- [ ] 将 `AdecoderTH_` 迁入 `MediaPipeline`。
-- [ ] 将 `VdecoderTH_` 迁入 `MediaPipeline`。
-- [ ] 将 `audioplayTH_` 迁入 `MediaPipeline`。
-- [ ] 将 `positionTimer_` 迁入 `MediaPipeline`。
-- [ ] Controller 新增 `std::unique_ptr<MediaPipeline> pipeline_`。
+### 3.1.3-a 在 MediaPipeline 中声明资源成员
+
+- [ ] 在 `MediaPipeline` 中声明 `APacket_`。
+- [ ] 在 `MediaPipeline` 中声明 `VPacket_`。
+- [ ] 在 `MediaPipeline` 中声明 `AFrame_`。
+- [ ] 在 `MediaPipeline` 中声明 `VFrame_`。
+- [ ] 在 `MediaPipeline` 中声明 `mediaSource_`。
+- [ ] 在 `MediaPipeline` 中声明 `syncManager_`。
+- [ ] 在 `MediaPipeline` 中声明 `demuxer_`。
+- [ ] 在 `MediaPipeline` 中声明 `Adecoder_`。
+- [ ] 在 `MediaPipeline` 中声明 `Vdecoder_`。
+- [ ] 在 `MediaPipeline` 中声明 `audioplay_`。
+- [ ] 在 `MediaPipeline` 中声明 `videoRender_`。
+- [ ] 在 `MediaPipeline` 中声明 `demuxerTH_`。
+- [ ] 在 `MediaPipeline` 中声明 `AdecoderTH_`。
+- [ ] 在 `MediaPipeline` 中声明 `VdecoderTH_`。
+- [ ] 在 `MediaPipeline` 中声明 `audioplayTH_`。
+- [ ] 在 `MediaPipeline` 中声明 `positionTimer_`。
+- [ ] 暂不删除 `MediaPlayController` 中的旧资源成员。
+- [ ] 暂不让 `MediaPlayController` 使用 `MediaPipeline`。
+
+**验收标准**：
+
+- [ ] `MediaPipeline` 已具备单路播放资源承载结构。
+- [ ] Controller 行为不变。
+- [ ] UI 行为不变。
+
+### 3.1.3-b 准备 Pipeline 侧队列常量和 deleter
+
+- [ ] 在 `MediaPipeline.cpp` 内部准备 `kPacketQueueMax`。
+- [ ] 在 `MediaPipeline.cpp` 内部准备 `kFrameQueueMax`。
+- [ ] 在 `MediaPipeline.cpp` 内部准备 packet deleter。
+- [ ] 在 `MediaPipeline.cpp` 内部准备 frame deleter。
+- [ ] 暂时保留 `MediaPlayController.h` 中旧常量和 deleter。
+
+**验收标准**：
+
+- [ ] Pipeline 侧后续可以独立创建音视频队列。
+- [ ] Controller 侧现有逻辑不受影响。
+
+### 3.1.3-c 最终清理 Controller 资源成员
+
+> 注意：本小节必须等 3.1.4、3.1.5、3.1.6 完成后再做。
+
+- [ ] 删除 `MediaPlayController` 中的队列成员。
+- [ ] 删除 `MediaPlayController` 中的媒体源成员。
+- [ ] 删除 `MediaPlayController` 中的 syncmanager 成员。
+- [ ] 删除 `MediaPlayController` 中的基础设施组件成员。
+- [ ] 删除 `MediaPlayController` 中的线程成员。
+- [ ] 删除 `MediaPlayController` 中的 position timer 成员。
+- [ ] 删除 `MediaPlayController.h` 对基础设施层播放组件的 include。
+- [ ] Controller 新增并只保留 `std::unique_ptr<MediaPipeline> pipeline_`。
 
 **验收标准**：
 
 - [ ] `MediaPlayController.h` 不再 include 基础设施层播放组件。
 - [ ] `MediaPlayController` 不再直接持有播放队列、组件和线程。
-- [ ] 暂不改变 UI 调用方式。
+- [ ] UI 调用方式不变。
 
 ## 3.1.4 迁移初始化和释放
 
