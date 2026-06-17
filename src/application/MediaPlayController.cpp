@@ -7,7 +7,6 @@
 
 #include <algorithm>
 #include <QDebug>
-#include <qlayout.h>
 #include <cmath>
 
 namespace {
@@ -99,168 +98,6 @@ bool MediaPlayController::SwitchSource(std::shared_ptr<IMediaSource> mediaSource
     }
 
     return true;
-}
-
-bool MediaPlayController::InitializeOpenedMediaSource(std::shared_ptr<IMediaSource> mediaSource,
-                                                      QWidget* rendererContainer) {
-    mediaSource_ = mediaSource;
-
-    // 1.初始化队列
-    VPacket_ = std::make_shared<SyncQueue<AVPacket*>>(kPacketQueueMax, packetDeleter);
-    VFrame_ = std::make_shared<SyncQueue<AVFrame*>>(kFrameQueueMax,  frameDeleter);
-
-    // 2.基层对象构造
-    demuxer_ = std::make_unique<demuxer>(mediaSource_,APacket_,VPacket_,AFrame_,VFrame_);
-    const Fileinfo& sourceInfo = mediaSource_->GetSourceInfo();
-    const bool hasAudio = sourceInfo.hasAudio_;
-    if (hasAudio) {
-        APacket_ = std::make_shared<SyncQueue<AVPacket*>>(kPacketQueueMax, packetDeleter);
-        AFrame_ = std::make_shared<SyncQueue<AVFrame*>>(kFrameQueueMax,  frameDeleter);
-        demuxer_->SetAudioQueues(APacket_, AFrame_);
-    }
-    Vdecoder_ = std::make_unique<decoder>();
-    if (hasAudio) {
-        Adecoder_ = std::make_unique<decoder>();
-        audioplay_ = std::make_unique<AudioPlayer>();
-    }
-    videoRender_ = new VideoRender(rendererContainer);
-    syncManager_ = std::make_shared<syncmanager>();
-    syncManager_->SetSyncType(hasAudio ? SYNCTYPE::AUDIO : SYNCTYPE::VIDEO);
-    positionTimer_ = std::make_unique<QTimer>();
-    positionTimer_->setInterval(200); // 间隔200毫秒
-
-    // 3.子线程初始化
-    demuxerTH_ = std::make_unique<QThread>();
-    VdecoderTH_ = std::make_unique<QThread>();
-    if (hasAudio) {
-        AdecoderTH_ = std::make_unique<QThread>();
-        audioplayTH_ = std::make_unique<QThread>();
-    }
-
-    // 4.将对象初始化并移动到对应的线程
-    demuxer_->moveToThread(demuxerTH_.get());
-    if (hasAudio) {
-        Adecoder_->InitDecoder(APacket_,AFrame_,demuxer_->ReAcoderPar(),demuxer_->ReAtimebase());
-        Adecoder_->moveToThread(AdecoderTH_.get());
-    }
-    Vdecoder_->InitDecoder(VPacket_,VFrame_,demuxer_->ReVcoderPar(),demuxer_->ReVtimebase());
-    Vdecoder_->moveToThread(VdecoderTH_.get());
-    if (hasAudio) {
-        audioplay_->InitAudioPlay(demuxer_->ReAcoderPar(), AFrame_, syncManager_, sourceInfo.A_timeBase);
-        audioplay_->moveToThread(audioplayTH_.get());
-    }
-    videoRender_->InitVideoRender(VFrame_, syncManager_, sourceInfo.FrameRate, sourceInfo.V_timeBase);
-    if (hasAudio) {
-        audioplay_->SetSpeed(playbackSpeed_);
-    }
-    videoRender_->SetSpeed(playbackSpeed_);
-
-    // 5.设置videorender
-    if (rendererContainer) {
-        if (!rendererContainer->layout()) {
-            rendererContainer->setLayout(new QVBoxLayout());
-        }
-        rendererContainer->layout()->addWidget(videoRender_);
-    }
-
-    // 6.链接信号槽
-    CreateConnects();
-    if (hasAudio) {
-        audioplay_->SetVolume(volume_);
-        audioplay_->SetMuted(muted_);
-    }
-
-    emit DurationChanged(Duration());
-    emit PositionChanged(Position());
-
-    return true;
-}
-
-void MediaPlayController::CreateConnects() {
-    connect(demuxerTH_.get(),  &QThread::started,
-        demuxer_.get(), &demuxer::StartDemuxer);
-
-    if (AdecoderTH_ && Adecoder_) {
-        connect(AdecoderTH_.get(), &QThread::started,
-            Adecoder_.get(), &decoder::StartDecoder);
-    }
-
-    connect(VdecoderTH_.get(), &QThread::started,
-        Vdecoder_.get(), &decoder::StartDecoder);
-
-    if (audioplayTH_ && audioplay_) {
-        connect(audioplayTH_.get(), &QThread::started,
-            audioplay_.get(), &AudioPlayer::StartAudioPlay);
-    }
-
-    connect(demuxer_.get(), &demuxer::DemuxFinished,
-            this, &MediaPlayController::HandleDemuxFinished);
-
-    connect(positionTimer_.get(), &QTimer::timeout, this , [this]() {
-        emit PositionChanged(Position());
-    });
-
-    if (audioplay_) {
-        connect(audioplay_.get(), &AudioPlayer::VolumeChanged, this, [this](qreal volume) {
-            volume_ = static_cast<double>(volume);
-            emit VolumeChanged(volume_);
-        });
-
-        connect(audioplay_.get(), &AudioPlayer::MuteChanged, this, [this](bool muted) {
-            muted_ = muted;
-            emit MuteChanged(muted_);
-        });
-    }
-}
-
-void MediaPlayController::ReleaseResources() {
-    if (positionTimer_) {
-        positionTimer_->stop();
-    }
-
-    // 确保所有工作循环已停止（防 Stop() 未调）
-    if (APacket_) { APacket_->RequestStop(); }
-    if (VPacket_) { VPacket_->RequestStop(); }
-    if (AFrame_)  { AFrame_->RequestStop();  }
-    if (VFrame_)  { VFrame_->RequestStop();  }
-
-    if (demuxer_)   demuxer_->Stop();
-    if (Adecoder_)  Adecoder_->Stop();
-    if (Vdecoder_)  Vdecoder_->Stop();
-    if (audioplay_) audioplay_->Stop();
-    if (videoRender_) videoRender_->StopRendering();
-
-    auto stopThread = [](std::unique_ptr<QThread>& th) {
-        if (th) {
-            th->quit();
-            th->wait();
-            th.reset();
-        }
-    };
-    stopThread(demuxerTH_);
-    stopThread(AdecoderTH_);
-    stopThread(VdecoderTH_);
-    stopThread(audioplayTH_);
-
-    demuxer_.reset();
-    Adecoder_.reset();
-    Vdecoder_.reset();
-    audioplay_.reset();
-    if (videoRender_) {
-        delete videoRender_;
-        videoRender_ = nullptr;
-    }
-
-    APacket_.reset();
-    VPacket_.reset();
-    AFrame_.reset();
-    VFrame_.reset();
-    syncManager_.reset();
-    if (mediaSource_) {
-        mediaSource_->Close();
-    }
-    mediaSource_.reset();
-    positionTimer_.reset();
 }
 
 void MediaPlayController::ConnectPipelineSignals()
@@ -374,22 +211,6 @@ void MediaPlayController::Shutdown() {
     SetState(PlaybackState::Stopped);
 }
 
-void MediaPlayController::HandleDemuxFinished() {
-    if (APacket_) {
-        APacket_->RequestStop();
-    }
-    if (VPacket_) {
-        VPacket_->RequestStop();
-    }
-    if (positionTimer_) {
-        positionTimer_->stop();
-    }
-
-    SetState(PlaybackState::Stopped);
-    emit PositionChanged(Duration());
-    emit PlaybackFinished();
-}
-
 void MediaPlayController::Pause() {
     if (!pipeline_ || !pipeline_->IsInitialized()) {
         qWarning() << "Pause failed: playback pipeline is not initialized";
@@ -494,30 +315,6 @@ void MediaPlayController::Forward() {
     SeekRelative(kSeekStepSeconds);
 }
 
-bool MediaPlayController::SuspendPipelineAndWait() {
-    SetState(PlaybackState::Paused);
-
-    if (videoRender_) {
-        videoRender_->Pause();
-    }
-    if (audioplay_) {
-        audioplay_->Pause();
-    }
-
-    bool suspended = true;
-    if (demuxer_ && demuxerTH_ && demuxerTH_->isRunning()) {
-        suspended = demuxer_->SuspendAndWait() == 0 && suspended;
-    }
-    if (Adecoder_ && AdecoderTH_ && AdecoderTH_->isRunning()) {
-        suspended = Adecoder_->SuspendAndWait() == 0 && suspended;
-    }
-    if (Vdecoder_ && VdecoderTH_ && VdecoderTH_->isRunning()) {
-        suspended = Vdecoder_->SuspendAndWait() == 0 && suspended;
-    }
-
-    return suspended;
-}
-
 void MediaPlayController::RestorePlaybackState(PlaybackState previousState) {
     if (previousState == PlaybackState::Playing) {
         Start();
@@ -525,38 +322,5 @@ void MediaPlayController::RestorePlaybackState(PlaybackState previousState) {
     }
 
     SetState(previousState);
-}
-
-void MediaPlayController::ResetPipelineToStart() {
-    if (videoRender_) {
-        videoRender_->StopRendering();
-    }
-    if (audioplay_) {
-        audioplay_->Pause();
-    }
-
-    ClearQueues();
-    demuxer_->SeekTo(0.0);
-    FlushDecoders();
-    ClearQueues();
-    syncManager_->SeekTo(0.0);
-}
-
-void MediaPlayController::ClearQueues() {
-    if (APacket_) { APacket_->ClearAndWake(); }
-    if (VPacket_) { VPacket_->ClearAndWake(); }
-    if (AFrame_)  { AFrame_->ClearAndWake();  }
-    if (VFrame_)  { VFrame_->ClearAndWake();  }
-}
-
-void MediaPlayController::FlushDecoders() {
-    if (Adecoder_) {
-        Adecoder_->ClearDiscardBefore();
-        Adecoder_->Flush();
-    }
-    if (Vdecoder_) {
-        Vdecoder_->ClearDiscardBefore();
-        Vdecoder_->Flush();
-    }
 }
 

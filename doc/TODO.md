@@ -142,20 +142,20 @@ MainWindow
 
 > 注意：本小节必须等 3.1.4、3.1.5、3.1.6 完成后再做。
 
-- [ ] 删除 `MediaPlayController` 中的队列成员。
-- [ ] 删除 `MediaPlayController` 中的媒体源成员。
-- [ ] 删除 `MediaPlayController` 中的 syncmanager 成员。
-- [ ] 删除 `MediaPlayController` 中的基础设施组件成员。
-- [ ] 删除 `MediaPlayController` 中的线程成员。
-- [ ] 删除 `MediaPlayController` 中的 position timer 成员。
-- [ ] 删除 `MediaPlayController.h` 对基础设施层播放组件的 include。
-- [ ] Controller 新增并只保留 `std::unique_ptr<MediaPipeline> pipeline_`。
+- [x] 删除 `MediaPlayController` 中的队列成员。
+- [x] 删除 `MediaPlayController` 中的媒体源成员。
+- [x] 删除 `MediaPlayController` 中的 syncmanager 成员。
+- [x] 删除 `MediaPlayController` 中的基础设施组件成员。
+- [x] 删除 `MediaPlayController` 中的线程成员。
+- [x] 删除 `MediaPlayController` 中的 position timer 成员。
+- [x] 删除 `MediaPlayController.h` 对基础设施层播放组件的 include。
+- [x] Controller 新增并只保留 `std::unique_ptr<MediaPipeline> pipeline_`。
 
 **验收标准**：
 
-- [ ] `MediaPlayController.h` 不再 include 基础设施层播放组件。
-- [ ] `MediaPlayController` 不再直接持有播放队列、组件和线程。
-- [ ] UI 调用方式不变。
+- [x] `MediaPlayController.h` 不再 include 基础设施层播放组件。
+- [x] `MediaPlayController` 不再直接持有播放队列、组件和线程。
+- [x] UI 调用方式不变。
 
 ## 3.1.4 迁移初始化和释放
 
@@ -210,7 +210,7 @@ MainWindow
 - [x] Pipeline 侧已具备内部组件连接能力。
 - [x] Pipeline 能对外发出位置、播放完成、音量、静音信号。
 - [x] 有音频和无音频路径连接完整。
-- [ ] Controller 不再直接连接基础设施层播放组件。
+- [x] Controller 不再直接连接基础设施层播放组件。
 
 ### 3.1.4-d 迁移释放逻辑
 
@@ -258,8 +258,8 @@ MainWindow
 
 - [x] 停用 `InitializeOpenedMediaSource()` 主路径。
 - [x] 停用 `ReleaseResources()` 主路径。
-- [ ] Controller 不再直接创建 demuxer/decoder/queue/audio/render/sync/thread。
-- [ ] Controller 不再直接连接基础设施层播放组件。
+- [x] Controller 不再直接创建 demuxer/decoder/queue/audio/render/sync/thread。
+- [x] Controller 不再直接连接基础设施层播放组件。
 
 **验收标准**：
 

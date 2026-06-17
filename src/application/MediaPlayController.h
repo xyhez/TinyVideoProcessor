@@ -3,32 +3,20 @@
 #define TINYVIDEOPROCESSOR_MEDIAPLAYCONTROLLER_H
 
 #include <QObject>
-#include <QThread>
-#include <QTimer>
 #include <memory>
 
-#include "core/queue.h"
 #include "domain/IMediaSource.h"
-#include "infrastructure/audioplayer.h"
-#include "infrastructure/decoder.h"
-#include "infrastructure/demuxer.h"
-#include "infrastructure/syncmanager.h"
-#include "infrastructure/videorender.h"
 
 class MediaPipeline;
+class QWidget;
 
-constexpr size_t kPacketQueueMax = 30;
-constexpr size_t kFrameQueueMax  = 30;
-
-inline auto packetDeleter = [](AVPacket* p) { if (p) av_packet_free(&p); };
-inline auto frameDeleter  = [](AVFrame*  f) { if (f) av_frame_free(&f);  };
 /**
  * @brief
  * MediaPlayController是应用层的协调者，
- * 是MainWindow(UI层)和基础设施层组件(demuxer/decoder/player/render)之间的中间层。
- * MainWindow(UI) -按钮事件 -键盘事件 -显示窗口
- * MediaPlayerController(应用层) -协调所有播放组件 -管理生命周期 -处理业务逻辑
- * 基础设施层 -demuxer/decoder/audioplayer/videorender/syncmanager
+ * 是 MainWindow(UI 层) 和 MediaPipeline(单路播放管线) 之间的中间层。
+ * MainWindow(UI) 负责按钮事件、键盘事件和显示窗口。
+ * MediaPlayController(应用层) 负责播放状态编排和用户级参数保存。
+ * MediaPipeline(领域层) 负责单路播放资源和管线生命周期。
  */
 class MediaPlayController :public QObject{
     Q_OBJECT
@@ -71,11 +59,6 @@ public:
     bool SwitchSource(std::shared_ptr<IMediaSource> mediaSource,
                       QWidget* rendererContainer,
                       bool autoStart);
-
-    /**
-     * @brief CreateConnects 创建 Controller 内部信号槽连接
-     */
-    void CreateConnects();
 
     /**
      * @brief Start 启动或恢复播放
@@ -227,45 +210,12 @@ signals:
     void MuteChanged(bool muted);
 
 private:
-    // 队列
-    std::shared_ptr<SyncQueue<AVPacket*>> APacket_ = nullptr;
-    std::shared_ptr<SyncQueue<AVPacket*>> VPacket_ = nullptr;
-    std::shared_ptr<SyncQueue<AVFrame*>>  AFrame_ = nullptr;
-    std::shared_ptr<SyncQueue<AVFrame*>>  VFrame_ = nullptr;
-
-    // 媒体源
-    std::shared_ptr<IMediaSource> mediaSource_;
-
-    // 同步
-    std::shared_ptr<syncmanager> syncManager_;
-
-    // 组件
-    std::unique_ptr<demuxer> demuxer_;
-    std::unique_ptr<decoder> Adecoder_;
-    std::unique_ptr<decoder> Vdecoder_;
-    std::unique_ptr<AudioPlayer> audioplay_;
-    VideoRender* videoRender_ = nullptr;
-
-    // 线程
-    std::unique_ptr<QThread> demuxerTH_;
-    std::unique_ptr<QThread> AdecoderTH_;
-    std::unique_ptr<QThread> VdecoderTH_;
-    std::unique_ptr<QThread> audioplayTH_;
-
-    // 定时向主线程中提供当前视频播放进度
-    std::unique_ptr<QTimer> positionTimer_ = nullptr;
-
     std::unique_ptr<MediaPipeline> pipeline_;
 
     PlaybackState state_ = PlaybackState::Stopped;
     double playbackSpeed_ = 1.0;
     double volume_ = 1.0;
     bool muted_ = false;
-
-    /**
-     * @brief ReleaseResources 释放当前播放管线资源
-     */
-    void ReleaseResources();
 
     /**
      * @brief ConnectPipelineSignals 创建 Controller 与 MediaPipeline 的信号转发连接
@@ -278,53 +228,16 @@ private:
     void ApplyUserSettingsToPipeline();
 
     /**
-     * @brief InitializeOpenedMediaSource 使用已打开的媒体源初始化播放管线
-     * @param mediaSource 已打开的媒体源抽象
-     * @param rendererContainer 视频渲染容器
-     * @return true 初始化成功
-     * @return false 初始化失败
-     */
-    bool InitializeOpenedMediaSource(std::shared_ptr<IMediaSource> mediaSource,
-                                     QWidget* rendererContainer);
-
-    /**
      * @brief SetState 设置播放状态并发出状态变化信号
      * @param state 目标播放状态
      */
     void SetState(PlaybackState state);
 
     /**
-     * @brief HandleDemuxFinished 处理媒体源自然播放结束
-     */
-    void HandleDemuxFinished();
-
-    /**
-     * @brief SuspendPipelineAndWait 挂起 demuxer/decoder 管线并等待安全点
-     * @return true 挂起成功
-     * @return false 挂起失败
-     */
-    bool SuspendPipelineAndWait();
-
-    /**
      * @brief RestorePlaybackState 按 Seek 前状态恢复播放管线
      * @param previousState Seek 前播放状态
      */
     void RestorePlaybackState(PlaybackState previousState);
-
-    /**
-     * @brief ResetPipelineToStart 清空缓存并把管线重置到起始位置
-     */
-    void ResetPipelineToStart();
-
-    /**
-     * @brief ClearQueues 清空音视频包队列和帧队列
-     */
-    void ClearQueues();
-
-    /**
-     * @brief FlushDecoders 清理解码器内部缓存
-     */
-    void FlushDecoders();
 };
 
 
