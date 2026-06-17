@@ -152,13 +152,13 @@
 
 **目标**：无音频视频播放时，视频渲染负责推进主时钟和进度。
 
-- [ ] `VideoRender::RenderFrame()` 判断当前同步模式。
-- [ ] `SYNCTYPE::AUDIO` 模式下保持现有音频主时钟同步逻辑。
-- [ ] `SYNCTYPE::VIDEO` 模式下不再等待音频时钟。
-- [ ] `SYNCTYPE::VIDEO` 模式下根据视频帧 PTS 和 `m_videoTimeBase` 计算当前视频时间。
-- [ ] `SYNCTYPE::VIDEO` 模式下渲染帧后调用 `syncManager->RefreshClock(videoPtsMs)`。
-- [ ] `SYNCTYPE::VIDEO` 模式下下一帧调度继续使用帧率和播放速度。
-- [ ] Seek 后视频主时钟从目标时间继续推进。
+- [x] `VideoRender::RenderFrame()` 判断当前同步模式。
+- [x] `SYNCTYPE::AUDIO` 模式下保持现有音频主时钟同步逻辑。
+- [x] `SYNCTYPE::VIDEO` 模式下不再等待音频时钟。
+- [x] `SYNCTYPE::VIDEO` 模式下根据视频帧 PTS 和 `m_videoTimeBase` 计算当前视频时间。
+- [x] `SYNCTYPE::VIDEO` 模式下渲染帧后调用 `syncManager->RefreshClock(videoPtsMs)`。
+- [x] `SYNCTYPE::VIDEO` 模式下下一帧调度继续使用帧率和播放速度。
+- [x] Seek 后视频主时钟从目标时间继续推进。
 
 **验收标准**：
 

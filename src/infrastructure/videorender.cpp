@@ -89,26 +89,29 @@ void VideoRender::RenderFrame()
         return;
     }
 
-    double videoPts = nextFrame->pts * m_videoTimeBase * 1000.0;
-    double audioPts = m_syncManager->GetClock() - 20;
-    double diff = videoPts - audioPts;
+    const SYNCTYPE syncType = m_syncManager->SyncType();
+    if (syncType == SYNCTYPE::AUDIO) {
+        double videoPts = nextFrame->pts * m_videoTimeBase * 1000.0;
+        double audioPts = m_syncManager->GetClock() - 20;
+        double diff = videoPts - audioPts;
 
-    // 2. 帧来得太早 → 精确等待后重判
-    if (diff > SYNC_THRESHOLD_MS) {
-        int waitMs = qMin(qRound(diff), 30);
-        ScheduleNextFrame(waitMs);
-        return;
-    }
-
-    // 3. 帧来得太晚 → 丢帧追赶，立即判下一帧
-    if (diff < -SYNC_THRESHOLD_MS) {
-        AVFrame* drop = nullptr;
-        if (m_frameQueue->TryPop(drop) && drop) {
-            av_frame_free(&drop);
-            m_dropped++;
+        // 2. 帧来得太早 → 精确等待后重判
+        if (diff > SYNC_THRESHOLD_MS) {
+            int waitMs = qMin(qRound(diff), 30);
+            ScheduleNextFrame(waitMs);
+            return;
         }
-        ScheduleNextFrame(0);
-        return;
+
+        // 3. 帧来得太晚 → 丢帧追赶，立即判下一帧
+        if (diff < -SYNC_THRESHOLD_MS) {
+            AVFrame* drop = nullptr;
+            if (m_frameQueue->TryPop(drop) && drop) {
+                av_frame_free(&drop);
+                m_dropped++;
+            }
+            ScheduleNextFrame(0);
+            return;
+        }
     }
 
     // 4. 在同步窗口内 → 渲染
@@ -129,6 +132,13 @@ void VideoRender::RenderFrame()
 
     m_rendered++;
     update();
+
+    if (syncType == SYNCTYPE::VIDEO &&
+        newFrame->pts != AV_NOPTS_VALUE &&
+        m_videoTimeBase > 0.0) {
+        const double videoPts = newFrame->pts * m_videoTimeBase * 1000.0;
+        m_syncManager->RefreshClock(videoPts);
+    }
 
     // 5. 调度下一次：按帧间隔
     ScheduleNextFrame(scaledInterval);
