@@ -179,21 +179,21 @@ MainWindow
 
 ### 3.1.4-b 迁移资源创建逻辑
 
-- [ ] 将 `InitializeOpenedMediaSource()` 中的队列创建逻辑迁入 `MediaPipeline::Initialize()`。
-- [ ] 将 demuxer 创建逻辑迁入 `MediaPipeline::Initialize()`。
-- [ ] 将 audio/video decoder 创建逻辑迁入 `MediaPipeline::Initialize()`。
-- [ ] 将 audio player 创建逻辑迁入 `MediaPipeline::Initialize()`。
-- [ ] 将 video render 创建逻辑迁入 `MediaPipeline::Initialize()`。
-- [ ] 将 syncmanager 创建逻辑迁入 `MediaPipeline::Initialize()`。
-- [ ] 将 position timer 创建逻辑迁入 `MediaPipeline::Initialize()`。
-- [ ] 将线程创建逻辑迁入 `MediaPipeline::Initialize()`。
-- [ ] 保持无音频流初始化能力。
+- [x] 将 `InitializeOpenedMediaSource()` 中的队列创建逻辑迁入 `MediaPipeline::Initialize()`。
+- [x] 将 demuxer 创建逻辑迁入 `MediaPipeline::Initialize()`。
+- [x] 将 audio/video decoder 创建逻辑迁入 `MediaPipeline::Initialize()`。
+- [x] 将 audio player 创建逻辑迁入 `MediaPipeline::Initialize()`。
+- [x] 将 video render 创建逻辑迁入 `MediaPipeline::Initialize()`。
+- [x] 将 syncmanager 创建逻辑迁入 `MediaPipeline::Initialize()`。
+- [x] 将 position timer 创建逻辑迁入 `MediaPipeline::Initialize()`。
+- [x] 将线程创建逻辑迁入 `MediaPipeline::Initialize()`。
+- [x] 保持无音频流初始化能力。
 
 **验收标准**：
 
-- [ ] `MediaPipeline` 能独立创建单路播放资源。
-- [ ] 有音频文件初始化路径不退化。
-- [ ] 无音频视频初始化路径不退化。
+- [x] `MediaPipeline` 能独立创建单路播放资源。
+- [x] 有音频文件初始化路径不退化。
+- [x] 无音频视频初始化路径不退化。
 
 ### 3.1.4-c 迁移信号连接逻辑
 
