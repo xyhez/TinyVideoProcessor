@@ -43,6 +43,8 @@ bool MediaPipeline::Initialize(std::shared_ptr<IMediaSource> mediaSource,
         return false;
     }
 
+    CreateConnects();
+
     return true;
 }
 
@@ -162,6 +164,38 @@ bool MediaPipeline::CreatePipelineResources(std::shared_ptr<IMediaSource> mediaS
 
 void MediaPipeline::CreateConnects()
 {
+    connect(demuxerTH_.get(), &QThread::started,
+            demuxer_.get(), &demuxer::StartDemuxer);
+
+    if (AdecoderTH_ && Adecoder_) {
+        connect(AdecoderTH_.get(), &QThread::started,
+                Adecoder_.get(), &decoder::StartDecoder);
+    }
+
+    connect(VdecoderTH_.get(), &QThread::started,
+            Vdecoder_.get(), &decoder::StartDecoder);
+
+    if (audioplayTH_ && audioplay_) {
+        connect(audioplayTH_.get(), &QThread::started,
+                audioplay_.get(), &AudioPlayer::StartAudioPlay);
+    }
+
+    connect(demuxer_.get(), &demuxer::DemuxFinished,
+            this, &MediaPipeline::HandleDemuxFinished);
+
+    connect(positionTimer_.get(), &QTimer::timeout, this, [this]() {
+        emit PositionChanged(Position());
+    });
+
+    if (audioplay_) {
+        connect(audioplay_.get(), &AudioPlayer::VolumeChanged, this, [this](qreal volume) {
+            emit VolumeChanged(static_cast<double>(volume));
+        });
+
+        connect(audioplay_.get(), &AudioPlayer::MuteChanged, this, [this](bool muted) {
+            emit MuteChanged(muted);
+        });
+    }
 }
 
 void MediaPipeline::ReleaseResources()

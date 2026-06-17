@@ -197,19 +197,20 @@ MainWindow
 
 ### 3.1.4-c 迁移信号连接逻辑
 
-- [ ] 将 demuxer 线程启动连接迁入 `MediaPipeline`。
-- [ ] 将 audio decoder 线程启动连接迁入 `MediaPipeline`。
-- [ ] 将 video decoder 线程启动连接迁入 `MediaPipeline`。
-- [ ] 将 audio player 线程启动连接迁入 `MediaPipeline`。
-- [ ] 将 demux finished 连接迁入 `MediaPipeline`。
-- [ ] 将 position timer 连接迁入 `MediaPipeline`。
-- [ ] 将 AudioPlayer 音量/静音信号转发迁入 `MediaPipeline`。
+- [x] 将 demuxer 线程启动连接迁入 `MediaPipeline`。
+- [x] 将 audio decoder 线程启动连接迁入 `MediaPipeline`。
+- [x] 将 video decoder 线程启动连接迁入 `MediaPipeline`。
+- [x] 将 audio player 线程启动连接迁入 `MediaPipeline`。
+- [x] 将 demux finished 连接迁入 `MediaPipeline`。
+- [x] 将 position timer 连接迁入 `MediaPipeline`。
+- [x] 将 AudioPlayer 音量/静音信号转发迁入 `MediaPipeline`。
 
 **验收标准**：
 
+- [x] Pipeline 侧已具备内部组件连接能力。
+- [x] Pipeline 能对外发出位置、播放完成、音量、静音信号。
+- [x] 有音频和无音频路径连接完整。
 - [ ] Controller 不再直接连接基础设施层播放组件。
-- [ ] Pipeline 能向 Controller 转发位置、播放完成、音量、静音信号。
-- [ ] 有音频和无音频路径连接完整。
 
 ### 3.1.4-d 迁移释放逻辑
 
