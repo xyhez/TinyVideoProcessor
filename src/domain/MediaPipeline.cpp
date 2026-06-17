@@ -55,14 +55,76 @@ void MediaPipeline::Shutdown()
 
 void MediaPipeline::Start()
 {
+    if (!demuxer_ || !Vdecoder_ || !videoRender_ || !positionTimer_ || !demuxerTH_ || !VdecoderTH_) {
+        qWarning() << "MediaPipeline start failed: playback pipeline is not initialized";
+        emit ErrorOccurred("Playback pipeline is not initialized");
+        return;
+    }
+
+    const bool hasAudio = Adecoder_ || audioplay_ || AdecoderTH_ || audioplayTH_;
+    if (hasAudio && (!Adecoder_ || !audioplay_ || !AdecoderTH_ || !audioplayTH_)) {
+        qWarning() << "MediaPipeline start failed: audio pipeline is incomplete";
+        emit ErrorOccurred("Audio pipeline is incomplete");
+        return;
+    }
+
+    positionTimer_->start();
+    emit PositionChanged(Position());
+    emit DurationChanged(Duration());
+
+    demuxerTH_->start();
+    VdecoderTH_->start();
+    if (hasAudio) {
+        AdecoderTH_->start();
+        audioplayTH_->start();
+    }
+
+    demuxer_->Start();
+    Vdecoder_->Start();
+    if (hasAudio) {
+        Adecoder_->Start();
+        audioplay_->Start();
+    }
+    videoRender_->StartRendering();
 }
 
 void MediaPipeline::Pause()
 {
+    if (!demuxer_ || !Vdecoder_ || !videoRender_ || !positionTimer_) {
+        qWarning() << "MediaPipeline pause failed: playback pipeline is not initialized";
+        emit ErrorOccurred("Playback pipeline is not initialized");
+        return;
+    }
+
+    emit PositionChanged(Position());
+    demuxer_->Pause();
+    if (Adecoder_) {
+        Adecoder_->Pause();
+    }
+    Vdecoder_->Pause();
+    if (audioplay_) {
+        audioplay_->Pause();
+    }
+    videoRender_->Pause();
+    positionTimer_->stop();
 }
 
 void MediaPipeline::Stop()
 {
+    if (!demuxer_ || !Vdecoder_ || !syncManager_ || !positionTimer_) {
+        return;
+    }
+
+    if (!SuspendPipelineAndWait()) {
+        qWarning() << "MediaPipeline stop failed: playback pipeline suspend failed";
+        emit ErrorOccurred("Playback pipeline suspend failed");
+        return;
+    }
+
+    emit PositionChanged(0.0);
+    positionTimer_->stop();
+
+    ResetPipelineToStart();
 }
 
 bool MediaPipeline::SeekTo(double seconds)
@@ -273,6 +335,45 @@ void MediaPipeline::HandleDemuxFinished()
 
     emit PositionChanged(Duration());
     emit PlaybackFinished();
+}
+
+bool MediaPipeline::SuspendPipelineAndWait()
+{
+    if (videoRender_) {
+        videoRender_->Pause();
+    }
+    if (audioplay_) {
+        audioplay_->Pause();
+    }
+
+    bool suspended = true;
+    if (demuxer_ && demuxerTH_ && demuxerTH_->isRunning()) {
+        suspended = demuxer_->SuspendAndWait() == 0 && suspended;
+    }
+    if (Adecoder_ && AdecoderTH_ && AdecoderTH_->isRunning()) {
+        suspended = Adecoder_->SuspendAndWait() == 0 && suspended;
+    }
+    if (Vdecoder_ && VdecoderTH_ && VdecoderTH_->isRunning()) {
+        suspended = Vdecoder_->SuspendAndWait() == 0 && suspended;
+    }
+
+    return suspended;
+}
+
+void MediaPipeline::ResetPipelineToStart()
+{
+    if (videoRender_) {
+        videoRender_->StopRendering();
+    }
+    if (audioplay_) {
+        audioplay_->Pause();
+    }
+
+    ClearQueues();
+    demuxer_->SeekTo(0.0);
+    FlushDecoders();
+    ClearQueues();
+    syncManager_->SeekTo(0.0);
 }
 
 void MediaPipeline::ClearQueues()

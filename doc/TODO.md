@@ -273,16 +273,25 @@ MainWindow
 
 **目标**：把播放控制流程迁入 `MediaPipeline`，Controller 只保留应用层状态编排。
 
-- [ ] 将 `Start()` 内部管线启动逻辑迁入 `MediaPipeline::Start()`。
-- [ ] 将 `Pause()` 内部管线暂停逻辑迁入 `MediaPipeline::Pause()`。
-- [ ] 将 `Stop()` 内部管线重置逻辑迁入 `MediaPipeline::Stop()`。
+### 3.1.5-a Pipeline 侧 Start/Pause/Stop 最小实现
+
+- [x] 将 `Start()` 内部管线启动逻辑迁入 `MediaPipeline::Start()`。
+- [x] 将 `Pause()` 内部管线暂停逻辑迁入 `MediaPipeline::Pause()`。
+- [x] 将 `Stop()` 内部管线重置逻辑迁入 `MediaPipeline::Stop()`。
+- [x] 将 `SuspendPipelineAndWait()` 迁入 `MediaPipeline`。
+- [x] 将 `ResetPipelineToStart()` 迁入 `MediaPipeline`。
+- [x] 复用 Pipeline 内部 `ClearQueues()`。
+- [x] 复用 Pipeline 内部 `FlushDecoders()`。
+- [x] 暂不切换 Controller 播放控制主路径。
+
+### 3.1.5-b Pipeline 侧 Seek 实现
+
 - [ ] 将 `SeekTo()` 内部管线 seek 逻辑迁入 `MediaPipeline::SeekTo()`。
 - [ ] 将 `SeekRelative()` 内部位置计算迁入或委托给 `MediaPipeline`。
-- [ ] 将 `SuspendPipelineAndWait()` 迁入 `MediaPipeline`。
 - [ ] 将 `RestorePlaybackState()` 中对管线的恢复调用改为调用 Pipeline。
-- [ ] 将 `ResetPipelineToStart()` 迁入 `MediaPipeline`。
-- [ ] 将 `ClearQueues()` 迁入 `MediaPipeline`。
-- [ ] 将 `FlushDecoders()` 迁入 `MediaPipeline`。
+
+### 3.1.5-c Controller 播放控制委托 Pipeline
+
 - [ ] Controller `Start()` 只设置状态并调用 `pipeline_->Start()`。
 - [ ] Controller `Pause()` 只设置状态并调用 `pipeline_->Pause()`。
 - [ ] Controller `Stop()` 只设置状态并调用 `pipeline_->Stop()`。

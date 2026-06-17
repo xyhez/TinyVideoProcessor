@@ -175,6 +175,18 @@ private:
     void HandleDemuxFinished();
 
     /**
+     * @brief SuspendPipelineAndWait 挂起 demuxer/decoder 管线并等待安全点
+     * @return true 挂起成功
+     * @return false 挂起失败
+     */
+    bool SuspendPipelineAndWait();
+
+    /**
+     * @brief ResetPipelineToStart 清空缓存并把管线重置到起始位置
+     */
+    void ResetPipelineToStart();
+
+    /**
      * @brief ClearQueues 清空音视频包队列和帧队列
      */
     void ClearQueues();
