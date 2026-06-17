@@ -18,15 +18,15 @@ MainWindow
 
 ## 架构边界
 
-- [ ] `MainWindow` 不直接访问 `MediaPipeline`。
-- [ ] `MainWindow` 不直接访问 demuxer、decoder、AudioPlayer、VideoRender、syncmanager。
-- [ ] `MediaPlayController` 保留应用层对外接口和播放状态。
-- [ ] `MediaPlayController` 不再直接持有播放管线基础设施资源。
-- [ ] `MediaPipeline` 只管理一路媒体源的播放资源。
-- [ ] `MediaPipeline` 不引入 pipeline id。
-- [ ] 不引入 `MultiStreamManager`。
-- [ ] 不新增多路播放 UI。
-- [ ] 保持 Phase 3.0 无音频流支持能力。
+- [x] `MainWindow` 不直接访问 `MediaPipeline`。
+- [x] `MainWindow` 不直接访问 demuxer、decoder、AudioPlayer、VideoRender、syncmanager。
+- [x] `MediaPlayController` 保留应用层对外接口和播放状态。
+- [x] `MediaPlayController` 不再直接持有播放管线基础设施资源。
+- [x] `MediaPipeline` 只管理一路媒体源的播放资源。
+- [x] `MediaPipeline` 不引入 pipeline id。
+- [x] 不引入 `MultiStreamManager`。
+- [x] 不新增多路播放 UI。
+- [x] 保持 Phase 3.0 无音频流支持能力。
 
 ## 参考文档
 
@@ -346,15 +346,15 @@ MainWindow
 - [ ] 播放完成后关闭正常。
 - [ ] 播放中关闭不阻塞。
 - [ ] 暂停后关闭不阻塞。
-- [ ] `MediaPlayController` 不直接持有基础设施层播放资源。
+- [x] `MediaPlayController` 不直接持有基础设施层播放资源。
 - [ ] 形成 `doc/Phase3_1_单路MediaPipeline抽取实现报告.md`。
 
 **验收标准**：
 
 - [ ] UI 行为不变。
 - [ ] Phase 3.0 无音频能力不退化。
-- [ ] Controller 和 Pipeline 边界清晰。
-- [ ] 后续可以进入真正多路管理设计。
+- [x] Controller 和 Pipeline 边界清晰。
+- [x] 后续可以进入真正多路管理设计。
 
 ## 3.1 不做范围
 
@@ -370,9 +370,9 @@ MainWindow
 
 ## Phase 3.1 完成标准
 
-- [ ] `MediaPlayController` 回到应用层协调角色。
-- [ ] 单路播放资源集中在 `MediaPipeline`。
+- [x] `MediaPlayController` 回到应用层协调角色。
+- [x] 单路播放资源集中在 `MediaPipeline`。
 - [ ] UI 行为不变。
 - [ ] 有音频文件播放不退化。
 - [ ] 无音频视频播放不退化。
-- [ ] 后续可以进入多路管理设计。
+- [x] 后续可以进入多路管理设计。
