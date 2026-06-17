@@ -100,30 +100,30 @@ MainWindow
 
 ### 3.1.3-a 在 MediaPipeline 中声明资源成员
 
-- [ ] 在 `MediaPipeline` 中声明 `APacket_`。
-- [ ] 在 `MediaPipeline` 中声明 `VPacket_`。
-- [ ] 在 `MediaPipeline` 中声明 `AFrame_`。
-- [ ] 在 `MediaPipeline` 中声明 `VFrame_`。
-- [ ] 在 `MediaPipeline` 中声明 `mediaSource_`。
-- [ ] 在 `MediaPipeline` 中声明 `syncManager_`。
-- [ ] 在 `MediaPipeline` 中声明 `demuxer_`。
-- [ ] 在 `MediaPipeline` 中声明 `Adecoder_`。
-- [ ] 在 `MediaPipeline` 中声明 `Vdecoder_`。
-- [ ] 在 `MediaPipeline` 中声明 `audioplay_`。
-- [ ] 在 `MediaPipeline` 中声明 `videoRender_`。
-- [ ] 在 `MediaPipeline` 中声明 `demuxerTH_`。
-- [ ] 在 `MediaPipeline` 中声明 `AdecoderTH_`。
-- [ ] 在 `MediaPipeline` 中声明 `VdecoderTH_`。
-- [ ] 在 `MediaPipeline` 中声明 `audioplayTH_`。
-- [ ] 在 `MediaPipeline` 中声明 `positionTimer_`。
-- [ ] 暂不删除 `MediaPlayController` 中的旧资源成员。
-- [ ] 暂不让 `MediaPlayController` 使用 `MediaPipeline`。
+- [x] 在 `MediaPipeline` 中声明 `APacket_`。
+- [x] 在 `MediaPipeline` 中声明 `VPacket_`。
+- [x] 在 `MediaPipeline` 中声明 `AFrame_`。
+- [x] 在 `MediaPipeline` 中声明 `VFrame_`。
+- [x] 在 `MediaPipeline` 中声明 `mediaSource_`。
+- [x] 在 `MediaPipeline` 中声明 `syncManager_`。
+- [x] 在 `MediaPipeline` 中声明 `demuxer_`。
+- [x] 在 `MediaPipeline` 中声明 `Adecoder_`。
+- [x] 在 `MediaPipeline` 中声明 `Vdecoder_`。
+- [x] 在 `MediaPipeline` 中声明 `audioplay_`。
+- [x] 在 `MediaPipeline` 中声明 `videoRender_`。
+- [x] 在 `MediaPipeline` 中声明 `demuxerTH_`。
+- [x] 在 `MediaPipeline` 中声明 `AdecoderTH_`。
+- [x] 在 `MediaPipeline` 中声明 `VdecoderTH_`。
+- [x] 在 `MediaPipeline` 中声明 `audioplayTH_`。
+- [x] 在 `MediaPipeline` 中声明 `positionTimer_`。
+- [x] 暂不删除 `MediaPlayController` 中的旧资源成员。
+- [x] 暂不让 `MediaPlayController` 使用 `MediaPipeline`。
 
 **验收标准**：
 
-- [ ] `MediaPipeline` 已具备单路播放资源承载结构。
-- [ ] Controller 行为不变。
-- [ ] UI 行为不变。
+- [x] `MediaPipeline` 已具备单路播放资源承载结构。
+- [x] Controller 行为不变。
+- [x] UI 行为不变。
 
 ### 3.1.3-b 准备 Pipeline 侧队列常量和 deleter
 
