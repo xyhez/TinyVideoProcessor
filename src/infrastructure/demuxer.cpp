@@ -54,9 +54,12 @@ demuxer::demuxer(std::shared_ptr<IMediaSource> mediaSource
             m_V_time_base = ic->streams[i]->time_base;
 
             // 填充媒体源信息
+            info.hasVideo_ = true;
+            info.videoStreamIndex_ = i;
             info.width_ = ic->streams[i]->codecpar->width;
             info.height_ = ic->streams[i]->codecpar->height;
             info.CodecId_ = ic->streams[i]->codecpar->codec_id;
+            info.videoCodecId_ = ic->streams[i]->codecpar->codec_id;
             const double frameRate = av_q2d(ic->streams[i]->avg_frame_rate);
             if (frameRate > 0.0) {
                 info.FrameRate = frameRate;
@@ -82,6 +85,9 @@ demuxer::demuxer(std::shared_ptr<IMediaSource> mediaSource
             m_A_time_base = ic->streams[i]->time_base;
 
             // 填充媒体源信息
+            info.hasAudio_ = true;
+            info.audioStreamIndex_ = i;
+            info.audioCodecId_ = ic->streams[i]->codecpar->codec_id;
             info.A_timeBase = av_q2d(ic->streams[i]->time_base);
 
         }

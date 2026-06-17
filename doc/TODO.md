@@ -49,16 +49,16 @@
 
 **目标**：demuxer 扫描 FFmpeg stream 后，把实际流能力写回 `Fileinfo`。
 
-- [ ] 找到视频流时设置 `info.hasVideo_ = true`。
-- [ ] 找到视频流时设置 `info.videoStreamIndex_`。
-- [ ] 找到视频流时设置 `info.videoCodecId_`。
-- [ ] 找到视频流时继续设置宽高、帧率、视频 time base、duration。
-- [ ] 找到音频流时设置 `info.hasAudio_ = true`。
-- [ ] 找到音频流时设置 `info.audioStreamIndex_`。
-- [ ] 找到音频流时设置 `info.audioCodecId_`。
-- [ ] 找到音频流时继续设置音频 time base。
-- [ ] 无音频流时保持 `m_audioStreamIndex = -1`、`m_A_coderPar = nullptr`。
-- [ ] 无视频流时保持 `m_videoStreamIndex = -1`、`m_V_coderPar = nullptr`。
+- [x] 找到视频流时设置 `info.hasVideo_ = true`。
+- [x] 找到视频流时设置 `info.videoStreamIndex_`。
+- [x] 找到视频流时设置 `info.videoCodecId_`。
+- [x] 找到视频流时继续设置宽高、帧率、视频 time base、duration。
+- [x] 找到音频流时设置 `info.hasAudio_ = true`。
+- [x] 找到音频流时设置 `info.audioStreamIndex_`。
+- [x] 找到音频流时设置 `info.audioCodecId_`。
+- [x] 找到音频流时继续设置音频 time base。
+- [x] 无音频流时保持 `m_audioStreamIndex = -1`、`m_A_coderPar = nullptr`。
+- [x] 无视频流时保持 `m_videoStreamIndex = -1`、`m_V_coderPar = nullptr`。
 
 **验收标准**：
 
