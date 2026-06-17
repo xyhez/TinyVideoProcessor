@@ -1,5 +1,6 @@
 #include "MediaPipeline.h"
 
+#include <algorithm>
 #include <QDebug>
 #include <QVBoxLayout>
 
@@ -191,19 +192,40 @@ double MediaPipeline::Position() const
     return syncManager_ ? syncManager_->GetClock() / 1000.0 : 0.0;
 }
 
+bool MediaPipeline::IsInitialized() const
+{
+    return demuxer_ && Vdecoder_ && videoRender_ && positionTimer_ && demuxerTH_ && VdecoderTH_;
+}
+
 void MediaPipeline::SetPlaybackSpeed(double speed)
 {
-    Q_UNUSED(speed);
+    if (audioplay_) {
+        audioplay_->SetSpeed(speed);
+    }
+    if (videoRender_) {
+        videoRender_->SetSpeed(speed);
+    }
 }
 
 void MediaPipeline::SetVolume(double volume)
 {
-    Q_UNUSED(volume);
+    const double clampedVolume = std::clamp(volume, 0.0, 1.0);
+    if (audioplay_) {
+        audioplay_->SetVolume(static_cast<qreal>(clampedVolume));
+        return;
+    }
+
+    emit VolumeChanged(clampedVolume);
 }
 
 void MediaPipeline::SetMuted(bool muted)
 {
-    Q_UNUSED(muted);
+    if (audioplay_) {
+        audioplay_->SetMuted(muted);
+        return;
+    }
+
+    emit MuteChanged(muted);
 }
 
 bool MediaPipeline::CreatePipelineResources(std::shared_ptr<IMediaSource> mediaSource,

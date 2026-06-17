@@ -47,11 +47,15 @@ bool MediaPlayController::Initialize(std::shared_ptr<IMediaSource> mediaSource, 
         return false;
     }
 
-    if (!InitializeOpenedMediaSource(mediaSource, rendererContainer)) {
-        mediaSource->Close();
-        ReleaseResources();
+    if (!pipeline_->Initialize(mediaSource, rendererContainer)) {
+        pipeline_->Shutdown();
+        SetState(PlaybackState::Stopped);
         return false;
     }
+
+    ApplyUserSettingsToPipeline();
+    emit DurationChanged(Duration());
+    emit PositionChanged(Position());
 
     return true;
 }
@@ -64,24 +68,28 @@ bool MediaPlayController::SwitchSource(std::shared_ptr<IMediaSource> mediaSource
         return false;
     }
 
-    if (!mediaSource->Open()) {
-        qWarning() << "SwitchSource failed: open new media source failed";
-        return false;
-    }
-
     Stop();
-    ReleaseResources();
+    pipeline_->Shutdown();
     SetState(PlaybackState::Stopped);
 
-    if (!InitializeOpenedMediaSource(mediaSource, rendererContainer)) {
-        qWarning() << "SwitchSource failed: initialize new media source failed";
-        mediaSource->Close();
-        ReleaseResources();
+    if (!mediaSource->Open()) {
+        qWarning() << "SwitchSource failed: open new media source failed";
         SetState(PlaybackState::Stopped);
         emit DurationChanged(0.0);
         emit PositionChanged(0.0);
         return false;
     }
+
+    if (!pipeline_->Initialize(mediaSource, rendererContainer)) {
+        qWarning() << "SwitchSource failed: initialize new media source failed";
+        pipeline_->Shutdown();
+        SetState(PlaybackState::Stopped);
+        emit DurationChanged(0.0);
+        emit PositionChanged(0.0);
+        return false;
+    }
+
+    ApplyUserSettingsToPipeline();
 
     if (autoStart) {
         Start();
@@ -282,16 +290,27 @@ void MediaPlayController::ConnectPipelineSignals()
     });
 }
 
+void MediaPlayController::ApplyUserSettingsToPipeline()
+{
+    if (!pipeline_) {
+        return;
+    }
+
+    pipeline_->SetPlaybackSpeed(playbackSpeed_);
+    pipeline_->SetVolume(volume_);
+    pipeline_->SetMuted(muted_);
+}
+
 MediaPlayController::PlaybackState MediaPlayController::State() const {
     return state_;
 }
 
 double MediaPlayController::Duration() const {
-    return mediaSource_ ? static_cast<double>(mediaSource_->GetSourceInfo().duration_):0.0;
+    return pipeline_ ? pipeline_->Duration() : 0.0;
 }
 
 double MediaPlayController::Position() const {
-    return syncManager_ ? syncManager_->GetClock() / 1000.0 : 0.0;
+    return pipeline_ ? pipeline_->Position() : 0.0;
 }
 
 double MediaPlayController::PlaybackSpeed() const {
@@ -309,11 +328,8 @@ void MediaPlayController::SetPlaybackSpeed(double speed) {
     }
 
     playbackSpeed_ = speed;
-    if (audioplay_) {
-        audioplay_->SetSpeed(playbackSpeed_);
-    }
-    if (videoRender_) {
-        videoRender_->SetSpeed(playbackSpeed_);
+    if (pipeline_) {
+        pipeline_->SetPlaybackSpeed(playbackSpeed_);
     }
 
     emit PlaybackSpeedChanged(playbackSpeed_);
@@ -329,59 +345,32 @@ void MediaPlayController::SetState(PlaybackState state) {
 }
 
 void MediaPlayController::Start() {
-    if (!demuxer_ || !Vdecoder_ || !videoRender_ || !positionTimer_ || !demuxerTH_ || !VdecoderTH_) {
+    if (!pipeline_ || !pipeline_->IsInitialized()) {
         qWarning() << "Start failed: playback pipeline is not initialized";
         return;
     }
 
-    const bool hasAudio = Adecoder_ || audioplay_ || AdecoderTH_ || audioplayTH_;
-    if (hasAudio && (!Adecoder_ || !audioplay_ || !AdecoderTH_ || !audioplayTH_)) {
-        qWarning() << "Start failed: audio pipeline is incomplete";
-        return;
-    }
-
     SetState(PlaybackState::Playing);
-
-    positionTimer_->start();
-    emit PositionChanged(Position());
-    emit DurationChanged(Duration());
-
-    demuxerTH_->start();
-    VdecoderTH_->start();
-    if (hasAudio) {
-        AdecoderTH_->start();
-        audioplayTH_->start();
-    }
-
-    demuxer_->Start();
-    Vdecoder_->Start();
-    if (hasAudio) {
-        Adecoder_->Start();
-        audioplay_->Start();
-    }
-    videoRender_->StartRendering();
+    pipeline_->Start();
 }
 
 void MediaPlayController::Stop() {
-    if (!demuxer_ || !Vdecoder_ || !syncManager_ || !positionTimer_) {
+    if (!pipeline_) {
         SetState(PlaybackState::Stopped);
         return;
     }
 
-    if (state_ != PlaybackState::Stopped && !SuspendPipelineAndWait()) {
-        qWarning() << "Stop failed: playback pipeline suspend failed";
-        return;
+    if (state_ != PlaybackState::Stopped) {
+        pipeline_->Stop();
     }
 
-    emit PositionChanged(0.0);
-    positionTimer_->stop();
-
-    ResetPipelineToStart();
     SetState(PlaybackState::Stopped);
 }
 
 void MediaPlayController::Shutdown() {
-    ReleaseResources();
+    if (pipeline_) {
+        pipeline_->Shutdown();
+    }
     SetState(PlaybackState::Stopped);
 }
 
@@ -402,23 +391,13 @@ void MediaPlayController::HandleDemuxFinished() {
 }
 
 void MediaPlayController::Pause() {
-    if (!demuxer_ || !Vdecoder_ || !videoRender_ || !positionTimer_) {
+    if (!pipeline_ || !pipeline_->IsInitialized()) {
         qWarning() << "Pause failed: playback pipeline is not initialized";
         return;
     }
 
     SetState(PlaybackState::Paused);
-    emit PositionChanged(Position());
-    demuxer_->Pause();
-    if (Adecoder_) {
-        Adecoder_->Pause();
-    }
-    Vdecoder_->Pause();
-    if (audioplay_) {
-        audioplay_->Pause();
-    }
-    videoRender_->Pause();
-    positionTimer_->stop();
+    pipeline_->Pause();
 }
 
 void MediaPlayController::VolumeUp() {
@@ -436,8 +415,8 @@ void MediaPlayController::SetVolume(double volume) {
     }
 
     volume_ = clampedVolume;
-    if (audioplay_) {
-        audioplay_->SetVolume(volume_);
+    if (pipeline_) {
+        pipeline_->SetVolume(volume_);
     } else {
         emit VolumeChanged(volume_);
     }
@@ -453,8 +432,8 @@ void MediaPlayController::SetMuted(bool muted) {
     }
 
     muted_ = muted;
-    if (audioplay_) {
-        audioplay_->SetMuted(muted_);
+    if (pipeline_) {
+        pipeline_->SetMuted(muted_);
     } else {
         emit MuteChanged(muted_);
     }
@@ -465,7 +444,7 @@ bool MediaPlayController::IsMuted() const {
 }
 
 void MediaPlayController::SeekTo(double seconds) {
-    if (!demuxer_ || !Vdecoder_ || !syncManager_) {
+    if (!pipeline_ || !pipeline_->IsInitialized()) {
         qWarning() << "Seek failed: playback pipeline is not initialized";
         return;
     }
@@ -475,47 +454,35 @@ void MediaPlayController::SeekTo(double seconds) {
         targetSeconds = 0.0;
     }
 
-    if (mediaSource_) {
-        const int durationSeconds = mediaSource_->GetSourceInfo().duration_;
-        if (durationSeconds > 0 && targetSeconds > durationSeconds) {
-            targetSeconds = durationSeconds;
-        }
+    const double durationSeconds = Duration();
+    if (durationSeconds > 0.0 && targetSeconds > durationSeconds) {
+        targetSeconds = durationSeconds;
     }
 
     const PlaybackState previousState = State();
 
-    if (previousState != PlaybackState::Stopped && !SuspendPipelineAndWait()) {
-        qWarning() << "Seek failed: playback pipeline suspend failed";
+    if (!pipeline_->SeekTo(targetSeconds)) {
         RestorePlaybackState(previousState);
         return;
     }
-
-    ClearQueues();
-
-    const int seekResult = demuxer_->SeekTo(targetSeconds);
-    if (seekResult != 0) {
-        qWarning() << "Seek failed: demuxer rejected target" << targetSeconds;
-        RestorePlaybackState(previousState);
-        return;
-    }
-
-    FlushDecoders();
-    Vdecoder_->SetDiscardBefore(targetSeconds);
-    ClearQueues();
-    syncManager_->SeekTo(targetSeconds * 1000.0);
-
-    emit PositionChanged(Position());
 
     RestorePlaybackState(previousState);
 }
 
 void MediaPlayController::SeekRelative(double seconds) {
-    if (!demuxer_) {
-        qWarning() << "Seek failed: demuxer is not initialized";
+    if (!pipeline_ || !pipeline_->IsInitialized()) {
+        qWarning() << "Seek failed: playback pipeline is not initialized";
         return;
     }
 
-    SeekTo(demuxer_->Position() + seconds);
+    const PlaybackState previousState = State();
+
+    if (!pipeline_->SeekRelative(seconds)) {
+        RestorePlaybackState(previousState);
+        return;
+    }
+
+    RestorePlaybackState(previousState);
 }
 
 void MediaPlayController::Rewind() {

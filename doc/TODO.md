@@ -248,16 +248,16 @@ MainWindow
 
 #### 3.1.4-e2 Initialize / SwitchSource / Shutdown 委托 Pipeline
 
-- [ ] Controller `Initialize()` 调用 `pipeline_->Initialize()`。
-- [ ] Controller `SwitchSource()` 先关闭旧 Pipeline，再初始化新 Pipeline。
-- [ ] Controller `Shutdown()` 调用 `pipeline_->Shutdown()`。
-- [ ] Controller 在切换源后重新下发 speed/volume/muted。
-- [ ] 保留 Controller 应用层状态编排。
+- [x] Controller `Initialize()` 调用 `pipeline_->Initialize()`。
+- [x] Controller `SwitchSource()` 先关闭旧 Pipeline，再初始化新 Pipeline。
+- [x] Controller `Shutdown()` 调用 `pipeline_->Shutdown()`。
+- [x] Controller 在切换源后重新下发 speed/volume/muted。
+- [x] 保留 Controller 应用层状态编排。
 
 #### 3.1.4-e3 清理初始化释放旧路径
 
-- [ ] 停用 `InitializeOpenedMediaSource()` 主路径。
-- [ ] 停用 `ReleaseResources()` 主路径。
+- [x] 停用 `InitializeOpenedMediaSource()` 主路径。
+- [x] 停用 `ReleaseResources()` 主路径。
 - [ ] Controller 不再直接创建 demuxer/decoder/queue/audio/render/sync/thread。
 - [ ] Controller 不再直接连接基础设施层播放组件。
 
@@ -288,14 +288,14 @@ MainWindow
 
 - [x] 将 `SeekTo()` 内部管线 seek 逻辑迁入 `MediaPipeline::SeekTo()`。
 - [x] 将 `SeekRelative()` 内部位置计算迁入或委托给 `MediaPipeline`。
-- [ ] 将 `RestorePlaybackState()` 中对管线的恢复调用改为调用 Pipeline。
+- [x] 将 `RestorePlaybackState()` 中对管线的恢复调用改为调用 Pipeline。
 
 ### 3.1.5-c Controller 播放控制委托 Pipeline
 
-- [ ] Controller `Start()` 只设置状态并调用 `pipeline_->Start()`。
-- [ ] Controller `Pause()` 只设置状态并调用 `pipeline_->Pause()`。
-- [ ] Controller `Stop()` 只设置状态并调用 `pipeline_->Stop()`。
-- [ ] Controller `SeekTo()` 只做目标边界和状态恢复编排，管线细节委托 Pipeline。
+- [x] Controller `Start()` 只设置状态并调用 `pipeline_->Start()`。
+- [x] Controller `Pause()` 只设置状态并调用 `pipeline_->Pause()`。
+- [x] Controller `Stop()` 只设置状态并调用 `pipeline_->Stop()`。
+- [x] Controller `SeekTo()` 只做目标边界和状态恢复编排，管线细节委托 Pipeline。
 
 **验收标准**：
 
@@ -309,13 +309,20 @@ MainWindow
 
 **目标**：Controller 保存用户级状态，Pipeline 承接具体下发。
 
-- [ ] Controller 继续持有 `playbackSpeed_`。
-- [ ] Controller 继续持有 `volume_`。
-- [ ] Controller 继续持有 `muted_`。
-- [ ] `MediaPipeline::SetPlaybackSpeed()` 下发到 AudioPlayer 和 VideoRender。
-- [ ] `MediaPipeline::SetVolume()` 下发到 AudioPlayer 或保存状态。
-- [ ] `MediaPipeline::SetMuted()` 下发到 AudioPlayer 或保存状态。
-- [ ] Controller 切换源后把当前 speed/volume/muted 重新下发给 Pipeline。
+### 3.1.6-a Pipeline 侧参数下发最小实现
+
+- [x] Controller 继续持有 `playbackSpeed_`。
+- [x] Controller 继续持有 `volume_`。
+- [x] Controller 继续持有 `muted_`。
+- [x] `MediaPipeline::SetPlaybackSpeed()` 下发到 AudioPlayer 和 VideoRender。
+- [x] `MediaPipeline::SetVolume()` 下发到 AudioPlayer。
+- [x] `MediaPipeline::SetMuted()` 下发到 AudioPlayer。
+- [x] 无音频流时 `SetVolume()` 发出 `VolumeChanged`，不访问 AudioPlayer。
+- [x] 无音频流时 `SetMuted()` 发出 `MuteChanged`，不访问 AudioPlayer。
+
+### 3.1.6-b Controller 参数重新下发
+
+- [x] Controller 切换源后把当前 speed/volume/muted 重新下发给 Pipeline。
 
 **验收标准**：
 

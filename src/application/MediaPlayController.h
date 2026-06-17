@@ -273,6 +273,11 @@ private:
     void ConnectPipelineSignals();
 
     /**
+     * @brief ApplyUserSettingsToPipeline 将当前用户级播放参数下发给 Pipeline
+     */
+    void ApplyUserSettingsToPipeline();
+
+    /**
      * @brief InitializeOpenedMediaSource 使用已打开的媒体源初始化播放管线
      * @param mediaSource 已打开的媒体源抽象
      * @param rendererContainer 视频渲染容器

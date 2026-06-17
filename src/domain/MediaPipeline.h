@@ -95,6 +95,13 @@ public:
     double Position() const;
 
     /**
+     * @brief IsInitialized 判断当前播放管线资源是否已初始化
+     * @return true 已初始化
+     * @return false 未初始化
+     */
+    bool IsInitialized() const;
+
+    /**
      * @brief SetPlaybackSpeed 设置播放速度
      * @param speed 播放速度档位
      */
