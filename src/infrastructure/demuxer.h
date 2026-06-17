@@ -63,6 +63,14 @@ public:
     AVCodecParameters* ReVcoderPar();
 
     /**
+     * @brief SetAudioQueues 绑定可选音频队列
+     * @param APacket 音频包队列
+     * @param AFrame 音频帧队列
+     */
+    void SetAudioQueues(std::shared_ptr<SyncQueue<AVPacket*>> APacket,
+                        std::shared_ptr<SyncQueue<AVFrame*>> AFrame);
+
+    /**
      * @brief ReAtimebase
      * @return 音频流 time_base
      */

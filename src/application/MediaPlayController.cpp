@@ -95,17 +95,23 @@ bool MediaPlayController::InitializeOpenedMediaSource(std::shared_ptr<IMediaSour
     mediaSource_ = mediaSource;
 
     // 1.初始化队列
-    APacket_ = std::make_shared<SyncQueue<AVPacket*>>(kPacketQueueMax, packetDeleter);
     VPacket_ = std::make_shared<SyncQueue<AVPacket*>>(kPacketQueueMax, packetDeleter);
-    AFrame_ = std::make_shared<SyncQueue<AVFrame*>>(kFrameQueueMax,  frameDeleter);
     VFrame_ = std::make_shared<SyncQueue<AVFrame*>>(kFrameQueueMax,  frameDeleter);
 
     // 2.基层对象构造
     demuxer_ = std::make_unique<demuxer>(mediaSource_,APacket_,VPacket_,AFrame_,VFrame_);
     const Fileinfo& sourceInfo = mediaSource_->GetSourceInfo();
-    Adecoder_ = std::make_unique<decoder>();
+    const bool hasAudio = sourceInfo.hasAudio_;
+    if (hasAudio) {
+        APacket_ = std::make_shared<SyncQueue<AVPacket*>>(kPacketQueueMax, packetDeleter);
+        AFrame_ = std::make_shared<SyncQueue<AVFrame*>>(kFrameQueueMax,  frameDeleter);
+        demuxer_->SetAudioQueues(APacket_, AFrame_);
+    }
     Vdecoder_ = std::make_unique<decoder>();
-    audioplay_ = std::make_unique<AudioPlayer>();
+    if (hasAudio) {
+        Adecoder_ = std::make_unique<decoder>();
+        audioplay_ = std::make_unique<AudioPlayer>();
+    }
     videoRender_ = new VideoRender(rendererContainer);
     syncManager_ = std::make_shared<syncmanager>();
     positionTimer_ = std::make_unique<QTimer>();
@@ -113,20 +119,28 @@ bool MediaPlayController::InitializeOpenedMediaSource(std::shared_ptr<IMediaSour
 
     // 3.子线程初始化
     demuxerTH_ = std::make_unique<QThread>();
-    AdecoderTH_ = std::make_unique<QThread>();
     VdecoderTH_ = std::make_unique<QThread>();
-    audioplayTH_ = std::make_unique<QThread>();
+    if (hasAudio) {
+        AdecoderTH_ = std::make_unique<QThread>();
+        audioplayTH_ = std::make_unique<QThread>();
+    }
 
     // 4.将对象初始化并移动到对应的线程
     demuxer_->moveToThread(demuxerTH_.get());
-    Adecoder_->InitDecoder(APacket_,AFrame_,demuxer_->ReAcoderPar(),demuxer_->ReAtimebase());
-    Adecoder_->moveToThread(AdecoderTH_.get());
+    if (hasAudio) {
+        Adecoder_->InitDecoder(APacket_,AFrame_,demuxer_->ReAcoderPar(),demuxer_->ReAtimebase());
+        Adecoder_->moveToThread(AdecoderTH_.get());
+    }
     Vdecoder_->InitDecoder(VPacket_,VFrame_,demuxer_->ReVcoderPar(),demuxer_->ReVtimebase());
     Vdecoder_->moveToThread(VdecoderTH_.get());
-    audioplay_->InitAudioPlay(demuxer_->ReAcoderPar(), AFrame_, syncManager_, sourceInfo.A_timeBase);
-    audioplay_->moveToThread(audioplayTH_.get());
+    if (hasAudio) {
+        audioplay_->InitAudioPlay(demuxer_->ReAcoderPar(), AFrame_, syncManager_, sourceInfo.A_timeBase);
+        audioplay_->moveToThread(audioplayTH_.get());
+    }
     videoRender_->InitVideoRender(VFrame_, syncManager_, sourceInfo.FrameRate, sourceInfo.V_timeBase);
-    audioplay_->SetSpeed(playbackSpeed_);
+    if (hasAudio) {
+        audioplay_->SetSpeed(playbackSpeed_);
+    }
     videoRender_->SetSpeed(playbackSpeed_);
 
     // 5.设置videorender
@@ -139,8 +153,10 @@ bool MediaPlayController::InitializeOpenedMediaSource(std::shared_ptr<IMediaSour
 
     // 6.链接信号槽
     CreateConnects();
-    audioplay_->SetVolume(volume_);
-    audioplay_->SetMuted(muted_);
+    if (hasAudio) {
+        audioplay_->SetVolume(volume_);
+        audioplay_->SetMuted(muted_);
+    }
 
     emit DurationChanged(Duration());
     emit PositionChanged(Position());

@@ -111,6 +111,13 @@ AVCodecParameters* demuxer::ReVcoderPar(){
     return m_V_coderPar;
 }
 
+void demuxer::SetAudioQueues(std::shared_ptr<SyncQueue<AVPacket*>> APacket,
+                             std::shared_ptr<SyncQueue<AVFrame*>> AFrame) {
+    QMutexLocker locker(&mutex);
+    m_APacket = APacket;
+    m_AFrame = AFrame;
+}
+
 AVRational demuxer::ReAtimebase() {
     return m_A_time_base;
 }

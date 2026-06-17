@@ -86,22 +86,22 @@
 
 **目标**：Controller 根据 `Fileinfo.hasAudio_` 创建播放管线资源，音频链路不再是必选项。
 
-- [ ] `InitializeOpenedMediaSource()` 始终创建视频包队列和视频帧队列。
-- [ ] `InitializeOpenedMediaSource()` 始终创建 demuxer、视频 decoder、VideoRender、syncmanager、position timer。
-- [ ] 仅当 `sourceInfo.hasAudio_ == true` 时创建音频包队列。
-- [ ] 仅当 `sourceInfo.hasAudio_ == true` 时创建音频帧队列。
-- [ ] 仅当 `sourceInfo.hasAudio_ == true` 时创建音频 decoder。
-- [ ] 仅当 `sourceInfo.hasAudio_ == true` 时创建 `AudioPlayer`。
-- [ ] 仅当 `sourceInfo.hasAudio_ == true` 时创建音频 decoder 线程。
-- [ ] 仅当 `sourceInfo.hasAudio_ == true` 时创建 AudioPlayer 线程。
-- [ ] 有音频时继续下发播放速度、音量、静音状态到 `AudioPlayer`。
-- [ ] 无音频时保留 Controller 内部音量、静音状态，但不创建音频输出。
+- [x] `InitializeOpenedMediaSource()` 始终创建视频包队列和视频帧队列。
+- [x] `InitializeOpenedMediaSource()` 始终创建 demuxer、视频 decoder、VideoRender、syncmanager、position timer。
+- [x] 仅当 `sourceInfo.hasAudio_ == true` 时创建音频包队列。
+- [x] 仅当 `sourceInfo.hasAudio_ == true` 时创建音频帧队列。
+- [x] 仅当 `sourceInfo.hasAudio_ == true` 时创建音频 decoder。
+- [x] 仅当 `sourceInfo.hasAudio_ == true` 时创建 `AudioPlayer`。
+- [x] 仅当 `sourceInfo.hasAudio_ == true` 时创建音频 decoder 线程。
+- [x] 仅当 `sourceInfo.hasAudio_ == true` 时创建 AudioPlayer 线程。
+- [x] 有音频时继续下发播放速度、音量、静音状态到 `AudioPlayer`。
+- [x] 无音频时保留 Controller 内部音量、静音状态，但不创建音频输出。
 
 **验收标准**：
 
-- [ ] 无音频视频不会初始化音频 decoder。
-- [ ] 无音频视频不会初始化 `AudioPlayer`。
-- [ ] 无音频视频不会创建音频线程。
+- [x] 无音频视频不会初始化音频 decoder。
+- [x] 无音频视频不会初始化 `AudioPlayer`。
+- [x] 无音频视频不会创建音频线程。
 - [ ] 普通音视频文件的音频链路行为不变。
 
 ## 3.0.5 调整 Controller 运行控制
