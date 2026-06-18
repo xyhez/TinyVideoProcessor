@@ -7,16 +7,16 @@
 
 #include "domain/IMediaSource.h"
 
-class MediaPipeline;
+class MultiStreamManager;
 class QWidget;
 
 /**
  * @brief
  * MediaPlayController是应用层的协调者，
- * 是 MainWindow(UI 层) 和 MediaPipeline(单路播放管线) 之间的中间层。
+ * 是 MainWindow(UI 层) 和 MultiStreamManager(多路播放管理器) 之间的中间层。
  * MainWindow(UI) 负责按钮事件、键盘事件和显示窗口。
  * MediaPlayController(应用层) 负责播放状态编排和用户级参数保存。
- * MediaPipeline(领域层) 负责单路播放资源和管线生命周期。
+ * MultiStreamManager(领域层) 负责播放管线集合和 active stream 管理。
  */
 class MediaPlayController :public QObject{
     Q_OBJECT
@@ -210,7 +210,7 @@ signals:
     void MuteChanged(bool muted);
 
 private:
-    std::unique_ptr<MediaPipeline> pipeline_;
+    std::unique_ptr<MultiStreamManager> multiStreamManager_;
 
     PlaybackState state_ = PlaybackState::Stopped;
     double playbackSpeed_ = 1.0;
@@ -218,14 +218,14 @@ private:
     bool muted_ = false;
 
     /**
-     * @brief ConnectPipelineSignals 创建 Controller 与 MediaPipeline 的信号转发连接
+     * @brief ConnectManagerSignals 创建 Controller 与 MultiStreamManager 的信号转发连接
      */
-    void ConnectPipelineSignals();
+    void ConnectManagerSignals();
 
     /**
-     * @brief ApplyUserSettingsToPipeline 将当前用户级播放参数下发给 Pipeline
+     * @brief ApplyUserSettingsToActiveStream 将当前用户级播放参数下发给 active stream
      */
-    void ApplyUserSettingsToPipeline();
+    void ApplyUserSettingsToActiveStream();
 
     /**
      * @brief SetState 设置播放状态并发出状态变化信号

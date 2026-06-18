@@ -3,7 +3,7 @@
 //
 
 #include "MediaPlayController.h"
-#include "domain/MediaPipeline.h"
+#include "domain/MultiStreamManager.h"
 
 #include <algorithm>
 #include <QDebug>
@@ -26,9 +26,9 @@ bool IsSupportedPlaybackSpeed(double speed)
 
 MediaPlayController::MediaPlayController(QObject *parent)
     : QObject(parent)
-    , pipeline_(std::make_unique<MediaPipeline>())
+    , multiStreamManager_(std::make_unique<MultiStreamManager>())
 {
-    ConnectPipelineSignals();
+    ConnectManagerSignals();
 }
 
 MediaPlayController::~MediaPlayController() {
@@ -41,18 +41,22 @@ bool MediaPlayController::Initialize(std::shared_ptr<IMediaSource> mediaSource, 
         return false;
     }
 
-    if (!mediaSource->Open()) {
-        qCritical() << "Failed to open media source";
-        return false;
-    }
-
-    if (!pipeline_->Initialize(mediaSource, rendererContainer)) {
-        pipeline_->Shutdown();
+    const MultiStreamManager::StreamId streamId =
+        multiStreamManager_->AddStream(mediaSource, rendererContainer);
+    if (streamId == MultiStreamManager::InvalidStreamId) {
+        qCritical() << "Failed to initialize media stream";
         SetState(PlaybackState::Stopped);
         return false;
     }
 
-    ApplyUserSettingsToPipeline();
+    if (!multiStreamManager_->SetActiveStream(streamId)) {
+        qCritical() << "Failed to set active stream";
+        multiStreamManager_->RemoveStream(streamId);
+        SetState(PlaybackState::Stopped);
+        return false;
+    }
+
+    ApplyUserSettingsToActiveStream();
     emit DurationChanged(Duration());
     emit PositionChanged(Position());
 
@@ -68,27 +72,29 @@ bool MediaPlayController::SwitchSource(std::shared_ptr<IMediaSource> mediaSource
     }
 
     Stop();
-    pipeline_->Shutdown();
+    multiStreamManager_->ShutdownAll();
     SetState(PlaybackState::Stopped);
 
-    if (!mediaSource->Open()) {
-        qWarning() << "SwitchSource failed: open new media source failed";
-        SetState(PlaybackState::Stopped);
-        emit DurationChanged(0.0);
-        emit PositionChanged(0.0);
-        return false;
-    }
-
-    if (!pipeline_->Initialize(mediaSource, rendererContainer)) {
+    const MultiStreamManager::StreamId streamId =
+        multiStreamManager_->AddStream(mediaSource, rendererContainer);
+    if (streamId == MultiStreamManager::InvalidStreamId) {
         qWarning() << "SwitchSource failed: initialize new media source failed";
-        pipeline_->Shutdown();
         SetState(PlaybackState::Stopped);
         emit DurationChanged(0.0);
         emit PositionChanged(0.0);
         return false;
     }
 
-    ApplyUserSettingsToPipeline();
+    if (!multiStreamManager_->SetActiveStream(streamId)) {
+        qWarning() << "SwitchSource failed: set active stream failed";
+        multiStreamManager_->RemoveStream(streamId);
+        SetState(PlaybackState::Stopped);
+        emit DurationChanged(0.0);
+        emit PositionChanged(0.0);
+        return false;
+    }
+
+    ApplyUserSettingsToActiveStream();
 
     if (autoStart) {
         Start();
@@ -100,42 +106,72 @@ bool MediaPlayController::SwitchSource(std::shared_ptr<IMediaSource> mediaSource
     return true;
 }
 
-void MediaPlayController::ConnectPipelineSignals()
+void MediaPlayController::ConnectManagerSignals()
 {
-    if (!pipeline_) {
+    if (!multiStreamManager_) {
         return;
     }
 
-    connect(pipeline_.get(), &MediaPipeline::DurationChanged,
-            this, &MediaPlayController::DurationChanged);
-    connect(pipeline_.get(), &MediaPipeline::PositionChanged,
-            this, &MediaPlayController::PositionChanged);
+    connect(multiStreamManager_.get(), &MultiStreamManager::StreamDurationChanged,
+            this, [this](MultiStreamManager::StreamId id, double seconds) {
+                if (id == multiStreamManager_->ActiveStream()) {
+                    emit DurationChanged(seconds);
+                }
+            });
 
-    connect(pipeline_.get(), &MediaPipeline::PlaybackFinished, this, [this]() {
-        SetState(PlaybackState::Stopped);
-        emit PlaybackFinished();
-    });
+    connect(multiStreamManager_.get(), &MultiStreamManager::StreamPositionChanged,
+            this, [this](MultiStreamManager::StreamId id, double seconds) {
+                if (id == multiStreamManager_->ActiveStream()) {
+                    emit PositionChanged(seconds);
+                }
+            });
 
-    connect(pipeline_.get(), &MediaPipeline::VolumeChanged, this, [this](double volume) {
-        volume_ = volume;
-        emit VolumeChanged(volume_);
-    });
+    connect(multiStreamManager_.get(), &MultiStreamManager::StreamPlaybackFinished,
+            this, [this](MultiStreamManager::StreamId id) {
+                if (id == multiStreamManager_->ActiveStream()) {
+                    SetState(PlaybackState::Stopped);
+                    emit PlaybackFinished();
+                }
+            });
 
-    connect(pipeline_.get(), &MediaPipeline::MuteChanged, this, [this](bool muted) {
-        muted_ = muted;
-        emit MuteChanged(muted_);
-    });
+    connect(multiStreamManager_.get(), &MultiStreamManager::StreamVolumeChanged,
+            this, [this](MultiStreamManager::StreamId id, double volume) {
+                if (id != multiStreamManager_->ActiveAudioStream()) {
+                    return;
+                }
+
+                if (std::fabs(volume_ - volume) >= kVolumeEpsilon) {
+                    volume_ = volume;
+                    emit VolumeChanged(volume_);
+                }
+            });
+
+    connect(multiStreamManager_.get(), &MultiStreamManager::StreamMuteChanged,
+            this, [this](MultiStreamManager::StreamId id, bool muted) {
+                if (id != multiStreamManager_->ActiveAudioStream()) {
+                    return;
+                }
+
+                if (muted_ != muted) {
+                    muted_ = muted;
+                    emit MuteChanged(muted_);
+                }
+            });
 }
 
-void MediaPlayController::ApplyUserSettingsToPipeline()
+void MediaPlayController::ApplyUserSettingsToActiveStream()
 {
-    if (!pipeline_) {
+    if (!multiStreamManager_) {
         return;
     }
 
-    pipeline_->SetPlaybackSpeed(playbackSpeed_);
-    pipeline_->SetVolume(volume_);
-    pipeline_->SetMuted(muted_);
+    const MultiStreamManager::StreamId activeStream = multiStreamManager_->ActiveStream();
+    if (activeStream != MultiStreamManager::InvalidStreamId) {
+        multiStreamManager_->SetStreamPlaybackSpeed(activeStream, playbackSpeed_);
+    }
+
+    multiStreamManager_->SetAudioVolume(volume_);
+    multiStreamManager_->SetAudioMuted(muted_);
 }
 
 MediaPlayController::PlaybackState MediaPlayController::State() const {
@@ -143,11 +179,11 @@ MediaPlayController::PlaybackState MediaPlayController::State() const {
 }
 
 double MediaPlayController::Duration() const {
-    return pipeline_ ? pipeline_->Duration() : 0.0;
+    return multiStreamManager_ ? multiStreamManager_->ActiveStreamDuration() : 0.0;
 }
 
 double MediaPlayController::Position() const {
-    return pipeline_ ? pipeline_->Position() : 0.0;
+    return multiStreamManager_ ? multiStreamManager_->ActiveStreamPosition() : 0.0;
 }
 
 double MediaPlayController::PlaybackSpeed() const {
@@ -165,8 +201,11 @@ void MediaPlayController::SetPlaybackSpeed(double speed) {
     }
 
     playbackSpeed_ = speed;
-    if (pipeline_) {
-        pipeline_->SetPlaybackSpeed(playbackSpeed_);
+    if (multiStreamManager_) {
+        const MultiStreamManager::StreamId activeStream = multiStreamManager_->ActiveStream();
+        if (activeStream != MultiStreamManager::InvalidStreamId) {
+            multiStreamManager_->SetStreamPlaybackSpeed(activeStream, playbackSpeed_);
+        }
     }
 
     emit PlaybackSpeedChanged(playbackSpeed_);
@@ -182,43 +221,55 @@ void MediaPlayController::SetState(PlaybackState state) {
 }
 
 void MediaPlayController::Start() {
-    if (!pipeline_ || !pipeline_->IsInitialized()) {
+    if (!multiStreamManager_
+        || multiStreamManager_->ActiveStream() == MultiStreamManager::InvalidStreamId) {
         qWarning() << "Start failed: playback pipeline is not initialized";
         return;
     }
 
+    if (!multiStreamManager_->StartStream(multiStreamManager_->ActiveStream())) {
+        qWarning() << "Start failed: active stream is invalid";
+        return;
+    }
+
     SetState(PlaybackState::Playing);
-    pipeline_->Start();
 }
 
 void MediaPlayController::Stop() {
-    if (!pipeline_) {
+    if (!multiStreamManager_) {
         SetState(PlaybackState::Stopped);
         return;
     }
 
-    if (state_ != PlaybackState::Stopped) {
-        pipeline_->Stop();
+    const MultiStreamManager::StreamId activeStream = multiStreamManager_->ActiveStream();
+    if (state_ != PlaybackState::Stopped
+        && activeStream != MultiStreamManager::InvalidStreamId) {
+        multiStreamManager_->StopStream(activeStream);
     }
 
     SetState(PlaybackState::Stopped);
 }
 
 void MediaPlayController::Shutdown() {
-    if (pipeline_) {
-        pipeline_->Shutdown();
+    if (multiStreamManager_) {
+        multiStreamManager_->ShutdownAll();
     }
     SetState(PlaybackState::Stopped);
 }
 
 void MediaPlayController::Pause() {
-    if (!pipeline_ || !pipeline_->IsInitialized()) {
+    if (!multiStreamManager_
+        || multiStreamManager_->ActiveStream() == MultiStreamManager::InvalidStreamId) {
         qWarning() << "Pause failed: playback pipeline is not initialized";
         return;
     }
 
+    if (!multiStreamManager_->PauseStream(multiStreamManager_->ActiveStream())) {
+        qWarning() << "Pause failed: active stream is invalid";
+        return;
+    }
+
     SetState(PlaybackState::Paused);
-    pipeline_->Pause();
 }
 
 void MediaPlayController::VolumeUp() {
@@ -236,11 +287,10 @@ void MediaPlayController::SetVolume(double volume) {
     }
 
     volume_ = clampedVolume;
-    if (pipeline_) {
-        pipeline_->SetVolume(volume_);
-    } else {
-        emit VolumeChanged(volume_);
+    if (multiStreamManager_) {
+        multiStreamManager_->SetAudioVolume(volume_);
     }
+    emit VolumeChanged(volume_);
 }
 
 double MediaPlayController::Volume() const {
@@ -253,11 +303,10 @@ void MediaPlayController::SetMuted(bool muted) {
     }
 
     muted_ = muted;
-    if (pipeline_) {
-        pipeline_->SetMuted(muted_);
-    } else {
-        emit MuteChanged(muted_);
+    if (multiStreamManager_) {
+        multiStreamManager_->SetAudioMuted(muted_);
     }
+    emit MuteChanged(muted_);
 }
 
 bool MediaPlayController::IsMuted() const {
@@ -265,7 +314,8 @@ bool MediaPlayController::IsMuted() const {
 }
 
 void MediaPlayController::SeekTo(double seconds) {
-    if (!pipeline_ || !pipeline_->IsInitialized()) {
+    if (!multiStreamManager_
+        || multiStreamManager_->ActiveStream() == MultiStreamManager::InvalidStreamId) {
         qWarning() << "Seek failed: playback pipeline is not initialized";
         return;
     }
@@ -282,7 +332,7 @@ void MediaPlayController::SeekTo(double seconds) {
 
     const PlaybackState previousState = State();
 
-    if (!pipeline_->SeekTo(targetSeconds)) {
+    if (!multiStreamManager_->SeekStreamTo(multiStreamManager_->ActiveStream(), targetSeconds)) {
         RestorePlaybackState(previousState);
         return;
     }
@@ -291,14 +341,15 @@ void MediaPlayController::SeekTo(double seconds) {
 }
 
 void MediaPlayController::SeekRelative(double seconds) {
-    if (!pipeline_ || !pipeline_->IsInitialized()) {
+    if (!multiStreamManager_
+        || multiStreamManager_->ActiveStream() == MultiStreamManager::InvalidStreamId) {
         qWarning() << "Seek failed: playback pipeline is not initialized";
         return;
     }
 
     const PlaybackState previousState = State();
 
-    if (!pipeline_->SeekRelative(seconds)) {
+    if (!multiStreamManager_->SeekStreamRelative(multiStreamManager_->ActiveStream(), seconds)) {
         RestorePlaybackState(previousState);
         return;
     }

@@ -214,61 +214,61 @@ MainWindow
 
 ### 3.2.9.1 Controller 持有 Manager
 
-- [ ] 引入 `MultiStreamManager` 头文件。
-- [ ] 将 `pipeline_` 替换为 `multiStreamManager_`。
-- [ ] 构造函数初始化 Manager。
-- [ ] 析构和 `Shutdown()` 释放 Manager 管理的全部 stream。
-- [ ] Controller 不直接持有 `MediaPipeline`。
+- [x] 引入 `MultiStreamManager` 头文件。
+- [x] 将 `pipeline_` 替换为 `multiStreamManager_`。
+- [x] 构造函数初始化 Manager。
+- [x] 析构和 `Shutdown()` 释放 Manager 管理的全部 stream。
+- [x] Controller 不直接持有 `MediaPipeline`。
 
 ### 3.2.9.2 Initialize / SwitchSource 接入 Manager
 
-- [ ] `Initialize()` 通过 Manager 添加第一路 stream。
-- [ ] `Initialize()` 成功后设置 active stream。
-- [ ] `Initialize()` 保留当前单路 UI 语义。
-- [ ] `SwitchSource()` 清理旧 stream。
-- [ ] `SwitchSource()` 添加新 stream。
-- [ ] `SwitchSource()` 根据 autoStart 恢复播放。
+- [x] `Initialize()` 通过 Manager 添加第一路 stream。
+- [x] `Initialize()` 成功后设置 active stream。
+- [x] `Initialize()` 保留当前单路 UI 语义。
+- [x] `SwitchSource()` 清理旧 stream。
+- [x] `SwitchSource()` 添加新 stream。
+- [x] `SwitchSource()` 根据 autoStart 恢复播放。
 
 ### 3.2.9.3 播放控制委托 active stream
 
-- [ ] `Start()` 委托 active stream。
-- [ ] `Pause()` 委托 active stream。
-- [ ] `Stop()` 委托 active stream。
-- [ ] `SeekTo()` 委托 active stream。
-- [ ] `SeekRelative()` 委托 active stream。
-- [ ] `SetPlaybackSpeed()` 委托 active stream。
+- [x] `Start()` 委托 active stream。
+- [x] `Pause()` 委托 active stream。
+- [x] `Stop()` 委托 active stream。
+- [x] `SeekTo()` 委托 active stream。
+- [x] `SeekRelative()` 委托 active stream。
+- [x] `SetPlaybackSpeed()` 委托 active stream。
 
 ### 3.2.9.4 音频控制接入 active audio stream
 
-- [ ] `SetVolume()` 委托 Manager 音频策略。
-- [ ] `Volume()` 返回 Controller 保存的 volume。
-- [ ] `SetMuted()` 委托 Manager 音频策略。
-- [ ] `IsMuted()` 返回 Controller 保存的 muted。
-- [ ] 切源后恢复当前音量和静音状态。
+- [x] `SetVolume()` 委托 Manager 音频策略。
+- [x] `Volume()` 返回 Controller 保存的 volume。
+- [x] `SetMuted()` 委托 Manager 音频策略。
+- [x] `IsMuted()` 返回 Controller 保存的 muted。
+- [x] 切源后恢复当前音量和静音状态。
 
 ### 3.2.9.5 状态读取和信号转发
 
-- [ ] `Duration()` 读取 active stream duration。
-- [ ] `Position()` 读取 active stream position。
-- [ ] Manager position 信号转发为 Controller position 信号。
-- [ ] Manager duration 信号转发为 Controller duration 信号。
-- [ ] Manager playback finished 信号转发为 Controller playback finished。
-- [ ] Manager volume/mute 信号转发为 Controller volume/mute 信号。
-- [ ] 只转发 active stream / active audio stream 的 UI 信号。
+- [x] `Duration()` 读取 active stream duration。
+- [x] `Position()` 读取 active stream position。
+- [x] Manager position 信号转发为 Controller position 信号。
+- [x] Manager duration 信号转发为 Controller duration 信号。
+- [x] Manager playback finished 信号转发为 Controller playback finished。
+- [x] Manager volume/mute 信号转发为 Controller volume/mute 信号。
+- [x] 只转发 active stream / active audio stream 的 UI 信号。
 
 ### 3.2.9.6 静态验收
 
-- [ ] `MainWindow` 不直接访问 `MultiStreamManager`。
-- [ ] `MainWindow` 不直接访问 `MediaPipeline`。
-- [ ] `MediaPlayController` 不直接持有 `MediaPipeline`。
-- [ ] `MediaPipeline` 不出现 `StreamId`。
-- [ ] 当前单路 UI 接口保持不变。
+- [x] `MainWindow` 不直接访问 `MultiStreamManager`。
+- [x] `MainWindow` 不直接访问 `MediaPipeline`。
+- [x] `MediaPlayController` 不直接持有 `MediaPipeline`。
+- [x] `MediaPipeline` 不出现 `StreamId`。
+- [x] 当前单路 UI 接口保持不变。
 
 **验收标准**：
 
 - [ ] 现有 UI 行为不变。
 - [ ] 播放列表切换不退化。
-- [ ] Controller 不直接持有多个 Pipeline。
+- [x] Controller 不直接持有多个 Pipeline。
 
 ## 3.2.10 最小多路文件源验证
 
