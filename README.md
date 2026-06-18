@@ -47,11 +47,11 @@ TinyVideoProcessor 是一个渐进式演进的视频处理框架，遵循清晰�
 ### 规划中的功能
 
 #### Phase 1: 完善播放器
-- [ ] 进度条拖动（Seek）
-- [ ] 播放列表管理
-- [ ] 播放速度控制
-- [ ] 快进/快退
-- [ ] 全屏模式
+- [x] 进度条拖动（Seek）
+- [x] 播放列表管理
+- [x] 播放速度控制
+- [x] 快进/快退
+- [x] 全屏模式
 - [ ] 配置持久化
 
 #### Phase 2: 摄像头支持
@@ -207,23 +207,37 @@ cmake --build . --config Release
 
 ```
 TinyVideoProcessor/
-├── README.md                    # 项目说明
-├── 架构指导.md               # 详细的演进规划
-├── CMakeLists.txt               # CMake 构建配置
-├── src/
-│   ├── main.cpp                 # 程序入口
-│   ├── mainwindow.h/cpp         # 主窗口
-│   ├── demuxer.h/cpp            # 解复用器
-│   ├── decoder.h/cpp            # 解码器
-│   ├── audioplayer.h/cpp        # 音频播放
-│   ├── videorender.h/cpp        # 视频渲染
-│   ├── syncmanager.h/cpp        # 音视频同步
-│   └── global.h/cpp             # 全局定义
-├── ui/
-│   └── mainwindow.ui            # UI 设计文件
-├── docs/                        # 文档目录（待创建）
-├── tests/                       # 测试代码（待创建）
-└── examples/                    # 示例代码（待创建）
+├── README.md                     # 项目说明
+├── CMakeLists.txt                # CMake 构建配置
+├── Lib/
+│   └── ffmpeg/                   # 随项目发布的 FFmpeg 依赖
+├── doc/
+│   ├── 架构指导.md               # 总体架构路线
+│   ├── TODO.md                   # 当前阶段任务清单
+│   ├── Phase1_*.md               # 播放器完善阶段文档
+│   ├── Phase3_0_*.md             # 无音频流支持文档
+│   ├── Phase3_1_*.md             # 单路 MediaPipeline 抽取文档
+│   └── Phase3_2_*.md             # 多路管理设计文档
+└── src/
+    ├── ui/
+    │   ├── main.cpp              # 程序入口
+    │   ├── mainwindow.h/cpp      # 主窗口
+    │   └── mainwindow.ui         # UI 设计文件
+    ├── application/
+    │   └── MediaPlayController.h/cpp
+    ├── domain/
+    │   ├── IMediaSource.h        # 媒体源抽象接口
+    │   ├── FileMediaSource.h/cpp # 文件媒体源
+    │   ├── MediaPipeline.h/cpp   # 单路播放管线
+    │   └── PlaylistManager.h/cpp # 播放列表管理
+    ├── infrastructure/
+    │   ├── demuxer.h/cpp         # 解复用器
+    │   ├── decoder.h/cpp         # 解码器
+    │   ├── audioplayer.h/cpp     # 音频播放
+    │   ├── videorender.h/cpp     # 视频渲染
+    │   └── syncmanager.h/cpp     # 音视频同步
+    └── core/
+        └── queue.h               # 线程安全队列
 ```
 
 ---
