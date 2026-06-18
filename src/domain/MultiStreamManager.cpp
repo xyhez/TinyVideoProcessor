@@ -151,12 +151,99 @@ void MultiStreamManager::ShutdownAll() {
     }
 }
 
+bool MultiStreamManager::StartStream(StreamId id) {
+    MediaPipeline* pipeline = FindPipeline(id);
+    if (!pipeline) {
+        return false;
+    }
+
+    pipeline->Start();
+    return true;
+}
+
+bool MultiStreamManager::PauseStream(StreamId id) {
+    MediaPipeline* pipeline = FindPipeline(id);
+    if (!pipeline) {
+        return false;
+    }
+
+    pipeline->Pause();
+    return true;
+}
+
+bool MultiStreamManager::StopStream(StreamId id) {
+    MediaPipeline* pipeline = FindPipeline(id);
+    if (!pipeline) {
+        return false;
+    }
+
+    pipeline->Stop();
+    return true;
+}
+
+bool MultiStreamManager::SeekStreamTo(StreamId id, double seconds) {
+    MediaPipeline* pipeline = FindPipeline(id);
+    if (!pipeline) {
+        return false;
+    }
+
+    return pipeline->SeekTo(seconds);
+}
+
+bool MultiStreamManager::SeekStreamRelative(StreamId id, double seconds) {
+    MediaPipeline* pipeline = FindPipeline(id);
+    if (!pipeline) {
+        return false;
+    }
+
+    return pipeline->SeekRelative(seconds);
+}
+
+bool MultiStreamManager::SetStreamPlaybackSpeed(StreamId id, double speed) {
+    MediaPipeline* pipeline = FindPipeline(id);
+    if (!pipeline) {
+        return false;
+    }
+
+    pipeline->SetPlaybackSpeed(speed);
+    return true;
+}
+
+bool MultiStreamManager::SetStreamVolume(StreamId id, double volume) {
+    MediaPipeline* pipeline = FindPipeline(id);
+    if (!pipeline) {
+        return false;
+    }
+
+    pipeline->SetVolume(volume);
+    return true;
+}
+
+bool MultiStreamManager::SetStreamMuted(StreamId id, bool muted) {
+    MediaPipeline* pipeline = FindPipeline(id);
+    if (!pipeline) {
+        return false;
+    }
+
+    pipeline->SetMuted(muted);
+    return true;
+}
+
 MultiStreamManager::StreamId MultiStreamManager::SelectFallbackStream() const {
     if (streams_.empty()) {
         return InvalidStreamId;
     }
 
     return streams_.begin()->first;
+}
+
+MediaPipeline* MultiStreamManager::FindPipeline(StreamId id) {
+    auto it = streams_.find(id);
+    if (it == streams_.end()) {
+        return nullptr;
+    }
+
+    return it->second.pipeline.get();
 }
 
 void MultiStreamManager::ConnectPipelineSignals(StreamId id, MediaPipeline* pipeline) {

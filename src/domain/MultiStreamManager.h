@@ -96,6 +96,75 @@ public:
      */
     void ShutdownAll();
 
+    /**
+     * @brief StartStream 启动或恢复指定逻辑流
+     * @param id 目标 StreamId
+     * @return true 操作已下发
+     * @return false id 不存在
+     */
+    bool StartStream(StreamId id);
+
+    /**
+     * @brief PauseStream 暂停指定逻辑流
+     * @param id 目标 StreamId
+     * @return true 操作已下发
+     * @return false id 不存在
+     */
+    bool PauseStream(StreamId id);
+
+    /**
+     * @brief StopStream 停止指定逻辑流
+     * @param id 目标 StreamId
+     * @return true 操作已下发
+     * @return false id 不存在
+     */
+    bool StopStream(StreamId id);
+
+    /**
+     * @brief SeekStreamTo 跳转指定逻辑流到目标位置
+     * @param id 目标 StreamId
+     * @param seconds 目标位置，单位秒
+     * @return true 跳转成功
+     * @return false id 不存在或跳转失败
+     */
+    bool SeekStreamTo(StreamId id, double seconds);
+
+    /**
+     * @brief SeekStreamRelative 按当前位置相对跳转指定逻辑流
+     * @param id 目标 StreamId
+     * @param seconds 相对跳转秒数，负数表示后退
+     * @return true 跳转成功
+     * @return false id 不存在或跳转失败
+     */
+    bool SeekStreamRelative(StreamId id, double seconds);
+
+    /**
+     * @brief SetStreamPlaybackSpeed 设置指定逻辑流播放速度
+     * @param id 目标 StreamId
+     * @param speed 播放速度
+     * @return true 操作已下发
+     * @return false id 不存在
+     */
+    bool SetStreamPlaybackSpeed(StreamId id, double speed);
+
+    /**
+     * @brief SetStreamVolume 设置指定逻辑流音量
+     * @param id 目标 StreamId
+     * @param volume 音量值，范围 0.0-1.0
+     * @return true 操作已下发
+     * @return false id 不存在
+     */
+    bool SetStreamVolume(StreamId id, double volume);
+
+    /**
+     * @brief SetStreamMuted 设置指定逻辑流静音状态
+     * @param id 目标 StreamId
+     * @param muted 是否静音
+     * @return true 操作已下发
+     * @return false id 不存在
+     */
+    bool SetStreamMuted(StreamId id, bool muted);
+
 signals:
     /**
      * @brief StreamAdded 逻辑流添加信号
@@ -174,6 +243,13 @@ private:
      * @return 可用 StreamId；无流时返回 InvalidStreamId
      */
     StreamId SelectFallbackStream() const;
+
+    /**
+     * @brief FindPipeline 查找指定逻辑流的播放管线
+     * @param id 目标 StreamId
+     * @return MediaPipeline 指针；id 不存在时返回 nullptr
+     */
+    MediaPipeline* FindPipeline(StreamId id);
 
     /**
      * @brief ConnectPipelineSignals 转发指定 Pipeline 的播放信号

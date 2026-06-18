@@ -141,21 +141,21 @@ MainWindow
 
 **目标**：Manager 可以控制指定一路 Pipeline。
 
-- [ ] 定义 `StartStream(StreamId id)`。
-- [ ] 定义 `PauseStream(StreamId id)`。
-- [ ] 定义 `StopStream(StreamId id)`。
-- [ ] 定义 `SeekStreamTo(StreamId id, double seconds)`。
-- [ ] 定义 `SeekStreamRelative(StreamId id, double seconds)`。
-- [ ] 定义 `SetStreamPlaybackSpeed(StreamId id, double speed)`。
-- [ ] 定义 `SetStreamVolume(StreamId id, double volume)`。
-- [ ] 定义 `SetStreamMuted(StreamId id, bool muted)`。
-- [ ] id 不存在时安全返回。
+- [x] 定义 `StartStream(StreamId id)`。
+- [x] 定义 `PauseStream(StreamId id)`。
+- [x] 定义 `StopStream(StreamId id)`。
+- [x] 定义 `SeekStreamTo(StreamId id, double seconds)`。
+- [x] 定义 `SeekStreamRelative(StreamId id, double seconds)`。
+- [x] 定义 `SetStreamPlaybackSpeed(StreamId id, double speed)`。
+- [x] 定义 `SetStreamVolume(StreamId id, double volume)`。
+- [x] 定义 `SetStreamMuted(StreamId id, bool muted)`。
+- [x] id 不存在时安全返回。
 
 **验收标准**：
 
-- [ ] 指定 id 存在时操作生效。
-- [ ] 指定 id 不存在时不崩溃。
-- [ ] 无音频视频设置音量和静音不崩溃。
+- [x] 指定 id 存在时操作生效。
+- [x] 指定 id 不存在时不崩溃。
+- [x] 无音频视频设置音量和静音不崩溃。
 
 ## 3.2.6 Manager 全局控制能力
 
