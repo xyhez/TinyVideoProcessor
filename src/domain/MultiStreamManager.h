@@ -97,6 +97,21 @@ public:
     void ShutdownAll();
 
     /**
+     * @brief StartAll 启动或恢复全部逻辑流
+     */
+    void StartAll();
+
+    /**
+     * @brief PauseAll 暂停全部逻辑流
+     */
+    void PauseAll();
+
+    /**
+     * @brief StopAll 停止全部逻辑流
+     */
+    void StopAll();
+
+    /**
      * @brief StartStream 启动或恢复指定逻辑流
      * @param id 目标 StreamId
      * @return true 操作已下发

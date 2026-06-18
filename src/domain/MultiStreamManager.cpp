@@ -151,6 +151,30 @@ void MultiStreamManager::ShutdownAll() {
     }
 }
 
+void MultiStreamManager::StartAll() {
+    for (auto& stream : streams_) {
+        if (stream.second.pipeline) {
+            stream.second.pipeline->Start();
+        }
+    }
+}
+
+void MultiStreamManager::PauseAll() {
+    for (auto& stream : streams_) {
+        if (stream.second.pipeline) {
+            stream.second.pipeline->Pause();
+        }
+    }
+}
+
+void MultiStreamManager::StopAll() {
+    for (auto& stream : streams_) {
+        if (stream.second.pipeline) {
+            stream.second.pipeline->Stop();
+        }
+    }
+}
+
 bool MultiStreamManager::StartStream(StreamId id) {
     MediaPipeline* pipeline = FindPipeline(id);
     if (!pipeline) {
