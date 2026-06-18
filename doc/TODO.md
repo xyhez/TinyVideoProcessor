@@ -626,3 +626,127 @@ MainWindow
 - [ ] 4K MKV 可看到实际 pix_fmt 和色彩信息日志。
 - [ ] 不支持格式不再静默失败。
 - [ ] 当前已支持格式播放不退化。
+
+## Phase 3.6 MultiViewRenderer 空壳
+
+**目标**：先建立统一渲染器的布局、绘制和点击命中边界，不接真实视频帧，不替换当前多个 `VideoRender` 的稳定播放路径。
+
+## 3.6.1 MultiViewRenderer 空壳设计
+
+**目标**：新增统一渲染器类的最小接口和职责边界。
+
+- [x] 新增 `MultiViewRenderer` 类。
+- [x] `MultiViewRenderer` 继承 `QOpenGLWidget`。
+- [x] 明确该类属于基础设施层。
+- [x] 不持有 `MediaPipeline`。
+- [x] 不访问 demuxer / decoder / audio player。
+- [x] 不参与 active audio stream 策略。
+- [x] 不接真实视频帧。
+
+**验收标准**：
+
+- [ ] 类可以独立加入构建。
+- [ ] 不影响当前播放路径。
+- [ ] 当前多个 `VideoRender` 方案仍可作为回退路径。
+
+## 3.6.2 Viewport 布局计算
+
+**目标**：让 `MultiViewRenderer` 能根据布局和 stream 列表计算每路画面区域。
+
+- [ ] 定义渲染器内部布局枚举或复用现有布局语义。
+- [ ] 支持 `Single` 布局 viewport。
+- [ ] 支持 `Grid2x2` 布局 viewport。
+- [ ] 支持最多 4 个逻辑 view slot。
+- [ ] 空 slot 保持空白。
+- [ ] 不引入 3x3 / 4x4 / 1+N。
+
+**验收标准**：
+
+- [ ] `Single` 能计算一个全区域 viewport。
+- [ ] `Grid2x2` 能计算四个 viewport。
+- [ ] 空 slot 不影响布局计算。
+
+## 3.6.3 空画面绘制
+
+**目标**：先验证统一 OpenGL widget 可以绘制多画面区域，不接纹理。
+
+- [ ] 初始化 OpenGL 状态。
+- [ ] 绘制空背景。
+- [ ] 绘制 `Single` 空画面区域。
+- [ ] 绘制 `Grid2x2` 四个空画面区域。
+- [ ] 绘制 slot 边界。
+- [ ] 不上传视频纹理。
+
+**验收标准**：
+
+- [ ] 渲染器空壳显示正常。
+- [ ] `Single` / `Grid2x2` 空布局显示正常。
+- [ ] 切换布局不崩溃。
+
+## 3.6.4 Active Stream 视觉标记
+
+**目标**：让统一渲染器能根据 active stream 绘制选中态。
+
+- [ ] 支持设置 slot 与 `StreamId` 的绑定关系。
+- [ ] 支持设置 active stream。
+- [ ] active stream 对应 viewport 绘制高亮边框。
+- [ ] 无 active stream 时不绘制高亮。
+
+**验收标准**：
+
+- [ ] active stream 高亮正确。
+- [ ] 切换 active stream 后高亮跟随变化。
+- [ ] 空 slot 不显示 active 高亮。
+
+## 3.6.5 点击命中与信号
+
+**目标**：将鼠标点击坐标映射到 viewport，并对外发出 stream 点击信号。
+
+- [ ] 实现坐标命中 viewport。
+- [ ] 命中已绑定 slot 时发出 `StreamClicked(StreamId)` 信号。
+- [ ] 点击空 slot 不发出有效 stream 信号。
+- [ ] `MultiViewRenderer` 不直接调用 `SetActiveStream()`。
+- [ ] active stream 切换仍由 `MainWindow -> MediaPlayController` 完成。
+
+**验收标准**：
+
+- [ ] 点击不同 viewport 能识别对应 stream。
+- [ ] 点击空区域不误触发。
+- [ ] 渲染器不承担播放状态切换职责。
+
+## 3.6.6 MainWindow 实验性接入入口
+
+**目标**：以并存方式验证 `MultiViewRenderer` 空壳，不替换当前真实播放显示链路。
+
+- [ ] 在 UI 中预留实验性渲染器挂载入口。
+- [ ] `MultiViewRenderer` 与当前多个 `VideoRender` 路径并存。
+- [ ] 默认仍使用当前多个 `VideoRender` 播放路径。
+- [ ] 实验入口只用于验证空布局、active 高亮和点击命中。
+- [ ] 不把真实视频帧接入 `MultiViewRenderer`。
+
+**验收标准**：
+
+- [ ] 当前播放功能不退化。
+- [ ] 可以打开或显示 `MultiViewRenderer` 空壳。
+- [ ] 空壳布局、active 高亮、点击信号可验证。
+- [ ] 关闭程序不阻塞。
+
+## 3.6.7 Phase 3.6 验收报告
+
+**目标**：收口统一渲染器空壳阶段，决定是否进入真实视频帧接入。
+
+- [ ] 形成 `doc/Phase3_6_MultiViewRenderer空壳实现报告.md`。
+- [ ] 记录空壳类职责边界。
+- [ ] 记录 viewport 布局计算方式。
+- [ ] 记录 active stream 高亮策略。
+- [ ] 记录点击命中策略。
+- [ ] 记录与当前多 `VideoRender` 路径的并存方式。
+- [ ] 记录下一阶段接真实帧前的风险点。
+
+**验收标准**：
+
+- [ ] `MultiViewRenderer` 不管理播放管线。
+- [ ] 当前播放路径不退化。
+- [ ] 空布局绘制通过。
+- [ ] 点击命中通过。
+- [ ] 具备进入真实帧接入预研的条件。

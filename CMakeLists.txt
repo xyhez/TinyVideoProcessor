@@ -49,6 +49,8 @@ set(PROJECT_SOURCES
         src/infrastructure/syncmanager.cpp
         src/infrastructure/videorender.h
         src/infrastructure/videorender.cpp
+        src/infrastructure/multiviewrenderer.h
+        src/infrastructure/multiviewrenderer.cpp
         src/infrastructure/audioplayer.h
         src/infrastructure/audioplayer.cpp
         src/core/queue.h
