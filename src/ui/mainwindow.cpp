@@ -295,7 +295,9 @@ void MainWindow::mouseMoveEvent(QMouseEvent *event) {
 }
 
 bool MainWindow::eventFilter(QObject *watched, QEvent *event) {
-    Q_UNUSED(watched);
+    if (HandleVideoContainerClick(watched, event)) {
+        return true;
+    }
 
     if (event->type() == QEvent::MouseMove) {
         HandleFullScreenMouseActivity();
@@ -420,7 +422,10 @@ void MainWindow::InitializeCursorHideTimer() {
 void MainWindow::InitializeVideoContainers() {
     ui->widget_videoArea->setMouseTracking(true);
     ui->widget_videoArea->installEventFilter(this);
+    InstallVideoContainerEventFilters();
+}
 
+void MainWindow::InstallVideoContainerEventFilters() {
     for (QWidget* container : VideoContainers()) {
         if (!container) {
             continue;
@@ -428,6 +433,10 @@ void MainWindow::InitializeVideoContainers() {
 
         container->setMouseTracking(true);
         container->installEventFilter(this);
+        const QList<QWidget*> childWidgets = container->findChildren<QWidget*>();
+        for (QWidget* child : childWidgets) {
+            child->installEventFilter(this);
+        }
     }
 }
 
@@ -516,6 +525,78 @@ void MainWindow::ReleaseVideoContainerForStream(MediaPlayController::StreamId st
 
 int MainWindow::ContainerIndexForStream(MediaPlayController::StreamId streamId) const {
     return streamContainerIndexes_.value(streamId, -1);
+}
+
+MediaPlayController::StreamId MainWindow::StreamIdForVideoContainerIndex(int containerIndex) const {
+    for (auto it = streamContainerIndexes_.cbegin(); it != streamContainerIndexes_.cend(); ++it) {
+        if (it.value() == containerIndex) {
+            return it.key();
+        }
+    }
+
+    return MediaPlayController::InvalidStreamId;
+}
+
+int MainWindow::VideoContainerIndexForWidget(QWidget* widget) const {
+    if (!widget) {
+        return -1;
+    }
+
+    const std::array<QWidget*, 4> containers = VideoContainers();
+    for (int index = 0; index < static_cast<int>(containers.size()); ++index) {
+        QWidget* container = containers.at(index);
+        if (!container) {
+            continue;
+        }
+
+        if (widget == container || container->isAncestorOf(widget)) {
+            return index;
+        }
+    }
+
+    return -1;
+}
+
+bool MainWindow::HandleVideoContainerClick(QObject* watched, QEvent* event) {
+    if (!event || event->type() != QEvent::MouseButtonPress) {
+        return false;
+    }
+
+    auto* mouseEvent = static_cast<QMouseEvent*>(event);
+    if (mouseEvent->button() != Qt::LeftButton) {
+        return false;
+    }
+
+    QWidget* sourceWidget = qobject_cast<QWidget*>(watched);
+    const int containerIndex = VideoContainerIndexForWidget(sourceWidget);
+    if (containerIndex < 0) {
+        return false;
+    }
+
+    return ActivateStreamFromVideoContainer(containerIndex);
+}
+
+bool MainWindow::ActivateStreamFromVideoContainer(int containerIndex) {
+    const MediaPlayController::StreamId streamId = StreamIdForVideoContainerIndex(containerIndex);
+    if (streamId == MediaPlayController::InvalidStreamId) {
+        return false;
+    }
+
+    if (!mediaPlayController_->SetActiveStream(streamId)) {
+        qWarning() << "Set active stream from video container failed:" << streamId;
+        return true;
+    }
+
+    const MediaPlayController::StreamId audioStreamId =
+        mediaPlayController_->StreamHasAudio(streamId)
+            ? streamId
+            : MediaPlayController::InvalidStreamId;
+    if (!mediaPlayController_->SetActiveAudioStream(audioStreamId)) {
+        qWarning() << "Set active audio stream from video container failed:" << streamId;
+    }
+
+    RefreshStreamView();
+    return true;
 }
 
 void MainWindow::RefreshMultiViewLayout() {
@@ -768,6 +849,7 @@ void MainWindow::AddMultiStreamFiles() {
 
         BindStreamToVideoContainer(streamId, containerIndex);
         streamDisplayNames_.insert(streamId, QFileInfo(filePath).fileName());
+        InstallVideoContainerEventFilters();
     }
 
     RefreshStreamView();
@@ -849,6 +931,7 @@ bool MainWindow::SwitchToPlaylistIndex(int index, bool autoStart) {
     if (activeStreamId != MediaPlayController::InvalidStreamId) {
         BindStreamToVideoContainer(activeStreamId, 0);
         streamDisplayNames_.insert(activeStreamId, item.displayName);
+        InstallVideoContainerEventFilters();
         RefreshStreamView();
     }
     return true;

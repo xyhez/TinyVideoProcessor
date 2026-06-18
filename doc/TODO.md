@@ -404,10 +404,10 @@ MainWindow
 
 **验收标准**：
 
-- [ ] 程序启动后 UI 正常。
-- [ ] `Single` 模式显示一个视频区域。
-- [ ] `2x2` 模式显示四个视频区域。
-- [ ] 切换布局不崩溃。
+- [x] 程序启动后 UI 正常。
+- [x] `Single` 模式显示一个视频区域。
+- [x] `2x2` 模式显示四个视频区域。
+- [x] 切换布局不崩溃。
 
 ## 3.3.5 Stream 与容器绑定
 
@@ -421,22 +421,22 @@ MainWindow
 
 **验收标准**：
 
-- [ ] 添加第 1 路显示在一个容器。
-- [ ] 添加第 2 路显示在另一个容器。
-- [ ] 最多添加 4 路显示流。
-- [ ] 移除一路后容器可再次复用。
-- [ ] UI 仍只通过 Controller 添加和移除 stream。
+- [x] 添加第 1 路显示在一个容器。
+- [x] 添加第 2 路显示在另一个容器。
+- [x] 最多添加 4 路显示流。
+- [x] 移除一路后容器可再次复用。
+- [x] UI 仍只通过 Controller 添加和移除 stream。
 
 ## 3.3.6 Active Stream 画面选择
 
 **目标**：点击某个视频容器时切换 active stream，并同步音频策略。
 
-- [ ] 为每个视频容器添加点击处理。
-- [ ] 根据容器找到对应 `StreamId`。
-- [ ] 点击画面时调用 `SetActiveStream(streamId)`。
-- [ ] 有音频流点击后调用 `SetActiveAudioStream(streamId)`。
-- [ ] 无音频流点击后调用 `SetActiveAudioStream(InvalidStreamId)`。
-- [ ] UI 标记 active stream。
+- [x] 为每个视频容器添加点击处理。
+- [x] 根据容器找到对应 `StreamId`。
+- [x] 点击画面时调用 `SetActiveStream(streamId)`。
+- [x] 有音频流点击后调用 `SetActiveAudioStream(streamId)`。
+- [x] 无音频流点击后调用 `SetActiveAudioStream(InvalidStreamId)`。
+- [x] UI 标记 active stream。
 
 **验收标准**：
 

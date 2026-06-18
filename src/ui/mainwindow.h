@@ -174,6 +174,11 @@ private:
     void InitializeVideoContainers();
 
     /**
+     * @brief InstallVideoContainerEventFilters 为视频容器及其子控件安装事件过滤器
+     */
+    void InstallVideoContainerEventFilters();
+
+    /**
      * @brief InitializeMultiViewLayout 初始化多路显示布局状态
      */
     void InitializeMultiViewLayout();
@@ -248,6 +253,35 @@ private:
      * @return 容器索引，未绑定时返回 -1
      */
     int ContainerIndexForStream(MediaPlayController::StreamId streamId) const;
+
+    /**
+     * @brief StreamIdForVideoContainerIndex 获取容器绑定的流 ID
+     * @param containerIndex 容器索引
+     * @return 流 ID，未绑定时返回 InvalidStreamId
+     */
+    MediaPlayController::StreamId StreamIdForVideoContainerIndex(int containerIndex) const;
+
+    /**
+     * @brief VideoContainerIndexForWidget 获取控件所属的视频容器索引
+     * @param widget 事件来源控件
+     * @return 容器索引，未命中时返回 -1
+     */
+    int VideoContainerIndexForWidget(QWidget* widget) const;
+
+    /**
+     * @brief HandleVideoContainerClick 处理视频容器点击事件
+     * @param watched 事件来源
+     * @param event 事件对象
+     * @return true 点击已处理
+     */
+    bool HandleVideoContainerClick(QObject* watched, QEvent* event);
+
+    /**
+     * @brief ActivateStreamFromVideoContainer 根据视频容器切换活动流
+     * @param containerIndex 容器索引
+     * @return true 切换成功
+     */
+    bool ActivateStreamFromVideoContainer(int containerIndex);
 
     /**
      * @brief RefreshMultiViewLayout 根据当前布局刷新视频容器显示状态

@@ -104,6 +104,14 @@ public:
     bool SetActiveAudioStream(StreamId id);
 
     /**
+     * @brief StreamHasAudio 判断指定逻辑流是否有音频
+     * @param id 目标 StreamId
+     * @return true 有音频
+     * @return false 不存在或没有音频
+     */
+    bool StreamHasAudio(StreamId id) const;
+
+    /**
      * @brief SetAudioVolume 设置全局音频音量，只下发给 active audio stream
      * @param volume 音量值，范围 0.0-1.0
      */
@@ -301,14 +309,6 @@ private:
      * @return 可用 StreamId；无音频流时返回 InvalidStreamId
      */
     StreamId SelectFallbackAudioStream() const;
-
-    /**
-     * @brief StreamHasAudio 判断指定逻辑流是否有音频
-     * @param id 目标 StreamId
-     * @return true 有音频
-     * @return false 不存在或没有音频
-     */
-    bool StreamHasAudio(StreamId id) const;
 
     /**
      * @brief ApplyAudioSettingsToStream 将全局音频参数下发到指定逻辑流

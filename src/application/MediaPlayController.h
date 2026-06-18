@@ -114,6 +114,14 @@ public:
     bool SetActiveAudioStream(StreamId id);
 
     /**
+     * @brief StreamHasAudio 判断指定媒体流是否有音频
+     * @param id 目标流 ID
+     * @return true 有音频
+     * @return false 不存在或没有音频
+     */
+    bool StreamHasAudio(StreamId id) const;
+
+    /**
      * @brief StartAll 启动或恢复全部媒体流
      */
     void StartAll();

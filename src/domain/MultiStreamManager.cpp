@@ -148,11 +148,12 @@ bool MultiStreamManager::SetActiveAudioStream(StreamId id) {
     }
 
     const StreamId previousAudioStreamId = activeAudioStreamId_;
-    if (previousAudioStreamId != InvalidStreamId) {
+    activeAudioStreamId_ = id;
+
+    if (previousAudioStreamId != InvalidStreamId && previousAudioStreamId != activeAudioStreamId_) {
         SetStreamMuted(previousAudioStreamId, true);
     }
 
-    activeAudioStreamId_ = id;
     if (activeAudioStreamId_ != InvalidStreamId) {
         ApplyAudioSettingsToStream(activeAudioStreamId_);
     }

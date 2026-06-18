@@ -193,6 +193,11 @@ bool MediaPlayController::SetActiveAudioStream(StreamId id)
     return true;
 }
 
+bool MediaPlayController::StreamHasAudio(StreamId id) const
+{
+    return multiStreamManager_ ? multiStreamManager_->StreamHasAudio(id) : false;
+}
+
 void MediaPlayController::StartAll()
 {
     if (!multiStreamManager_ || multiStreamManager_->StreamIds().isEmpty()) {
