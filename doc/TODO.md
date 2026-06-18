@@ -122,20 +122,20 @@ MainWindow
 
 **目标**：让 Manager 对外暴露带 `StreamId` 的信号。
 
-- [ ] 转发 Pipeline 的 `PositionChanged`。
-- [ ] 转发 Pipeline 的 `DurationChanged`。
-- [ ] 转发 Pipeline 的 `PlaybackFinished`。
-- [ ] 转发 Pipeline 的 `VolumeChanged`。
-- [ ] 转发 Pipeline 的 `MuteChanged`。
-- [ ] 转发 Pipeline 的 `ErrorOccurred`。
-- [ ] 所有转发信号携带 `StreamId`。
-- [ ] RemoveStream 后旧信号不会访问已删除 slot。
+- [x] 转发 Pipeline 的 `PositionChanged`。
+- [x] 转发 Pipeline 的 `DurationChanged`。
+- [x] 转发 Pipeline 的 `PlaybackFinished`。
+- [x] 转发 Pipeline 的 `VolumeChanged`。
+- [x] 转发 Pipeline 的 `MuteChanged`。
+- [x] 转发 Pipeline 的 `ErrorOccurred`。
+- [x] 所有转发信号携带 `StreamId`。
+- [x] RemoveStream 后旧信号不会访问已删除 slot。
 
 **验收标准**：
 
-- [ ] 任意一路 Pipeline 的信号能标识来源。
-- [ ] 删除一路后无悬空回调。
-- [ ] 当前单路 Controller 信号转发不受影响。
+- [x] 任意一路 Pipeline 的信号能标识来源。
+- [x] 删除一路后无悬空回调。
+- [x] 当前单路 Controller 信号转发不受影响。
 
 ## 3.2.5 Manager 单路控制能力
 

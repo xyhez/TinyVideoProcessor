@@ -128,6 +128,40 @@ signals:
      */
     void StreamErrorOccurred(MultiStreamManager::StreamId id, QString message);
 
+    /**
+     * @brief StreamPositionChanged 指定逻辑流播放位置变化信号
+     * @param id 发生变化的 StreamId
+     * @param seconds 当前播放位置，单位秒
+     */
+    void StreamPositionChanged(MultiStreamManager::StreamId id, double seconds);
+
+    /**
+     * @brief StreamDurationChanged 指定逻辑流媒体时长变化信号
+     * @param id 发生变化的 StreamId
+     * @param seconds 媒体总时长，单位秒
+     */
+    void StreamDurationChanged(MultiStreamManager::StreamId id, double seconds);
+
+    /**
+     * @brief StreamPlaybackFinished 指定逻辑流自然播放结束信号
+     * @param id 播放结束的 StreamId
+     */
+    void StreamPlaybackFinished(MultiStreamManager::StreamId id);
+
+    /**
+     * @brief StreamVolumeChanged 指定逻辑流音量变化信号
+     * @param id 发生变化的 StreamId
+     * @param volume 当前音量，范围 0.0-1.0
+     */
+    void StreamVolumeChanged(MultiStreamManager::StreamId id, double volume);
+
+    /**
+     * @brief StreamMuteChanged 指定逻辑流静音状态变化信号
+     * @param id 发生变化的 StreamId
+     * @param muted 是否静音
+     */
+    void StreamMuteChanged(MultiStreamManager::StreamId id, bool muted);
+
 private:
     struct StreamSlot {
         std::shared_ptr<IMediaSource> mediaSource;
@@ -140,6 +174,13 @@ private:
      * @return 可用 StreamId；无流时返回 InvalidStreamId
      */
     StreamId SelectFallbackStream() const;
+
+    /**
+     * @brief ConnectPipelineSignals 转发指定 Pipeline 的播放信号
+     * @param id Pipeline 对应的 StreamId
+     * @param pipeline 单路播放管线
+     */
+    void ConnectPipelineSignals(StreamId id, MediaPipeline* pipeline);
 
     std::map<StreamId, StreamSlot> streams_;
     StreamId nextStreamId_ = 1;

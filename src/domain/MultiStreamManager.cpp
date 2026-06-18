@@ -33,6 +33,7 @@ MultiStreamManager::StreamId MultiStreamManager::AddStream(std::shared_ptr<IMedi
     slot.rendererContainer = rendererContainer;
     slot.pipeline = std::move(pipeline);
 
+    ConnectPipelineSignals(id, slot.pipeline.get());
     streams_.emplace(id, std::move(slot));
 
     emit StreamAdded(id);
@@ -156,4 +157,40 @@ MultiStreamManager::StreamId MultiStreamManager::SelectFallbackStream() const {
     }
 
     return streams_.begin()->first;
+}
+
+void MultiStreamManager::ConnectPipelineSignals(StreamId id, MediaPipeline* pipeline) {
+    if (!pipeline) {
+        return;
+    }
+
+    connect(pipeline, &MediaPipeline::PositionChanged, this,
+            [this, id](double seconds) {
+                emit StreamPositionChanged(id, seconds);
+            });
+
+    connect(pipeline, &MediaPipeline::DurationChanged, this,
+            [this, id](double seconds) {
+                emit StreamDurationChanged(id, seconds);
+            });
+
+    connect(pipeline, &MediaPipeline::PlaybackFinished, this,
+            [this, id]() {
+                emit StreamPlaybackFinished(id);
+            });
+
+    connect(pipeline, &MediaPipeline::VolumeChanged, this,
+            [this, id](double volume) {
+                emit StreamVolumeChanged(id, volume);
+            });
+
+    connect(pipeline, &MediaPipeline::MuteChanged, this,
+            [this, id](bool muted) {
+                emit StreamMuteChanged(id, muted);
+            });
+
+    connect(pipeline, &MediaPipeline::ErrorOccurred, this,
+            [this, id](const QString& message) {
+                emit StreamErrorOccurred(id, message);
+            });
 }
