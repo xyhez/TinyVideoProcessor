@@ -296,20 +296,20 @@ MainWindow
 
 **目标**：收口多路管理阶段。
 
-- [ ] 形成 `doc/Phase3_2_多路管理实现报告.md`。
-- [ ] 记录 Manager 最终职责。
-- [ ] 记录 Controller 和 Manager 边界。
-- [ ] 记录 Pipeline 是否保持单路无 id。
-- [ ] 记录文件源多路验证结果。
-- [ ] 记录已知限制。
-- [ ] 记录下一阶段建议。
+- [x] 形成 `doc/Phase3_2_多路管理实现报告.md`。
+- [x] 记录 Manager 最终职责。
+- [x] 记录 Controller 和 Manager 边界。
+- [x] 记录 Pipeline 是否保持单路无 id。
+- [x] 记录文件源多路验证结果。
+- [x] 记录已知限制。
+- [x] 记录下一阶段建议。
 
 **验收标准**：
 
-- [ ] Manager 边界清晰。
-- [ ] Controller 不直接持有多个 Pipeline。
-- [ ] Pipeline 保持单路职责。
-- [ ] 后续可以进入多路 UI 或多路渲染优化。
+- [x] Manager 边界清晰。
+- [x] Controller 不直接持有多个 Pipeline。
+- [x] Pipeline 保持单路职责。
+- [x] 后续可以进入多路 UI 或多路渲染优化。
 
 ## Phase 3.2 不做范围
 
