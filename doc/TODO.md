@@ -178,18 +178,18 @@ MainWindow
 
 **目标**：确定 UI 当前显示哪一路状态。
 
-- [ ] Manager 保存 `activeStreamId_`。
-- [ ] `SetActiveStream()` 校验 id 是否存在。
-- [ ] active stream 被删除时自动选择下一个可用 stream 或置为无效。
-- [ ] Controller 后续从 active stream 读取 `Position()`。
-- [ ] Controller 后续从 active stream 读取 `Duration()`。
-- [ ] 没有 active stream 时返回 0 或无效状态。
+- [x] Manager 保存 `activeStreamId_`。
+- [x] `SetActiveStream()` 校验 id 是否存在。
+- [x] active stream 被删除时自动选择下一个可用 stream 或置为无效。
+- [x] Controller 后续从 active stream 读取 `Position()`。
+- [x] Controller 后续从 active stream 读取 `Duration()`。
+- [x] 没有 active stream 时返回 0 或无效状态。
 
 **验收标准**：
 
-- [ ] 切换 active stream 后 UI 状态语义明确。
-- [ ] 删除 active stream 不崩溃。
-- [ ] 没有 active stream 时行为可解释。
+- [x] 切换 active stream 后 UI 状态语义明确。
+- [x] 删除 active stream 不崩溃。
+- [x] 没有 active stream 时行为可解释。
 
 ## 3.2.8 Active Audio Stream 策略
 

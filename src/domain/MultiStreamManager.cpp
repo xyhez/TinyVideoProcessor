@@ -102,6 +102,24 @@ bool MultiStreamManager::SetActiveStream(StreamId id) {
     return true;
 }
 
+double MultiStreamManager::ActiveStreamPosition() const {
+    const MediaPipeline* pipeline = FindPipeline(activeStreamId_);
+    if (!pipeline) {
+        return 0.0;
+    }
+
+    return pipeline->Position();
+}
+
+double MultiStreamManager::ActiveStreamDuration() const {
+    const MediaPipeline* pipeline = FindPipeline(activeStreamId_);
+    if (!pipeline) {
+        return 0.0;
+    }
+
+    return pipeline->Duration();
+}
+
 MultiStreamManager::StreamId MultiStreamManager::ActiveAudioStream() const {
     return activeAudioStreamId_;
 }
@@ -262,6 +280,15 @@ MultiStreamManager::StreamId MultiStreamManager::SelectFallbackStream() const {
 }
 
 MediaPipeline* MultiStreamManager::FindPipeline(StreamId id) {
+    auto it = streams_.find(id);
+    if (it == streams_.end()) {
+        return nullptr;
+    }
+
+    return it->second.pipeline.get();
+}
+
+const MediaPipeline* MultiStreamManager::FindPipeline(StreamId id) const {
     auto it = streams_.find(id);
     if (it == streams_.end()) {
         return nullptr;

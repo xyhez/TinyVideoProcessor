@@ -78,6 +78,18 @@ public:
     bool SetActiveStream(StreamId id);
 
     /**
+     * @brief ActiveStreamPosition 获取当前活动显示流播放位置
+     * @return 当前播放位置，单位秒；无活动流时返回 0.0
+     */
+    double ActiveStreamPosition() const;
+
+    /**
+     * @brief ActiveStreamDuration 获取当前活动显示流媒体时长
+     * @return 媒体总时长，单位秒；无活动流时返回 0.0
+     */
+    double ActiveStreamDuration() const;
+
+    /**
      * @brief ActiveAudioStream 获取当前活动音频流
      * @return 当前活动音频 StreamId；无活动音频流时返回 InvalidStreamId
      */
@@ -265,6 +277,13 @@ private:
      * @return MediaPipeline 指针；id 不存在时返回 nullptr
      */
     MediaPipeline* FindPipeline(StreamId id);
+
+    /**
+     * @brief FindPipeline 查找指定逻辑流的播放管线
+     * @param id 目标 StreamId
+     * @return MediaPipeline 指针；id 不存在时返回 nullptr
+     */
+    const MediaPipeline* FindPipeline(StreamId id) const;
 
     /**
      * @brief ConnectPipelineSignals 转发指定 Pipeline 的播放信号
