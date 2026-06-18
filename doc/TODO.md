@@ -66,34 +66,34 @@ MainWindow
 
 **目标**：新增类和接口，不接入 Controller，不创建真实 Pipeline。
 
-- [ ] 新增 `src/domain/MultiStreamManager.h`。
-- [ ] 新增 `src/domain/MultiStreamManager.cpp`。
-- [ ] `MultiStreamManager` 继承 `QObject`。
-- [ ] 定义 `StreamId` 类型。
-- [ ] 定义无效 StreamId 常量。
-- [ ] 定义 `AddStream()`。
-- [ ] 定义 `RemoveStream()`。
-- [ ] 定义 `HasStream()`。
-- [ ] 定义 `StreamIds()`。
-- [ ] 定义 `ActiveStream()`。
-- [ ] 定义 `SetActiveStream()`。
-- [ ] 定义 `ActiveAudioStream()`。
-- [ ] 定义 `SetActiveAudioStream()`。
-- [ ] 定义 `ShutdownAll()`。
-- [ ] 定义 `StreamAdded` 信号。
-- [ ] 定义 `StreamRemoved` 信号。
-- [ ] 定义 `ActiveStreamChanged` 信号。
-- [ ] 定义 `ActiveAudioStreamChanged` 信号。
-- [ ] 定义 `StreamErrorOccurred` 信号。
-- [ ] 加入构建系统。
-- [ ] 暂不让 Controller 使用 `MultiStreamManager`。
+- [x] 新增 `src/domain/MultiStreamManager.h`。
+- [x] 新增 `src/domain/MultiStreamManager.cpp`。
+- [x] `MultiStreamManager` 继承 `QObject`。
+- [x] 定义 `StreamId` 类型。
+- [x] 定义无效 StreamId 常量。
+- [x] 定义 `AddStream()`。
+- [x] 定义 `RemoveStream()`。
+- [x] 定义 `HasStream()`。
+- [x] 定义 `StreamIds()`。
+- [x] 定义 `ActiveStream()`。
+- [x] 定义 `SetActiveStream()`。
+- [x] 定义 `ActiveAudioStream()`。
+- [x] 定义 `SetActiveAudioStream()`。
+- [x] 定义 `ShutdownAll()`。
+- [x] 定义 `StreamAdded` 信号。
+- [x] 定义 `StreamRemoved` 信号。
+- [x] 定义 `ActiveStreamChanged` 信号。
+- [x] 定义 `ActiveAudioStreamChanged` 信号。
+- [x] 定义 `StreamErrorOccurred` 信号。
+- [x] 加入构建系统。
+- [x] 暂不让 Controller 使用 `MultiStreamManager`。
 
 **验收标准**：
 
-- [ ] 新类加入构建系统。
-- [ ] 当前单路播放行为不变。
-- [ ] `MediaPipeline` 不出现 id 字段。
-- [ ] 不新增 UI。
+- [x] 新类加入构建系统。
+- [x] 当前单路播放行为不变。
+- [x] `MediaPipeline` 不出现 id 字段。
+- [x] 不新增 UI。
 
 ## 3.2.3 Manager 持有多个 Pipeline
 
