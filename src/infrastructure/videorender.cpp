@@ -3,6 +3,10 @@
 #include <QDebug>
 #include <cmath>
 
+extern "C" {
+#include <libavutil/pixdesc.h>
+}
+
 static const int SYNC_THRESHOLD_MS = 40;
 
 namespace {
@@ -14,6 +18,36 @@ bool IsSupportedSpeed(double speed)
         || std::fabs(speed - 1.0) < kSpeedEpsilon
         || std::fabs(speed - 1.5) < kSpeedEpsilon
         || std::fabs(speed - 2.0) < kSpeedEpsilon;
+}
+
+QString PixelFormatName(int format)
+{
+    const char* name = av_get_pix_fmt_name(static_cast<AVPixelFormat>(format));
+    return name ? QString::fromUtf8(name) : QString("unknown(%1)").arg(format);
+}
+
+QString ColorRangeName(AVColorRange range)
+{
+    const char* name = av_color_range_name(range);
+    return name ? QString::fromUtf8(name) : QString("unknown(%1)").arg(static_cast<int>(range));
+}
+
+QString ColorSpaceName(AVColorSpace colorSpace)
+{
+    const char* name = av_color_space_name(colorSpace);
+    return name ? QString::fromUtf8(name) : QString("unknown(%1)").arg(static_cast<int>(colorSpace));
+}
+
+QString ColorPrimariesName(AVColorPrimaries primaries)
+{
+    const char* name = av_color_primaries_name(primaries);
+    return name ? QString::fromUtf8(name) : QString("unknown(%1)").arg(static_cast<int>(primaries));
+}
+
+QString ColorTransferName(AVColorTransferCharacteristic transfer)
+{
+    const char* name = av_color_transfer_name(transfer);
+    return name ? QString::fromUtf8(name) : QString("unknown(%1)").arg(static_cast<int>(transfer));
 }
 }
 
@@ -211,14 +245,19 @@ void VideoRender::paintGL()
         return;
     }
 
+    const bool supported = IsSupportedFrameFormat(frame);
+    LogFrameFormatIfNeeded(frame, supported);
+    if (!supported) {
+        glClear(GL_COLOR_BUFFER_BIT);
+        return;
+    }
+
     UploadTexture(frame);
     DrawFrame();
 }
 
 void VideoRender::UploadTexture(AVFrame* f)
 {
-    if (f->format != AV_PIX_FMT_YUV420P) return;
-
     if (m_texY && (m_texY->width() != f->width || m_texY->height() != f->height)) {
         FreeTextures();
     }
@@ -248,6 +287,65 @@ void VideoRender::UploadTexture(AVFrame* f)
 
     opt.setRowLength(f->linesize[2]);
     m_texV->setData(QOpenGLTexture::Red, QOpenGLTexture::UInt8, f->data[2], &opt);
+}
+
+bool VideoRender::IsSupportedFrameFormat(const AVFrame* frame) const
+{
+    return frame && frame->format == AV_PIX_FMT_YUV420P;
+}
+
+void VideoRender::LogFrameFormatIfNeeded(const AVFrame* frame, bool supported)
+{
+    if (!frame) {
+        return;
+    }
+
+    const bool changed = !m_hasLoggedFrameFormat
+        || m_lastLoggedFormat != static_cast<AVPixelFormat>(frame->format)
+        || m_lastLoggedWidth != frame->width
+        || m_lastLoggedHeight != frame->height
+        || m_lastLoggedLinesize[0] != frame->linesize[0]
+        || m_lastLoggedLinesize[1] != frame->linesize[1]
+        || m_lastLoggedLinesize[2] != frame->linesize[2]
+        || m_lastLoggedLinesize[3] != frame->linesize[3]
+        || m_lastLoggedColorRange != frame->color_range
+        || m_lastLoggedColorSpace != frame->colorspace
+        || m_lastLoggedColorPrimaries != frame->color_primaries
+        || m_lastLoggedColorTrc != frame->color_trc
+        || m_lastLoggedSupported != supported;
+    if (!changed) {
+        return;
+    }
+
+    m_hasLoggedFrameFormat = true;
+    m_lastLoggedFormat = static_cast<AVPixelFormat>(frame->format);
+    m_lastLoggedWidth = frame->width;
+    m_lastLoggedHeight = frame->height;
+    for (int index = 0; index < 4; ++index) {
+        m_lastLoggedLinesize[index] = frame->linesize[index];
+    }
+    m_lastLoggedColorRange = frame->color_range;
+    m_lastLoggedColorSpace = frame->colorspace;
+    m_lastLoggedColorPrimaries = frame->color_primaries;
+    m_lastLoggedColorTrc = frame->color_trc;
+    m_lastLoggedSupported = supported;
+
+    const QString prefix = supported
+        ? "VideoRender accepted frame format:"
+        : "VideoRender unsupported frame format:";
+    qInfo().noquote()
+        << prefix
+        << QString("pix_fmt=%1").arg(PixelFormatName(frame->format))
+        << QString("size=%1x%2").arg(frame->width).arg(frame->height)
+        << QString("linesize=[%1,%2,%3,%4]")
+              .arg(frame->linesize[0])
+              .arg(frame->linesize[1])
+              .arg(frame->linesize[2])
+              .arg(frame->linesize[3])
+        << QString("color_range=%1").arg(ColorRangeName(frame->color_range))
+        << QString("colorspace=%1").arg(ColorSpaceName(frame->colorspace))
+        << QString("color_primaries=%1").arg(ColorPrimariesName(frame->color_primaries))
+        << QString("color_trc=%1").arg(ColorTransferName(frame->color_trc));
 }
 
 void VideoRender::DrawFrame()

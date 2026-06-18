@@ -605,21 +605,24 @@ MainWindow
 - [ ] 无音频流视频不受影响。
 - [ ] 音画同步不退化。
 
-## 3.5.5 视频输出格式归一化实现
+## 3.5.5 VideoRender 输入格式能力梳理与最小修正
 
-**目标**：在音频格式链路稳定后，再统一视频 decoder 输出格式，让当前 `VideoRender` 先稳定消费一种格式。
+**目标**：明确 `VideoRender` 当前支持的输入帧格式，对不支持格式输出可诊断日志，避免静默失败。本任务不修改 decoder 输出格式，不做 `sws_scale` 统一转换。
 
-- [ ] 在视频 decoder 输出侧识别非 `AV_PIX_FMT_YUV420P` 帧。
-- [ ] 使用 `sws_scale` 将可转换视频帧归一化为 `AV_PIX_FMT_YUV420P`。
-- [ ] 保留 `pts`、`time_base`、`sample_aspect_ratio`、`color_range`、`colorspace` 等关键元数据。
-- [ ] 对无法转换的视频帧输出明确日志并安全丢弃。
-- [ ] 保持 `VideoRender` 第一版只消费 `AV_PIX_FMT_YUV420P`。
-- [ ] 暂不实现 HDR tone mapping。
+- [x] 将支持格式判断抽成 `IsSupportedFrameFormat()`。
+- [x] 明确当前仅支持 `AV_PIX_FMT_YUV420P`。
+- [x] 新增帧格式签名记录，避免每帧重复刷日志。
+- [x] 对支持格式首次输出 accepted 日志。
+- [x] 对不支持格式输出 unsupported 日志。
+- [x] 日志包含 pix_fmt、width、height、linesize、color_range、colorspace、color_primaries、color_trc。
+- [x] 非支持格式不进行纹理上传和绘制。
+- [x] 不修改 decoder 输出格式。
+- [x] 不实现 `sws_scale` 统一转换。
+- [x] 不实现 HDR tone mapping。
 
 **验收标准**：
 
-- [ ] 普通 H.264 MP4 播放不退化。
-- [ ] 4K MKV 能完整显示画面。
-- [ ] 4K MKV 色彩明显异常问题改善。
-- [ ] seek 后画面正常恢复。
-- [ ] 多路显示不退化。
+- [ ] 普通 MP4 可看到 accepted `yuv420p` 日志并正常播放。
+- [ ] 4K MKV 可看到实际 pix_fmt 和色彩信息日志。
+- [ ] 不支持格式不再静默失败。
+- [ ] 当前已支持格式播放不退化。

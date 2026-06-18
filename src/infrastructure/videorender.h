@@ -15,6 +15,7 @@
 
 extern "C" {
 #include <libavutil/frame.h>
+#include <libavutil/pixfmt.h>
 #include <libavutil/rational.h>
 }
 
@@ -108,6 +109,21 @@ private:
     void UploadTexture(AVFrame* frame);
 
     /**
+     * @brief IsSupportedFrameFormat 判断当前渲染器是否支持该帧格式
+     * @param frame 待判断的视频帧
+     * @return true 支持渲染
+     * @return false 不支持渲染
+     */
+    bool IsSupportedFrameFormat(const AVFrame* frame) const;
+
+    /**
+     * @brief LogFrameFormatIfNeeded 在格式签名变化时输出诊断日志
+     * @param frame 当前视频帧
+     * @param supported 是否为受支持格式
+     */
+    void LogFrameFormatIfNeeded(const AVFrame* frame, bool supported);
+
+    /**
      * @brief DrawFrame 绘制当前纹理帧
      */
     void DrawFrame();
@@ -153,6 +169,17 @@ private:
 
     int m_rendered = 0;
     int m_dropped = 0;
+
+    AVPixelFormat m_lastLoggedFormat = AV_PIX_FMT_NONE;
+    int m_lastLoggedWidth = 0;
+    int m_lastLoggedHeight = 0;
+    int m_lastLoggedLinesize[4] = {0, 0, 0, 0};
+    AVColorRange m_lastLoggedColorRange = AVCOL_RANGE_UNSPECIFIED;
+    AVColorSpace m_lastLoggedColorSpace = AVCOL_SPC_UNSPECIFIED;
+    AVColorPrimaries m_lastLoggedColorPrimaries = AVCOL_PRI_UNSPECIFIED;
+    AVColorTransferCharacteristic m_lastLoggedColorTrc = AVCOL_TRC_UNSPECIFIED;
+    bool m_lastLoggedSupported = false;
+    bool m_hasLoggedFrameFormat = false;
 };
 
 #endif // VIDEORENDER_H
