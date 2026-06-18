@@ -216,6 +216,40 @@ private:
     QWidget* PrimaryVideoContainer() const;
 
     /**
+     * @brief VideoContainerAt 获取指定索引的视频容器
+     * @param index 容器索引
+     * @return 视频容器，索引无效时返回 nullptr
+     */
+    QWidget* VideoContainerAt(int index) const;
+
+    /**
+     * @brief FirstAvailableVideoContainerIndex 获取第一个空闲视频容器索引
+     * @return 空闲容器索引，无空闲容器时返回 -1
+     */
+    int FirstAvailableVideoContainerIndex() const;
+
+    /**
+     * @brief BindStreamToVideoContainer 绑定流和视频容器
+     * @param streamId 流 ID
+     * @param containerIndex 容器索引
+     */
+    void BindStreamToVideoContainer(MediaPlayController::StreamId streamId,
+                                    int containerIndex);
+
+    /**
+     * @brief ReleaseVideoContainerForStream 释放流占用的视频容器
+     * @param streamId 流 ID
+     */
+    void ReleaseVideoContainerForStream(MediaPlayController::StreamId streamId);
+
+    /**
+     * @brief ContainerIndexForStream 获取流绑定的视频容器索引
+     * @param streamId 流 ID
+     * @return 容器索引，未绑定时返回 -1
+     */
+    int ContainerIndexForStream(MediaPlayController::StreamId streamId) const;
+
+    /**
      * @brief RefreshMultiViewLayout 根据当前布局刷新视频容器显示状态
      */
     void RefreshMultiViewLayout();
@@ -348,6 +382,7 @@ private:
     bool isCursorHidden_ = false;
     MultiViewLayout multiViewLayout_ = MultiViewLayout::Single;
     QMap<MediaPlayController::StreamId, QString> streamDisplayNames_;
+    QMap<MediaPlayController::StreamId, int> streamContainerIndexes_;
 
     /**
      * @brief formatTime 将秒数格式化为 UI 时间字符串

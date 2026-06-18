@@ -413,11 +413,11 @@ MainWindow
 
 **目标**：添加 stream 时为其分配一个可用视频容器。
 
-- [ ] 在 `MainWindow` 维护 `StreamId -> QWidget*` 的 UI 绑定表。
-- [ ] 添加 stream 时分配第一个空闲容器。
-- [ ] 添加 stream 时把对应容器传给 `MediaPlayController::AddStream()`。
-- [ ] 移除 stream 后释放容器占用。
-- [ ] 容器满时拒绝继续添加显示流并输出日志。
+- [x] 在 `MainWindow` 维护 `StreamId -> 视频容器索引` 的 UI 绑定表。
+- [x] 添加 stream 时分配第一个空闲容器。
+- [x] 添加 stream 时把对应容器传给 `MediaPlayController::AddStream()`。
+- [x] 移除 stream 后释放容器占用。
+- [x] 容器满时拒绝继续添加显示流并输出日志。
 
 **验收标准**：
 

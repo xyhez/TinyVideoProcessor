@@ -96,6 +96,7 @@ void MainWindow::CreateConnects() {
     connect(mediaPlayController_.get(), &MediaPlayController::StreamRemoved,
             this, [this](MediaPlayController::StreamId id) {
                 streamDisplayNames_.remove(id);
+                ReleaseVideoContainerForStream(id);
                 RefreshStreamView();
             });
 
@@ -476,6 +477,47 @@ QWidget* MainWindow::PrimaryVideoContainer() const {
     return ui->video_widget;
 }
 
+QWidget* MainWindow::VideoContainerAt(int index) const {
+    const std::array<QWidget*, 4> containers = VideoContainers();
+    if (index < 0 || index >= static_cast<int>(containers.size())) {
+        return nullptr;
+    }
+
+    return containers.at(index);
+}
+
+int MainWindow::FirstAvailableVideoContainerIndex() const {
+    const std::array<QWidget*, 4> containers = VideoContainers();
+    for (int index = 0; index < static_cast<int>(containers.size()); ++index) {
+        if (!containers.at(index)) {
+            continue;
+        }
+
+        if (!streamContainerIndexes_.values().contains(index)) {
+            return index;
+        }
+    }
+
+    return -1;
+}
+
+void MainWindow::BindStreamToVideoContainer(MediaPlayController::StreamId streamId,
+                                            int containerIndex) {
+    if (streamId == MediaPlayController::InvalidStreamId || !VideoContainerAt(containerIndex)) {
+        return;
+    }
+
+    streamContainerIndexes_.insert(streamId, containerIndex);
+}
+
+void MainWindow::ReleaseVideoContainerForStream(MediaPlayController::StreamId streamId) {
+    streamContainerIndexes_.remove(streamId);
+}
+
+int MainWindow::ContainerIndexForStream(MediaPlayController::StreamId streamId) const {
+    return streamContainerIndexes_.value(streamId, -1);
+}
+
 void MainWindow::RefreshMultiViewLayout() {
     const std::array<QWidget*, 4> containers = VideoContainers();
     for (int index = 0; index < static_cast<int>(containers.size()); ++index) {
@@ -669,6 +711,10 @@ void MainWindow::RefreshStreamView() {
 
         const QString displayName = streamDisplayNames_.value(id, QString("Stream %1").arg(id));
         QString text = QString("#%1 %2").arg(id).arg(displayName);
+        const int containerIndex = ContainerIndexForStream(id);
+        if (containerIndex >= 0) {
+            text += QString(" [Slot %1]").arg(containerIndex + 1);
+        }
         if (!marks.isEmpty()) {
             text += QString(" [%1]").arg(marks.join(", "));
         }
@@ -686,7 +732,9 @@ void MainWindow::RefreshStreamView() {
 void MainWindow::UpdateStreamControls() {
     const bool hasStream = !mediaPlayController_->StreamIds().isEmpty();
     const bool hasSelectedStream = SelectedStreamId() != MediaPlayController::InvalidStreamId;
+    const bool hasAvailableContainer = FirstAvailableVideoContainerIndex() >= 0;
 
+    ui->pushButton_addStream->setEnabled(hasAvailableContainer);
     ui->pushButton_removeStream->setEnabled(hasSelectedStream);
     ui->pushButton_activeStream->setEnabled(hasSelectedStream);
     ui->pushButton_activeAudio->setEnabled(hasSelectedStream);
@@ -703,14 +751,22 @@ void MainWindow::AddMultiStreamFiles() {
         "Video Files (*.mp4 *.mkv *.avi *.mov *.flv);;All Files (*.*)");
 
     for (const QString& filePath : filePaths) {
+        const int containerIndex = FirstAvailableVideoContainerIndex();
+        QWidget* container = VideoContainerAt(containerIndex);
+        if (!container) {
+            qWarning() << "Add stream failed: no available video container";
+            break;
+        }
+
         std::shared_ptr<IMediaSource> mediaSource = std::make_shared<FileMediaSource>(filePath);
         const MediaPlayController::StreamId streamId =
-            mediaPlayController_->AddStream(mediaSource, PrimaryVideoContainer());
+            mediaPlayController_->AddStream(mediaSource, container);
         if (streamId == MediaPlayController::InvalidStreamId) {
             qWarning() << "Add stream failed:" << filePath;
             continue;
         }
 
+        BindStreamToVideoContainer(streamId, containerIndex);
         streamDisplayNames_.insert(streamId, QFileInfo(filePath).fileName());
     }
 
@@ -791,6 +847,7 @@ bool MainWindow::SwitchToPlaylistIndex(int index, bool autoStart) {
     playlistManager_->SetCurrentIndex(index);
     const MediaPlayController::StreamId activeStreamId = mediaPlayController_->ActiveStream();
     if (activeStreamId != MediaPlayController::InvalidStreamId) {
+        BindStreamToVideoContainer(activeStreamId, 0);
         streamDisplayNames_.insert(activeStreamId, item.displayName);
         RefreshStreamView();
     }
