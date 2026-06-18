@@ -616,6 +616,24 @@ void MainWindow::RefreshMultiViewLayout() {
             || index == singleVisibleIndex;
         container->setVisible(visible);
     }
+
+    UpdateVideoContainerStyles();
+}
+
+void MainWindow::UpdateVideoContainerStyles() {
+    const int activeContainerIndex = ContainerIndexForStream(mediaPlayController_->ActiveStream());
+    const std::array<QWidget*, 4> containers = VideoContainers();
+    for (int index = 0; index < static_cast<int>(containers.size()); ++index) {
+        QWidget* container = containers.at(index);
+        if (!container) {
+            continue;
+        }
+
+        const bool active = index == activeContainerIndex;
+        container->setStyleSheet(active
+            ? "background-color: #101820; border: 3px solid #2f80ed;"
+            : "background-color: #101010; border: 1px solid #3a3a3a;");
+    }
 }
 
 void MainWindow::UpdateLayoutComboBox(MultiViewLayout layout) {

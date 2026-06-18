@@ -289,6 +289,11 @@ private:
     void RefreshMultiViewLayout();
 
     /**
+     * @brief UpdateVideoContainerStyles 根据 active stream 刷新视频容器视觉标记
+     */
+    void UpdateVideoContainerStyles();
+
+    /**
      * @brief UpdateLayoutComboBox 根据当前布局同步布局下拉框
      * @param layout 当前布局
      */
