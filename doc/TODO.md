@@ -99,24 +99,24 @@ MainWindow
 
 **目标**：让 `MultiStreamManager` 可以创建和释放多个 `MediaPipeline`。
 
-- [ ] 定义 `StreamSlot`。
-- [ ] 使用容器保存 `StreamId -> StreamSlot`。
-- [ ] `AddStream()` 分配新的 `StreamId`。
-- [ ] `AddStream()` 创建 `MediaPipeline`。
-- [ ] `AddStream()` 初始化媒体源和 renderer container。
-- [ ] `AddStream()` 失败时完整回滚。
-- [ ] `RemoveStream()` 调用 Pipeline `Shutdown()`。
-- [ ] `RemoveStream()` 删除 slot。
-- [ ] `ShutdownAll()` 释放全部 Pipeline。
-- [ ] 删除 active stream 时更新 active stream。
-- [ ] 删除 active audio stream 时更新 active audio stream。
+- [x] 定义 `StreamSlot`。
+- [x] 使用容器保存 `StreamId -> StreamSlot`。
+- [x] `AddStream()` 分配新的 `StreamId`。
+- [x] `AddStream()` 创建 `MediaPipeline`。
+- [x] `AddStream()` 初始化媒体源和 renderer container。
+- [x] `AddStream()` 失败时完整回滚。
+- [x] `RemoveStream()` 调用 Pipeline `Shutdown()`。
+- [x] `RemoveStream()` 删除 slot。
+- [x] `ShutdownAll()` 释放全部 Pipeline。
+- [x] 删除 active stream 时更新 active stream。
+- [x] 删除 active audio stream 时更新 active audio stream。
 
 **验收标准**：
 
-- [ ] 可以添加一路文件源。
-- [ ] 可以移除一路文件源。
-- [ ] 可以添加多路但暂不接 UI 播放。
-- [ ] 移除不存在的 id 不崩溃。
+- [x] 可以添加一路文件源。
+- [x] 可以移除一路文件源。
+- [x] 可以添加多路但暂不接 UI 播放。
+- [x] 移除不存在的 id 不崩溃。
 
 ## 3.2.4 Manager 转发 Pipeline 信号
 

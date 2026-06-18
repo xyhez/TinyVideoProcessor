@@ -1,12 +1,39 @@
 #include "MultiStreamManager.h"
 
+#include <utility>
+
 MultiStreamManager::MultiStreamManager(QObject* parent)
     : QObject(parent) {
 }
 
-MultiStreamManager::StreamId MultiStreamManager::AddStream() {
+MultiStreamManager::StreamId MultiStreamManager::AddStream(std::shared_ptr<IMediaSource> mediaSource,
+                                                           QWidget* rendererContainer) {
+    if (!mediaSource) {
+        emit StreamErrorOccurred(InvalidStreamId, "Media source is null");
+        return InvalidStreamId;
+    }
+
+    if (!mediaSource->Open()) {
+        mediaSource->Close();
+        emit StreamErrorOccurred(InvalidStreamId, "Open media source failed");
+        return InvalidStreamId;
+    }
+
+    auto pipeline = std::make_unique<MediaPipeline>();
+    if (!pipeline->Initialize(mediaSource, rendererContainer)) {
+        pipeline->Shutdown();
+        mediaSource->Close();
+        emit StreamErrorOccurred(InvalidStreamId, "Initialize media pipeline failed");
+        return InvalidStreamId;
+    }
+
     const StreamId id = nextStreamId_++;
-    streamIds_.append(id);
+    StreamSlot slot;
+    slot.mediaSource = std::move(mediaSource);
+    slot.rendererContainer = rendererContainer;
+    slot.pipeline = std::move(pipeline);
+
+    streams_.emplace(id, std::move(slot));
 
     emit StreamAdded(id);
     if (activeStreamId_ == InvalidStreamId) {
@@ -18,12 +45,16 @@ MultiStreamManager::StreamId MultiStreamManager::AddStream() {
 }
 
 bool MultiStreamManager::RemoveStream(StreamId id) {
-    const int index = streamIds_.indexOf(id);
-    if (index < 0) {
+    auto it = streams_.find(id);
+    if (it == streams_.end()) {
         return false;
     }
 
-    streamIds_.removeAt(index);
+    if (it->second.pipeline) {
+        it->second.pipeline->Shutdown();
+    }
+    streams_.erase(it);
+
     emit StreamRemoved(id);
 
     if (activeStreamId_ == id) {
@@ -40,11 +71,16 @@ bool MultiStreamManager::RemoveStream(StreamId id) {
 }
 
 bool MultiStreamManager::HasStream(StreamId id) const {
-    return streamIds_.contains(id);
+    return streams_.find(id) != streams_.end();
 }
 
 QList<MultiStreamManager::StreamId> MultiStreamManager::StreamIds() const {
-    return streamIds_;
+    QList<StreamId> streamIds;
+    for (const auto& stream : streams_) {
+        streamIds.append(stream.first);
+    }
+
+    return streamIds;
 }
 
 MultiStreamManager::StreamId MultiStreamManager::ActiveStream() const {
@@ -84,14 +120,20 @@ bool MultiStreamManager::SetActiveAudioStream(StreamId id) {
 }
 
 void MultiStreamManager::ShutdownAll() {
-    if (streamIds_.isEmpty()
+    if (streams_.empty()
         && activeStreamId_ == InvalidStreamId
         && activeAudioStreamId_ == InvalidStreamId) {
         return;
     }
 
-    const QList<StreamId> removedStreamIds = streamIds_;
-    streamIds_.clear();
+    QList<StreamId> removedStreamIds;
+    for (auto& stream : streams_) {
+        removedStreamIds.append(stream.first);
+        if (stream.second.pipeline) {
+            stream.second.pipeline->Shutdown();
+        }
+    }
+    streams_.clear();
 
     for (StreamId id : removedStreamIds) {
         emit StreamRemoved(id);
@@ -109,9 +151,9 @@ void MultiStreamManager::ShutdownAll() {
 }
 
 MultiStreamManager::StreamId MultiStreamManager::SelectFallbackStream() const {
-    if (streamIds_.isEmpty()) {
+    if (streams_.empty()) {
         return InvalidStreamId;
     }
 
-    return streamIds_.first();
+    return streams_.begin()->first;
 }

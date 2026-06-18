@@ -5,11 +5,19 @@
 #include <QObject>
 #include <QString>
 
+#include <map>
+#include <memory>
+
+#include "domain/IMediaSource.h"
+#include "domain/MediaPipeline.h"
+
+class QWidget;
+
 /**
  * @brief MultiStreamManager 管理多路播放管线的外层身份和状态
  *
- * Phase 3.2.2 先建立多路管理空壳，只管理 StreamId、active stream
- * 和 active audio stream，不创建也不持有真实 MediaPipeline。
+ * MultiStreamManager 只在外层管理 StreamId 和多个单路 MediaPipeline，
+ * MediaPipeline 本身不感知 id，也不承担多路调度职责。
  */
 class MultiStreamManager : public QObject {
     Q_OBJECT
@@ -25,10 +33,13 @@ public:
     explicit MultiStreamManager(QObject* parent = nullptr);
 
     /**
-     * @brief AddStream 添加一路逻辑流
+     * @brief AddStream 添加并初始化一路播放管线
+     * @param mediaSource 媒体源抽象
+     * @param rendererContainer 视频渲染容器
      * @return 新分配的 StreamId
      */
-    StreamId AddStream();
+    StreamId AddStream(std::shared_ptr<IMediaSource> mediaSource,
+                       QWidget* rendererContainer);
 
     /**
      * @brief RemoveStream 移除指定逻辑流
@@ -118,13 +129,19 @@ signals:
     void StreamErrorOccurred(MultiStreamManager::StreamId id, QString message);
 
 private:
+    struct StreamSlot {
+        std::shared_ptr<IMediaSource> mediaSource;
+        QWidget* rendererContainer = nullptr;
+        std::unique_ptr<MediaPipeline> pipeline;
+    };
+
     /**
      * @brief SelectFallbackStream 选择可用的兜底流
      * @return 可用 StreamId；无流时返回 InvalidStreamId
      */
     StreamId SelectFallbackStream() const;
 
-    QList<StreamId> streamIds_;
+    std::map<StreamId, StreamSlot> streams_;
     StreamId nextStreamId_ = 1;
     StreamId activeStreamId_ = InvalidStreamId;
     StreamId activeAudioStreamId_ = InvalidStreamId;
