@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <QMutexLocker>
 
 namespace {
@@ -15,6 +16,80 @@ bool IsSupportedSpeed(double speed)
         || std::fabs(speed - 1.0) < kSpeedEpsilon
         || std::fabs(speed - 1.5) < kSpeedEpsilon
         || std::fabs(speed - 2.0) < kSpeedEpsilon;
+}
+
+QString AvErrorString(int errorCode)
+{
+    char buffer[AV_ERROR_MAX_STRING_SIZE] = {0};
+    av_strerror(errorCode, buffer, sizeof(buffer));
+    return QString::fromUtf8(buffer);
+}
+
+QString ChannelLayoutName(const AVChannelLayout& layout)
+{
+    if (layout.nb_channels <= 0) {
+        return "invalid";
+    }
+
+    char buffer[128] = {0};
+    if (av_channel_layout_describe(&layout, buffer, sizeof(buffer)) < 0) {
+        return QString("%1 channels").arg(layout.nb_channels);
+    }
+
+    return QString::fromUtf8(buffer);
+}
+
+QString QtSampleFormatName(QAudioFormat::SampleFormat format)
+{
+    switch (format) {
+    case QAudioFormat::UInt8:
+        return "UInt8";
+    case QAudioFormat::Int16:
+        return "Int16";
+    case QAudioFormat::Int32:
+        return "Int32";
+    case QAudioFormat::Float:
+        return "Float";
+    case QAudioFormat::Unknown:
+        return "Unknown";
+    }
+
+    return "Unknown";
+}
+
+AVSampleFormat ToAvSampleFormat(QAudioFormat::SampleFormat format)
+{
+    switch (format) {
+    case QAudioFormat::UInt8:
+        return AV_SAMPLE_FMT_U8;
+    case QAudioFormat::Int16:
+        return AV_SAMPLE_FMT_S16;
+    case QAudioFormat::Int32:
+        return AV_SAMPLE_FMT_S32;
+    case QAudioFormat::Float:
+        return AV_SAMPLE_FMT_FLT;
+    case QAudioFormat::Unknown:
+        return AV_SAMPLE_FMT_S16;
+    }
+
+    return AV_SAMPLE_FMT_S16;
+}
+
+bool CopyOrDefaultChannelLayout(AVChannelLayout* dst,
+                                const AVChannelLayout& src,
+                                int fallbackChannels)
+{
+    if (!dst) {
+        return false;
+    }
+
+    std::memset(dst, 0, sizeof(*dst));
+    if (src.nb_channels > 0 && av_channel_layout_copy(dst, &src) >= 0) {
+        return true;
+    }
+
+    av_channel_layout_default(dst, std::max(1, fallbackChannels));
+    return dst->nb_channels > 0;
 }
 }
 
@@ -51,18 +126,27 @@ void AudioPlayer::InitAudioPlay(AVCodecParameters* codecPar,
     m_audioTimeBase = audioTimeBase;
 
     if (codecPar) {
-        m_dstRate = codecPar->sample_rate;
-        m_dstChannels = codecPar->ch_layout.nb_channels;
+        m_srcRate = codecPar->sample_rate > 0 ? codecPar->sample_rate : m_srcRate;
+        m_srcChannels = codecPar->ch_layout.nb_channels > 0
+            ? codecPar->ch_layout.nb_channels
+            : m_srcChannels;
     }
+    m_dstRate = m_srcRate;
+    m_dstChannels = 2;
 
     InitAudioOutput();
 
-    qDebug() << "AudioPlayer initialized: Rate =" << m_dstRate
-             << "Hz, Channels =" << m_dstChannels;
+    qDebug() << "AudioPlayer initialized: source =" << m_srcRate
+             << "Hz," << m_srcChannels << "channels; output =" << m_dstRate
+             << "Hz," << m_dstChannels << "channels,"
+             << av_get_sample_fmt_name(m_dstFormat);
 }
 
 void AudioPlayer::InitResampler() {
-    m_swr = swr_alloc();
+    if (m_swr) {
+        swr_free(&m_swr);
+    }
+    m_bytesPerSample = std::max(1, av_get_bytes_per_sample(m_dstFormat));
 }
 
 void AudioPlayer::InitAudioOutput()
@@ -74,17 +158,24 @@ void AudioPlayer::InitAudioOutput()
 
     QAudioDevice dev = QMediaDevices::defaultAudioOutput();
     if (!dev.isFormatSupported(fmt)) {
-        qWarning() << "AudioPlayer: Default format not supported, using preferred format";
-        fmt = dev.preferredFormat();
-        m_dstRate = fmt.sampleRate();
-        m_dstChannels = fmt.channelCount();
+        qWarning() << "AudioPlayer: Requested format not supported, trying preferred output format";
+        QAudioFormat preferred = dev.preferredFormat();
+        QAudioFormat preferredInt16 = preferred;
+        preferredInt16.setSampleFormat(QAudioFormat::Int16);
+        fmt = dev.isFormatSupported(preferredInt16) ? preferredInt16 : preferred;
     }
+
+    m_dstRate = fmt.sampleRate() > 0 ? fmt.sampleRate() : m_dstRate;
+    m_dstChannels = fmt.channelCount() > 0 ? fmt.channelCount() : 2;
+    m_dstFormat = ToAvSampleFormat(fmt.sampleFormat());
+    m_bytesPerSample = std::max(1, av_get_bytes_per_sample(m_dstFormat));
 
     m_audioSink = new QAudioSink(dev, fmt, this);
     ApplyOutputVolume();
 
     qDebug() << "AudioPlayer: Audio output initialized -"
-             << m_dstRate << "Hz," << m_dstChannels << "channels";
+             << m_dstRate << "Hz," << m_dstChannels << "channels,"
+             << QtSampleFormatName(fmt.sampleFormat());
 }
 
 void AudioPlayer::ApplyOutputVolume()
@@ -286,27 +377,79 @@ void AudioPlayer::Run()
         // }
 
         if (m_first) {
-            AVChannelLayout inLayout = tmp->ch_layout;
-            int inRate = tmp->sample_rate;
-            AVSampleFormat inFmt = (AVSampleFormat)tmp->format;
+            AVChannelLayout inLayout = {};
+            const int fallbackInputChannels = tmp->ch_layout.nb_channels > 0
+                ? tmp->ch_layout.nb_channels
+                : m_srcChannels;
+            if (!CopyOrDefaultChannelLayout(&inLayout, tmp->ch_layout, fallbackInputChannels)) {
+                qWarning() << "AudioPlayer: Invalid input channel layout, skipping audio frame";
+                av_frame_unref(tmp);
+                av_frame_free(&tmp);
+                continue;
+            }
 
-            AVChannelLayout outLayout = AV_CHANNEL_LAYOUT_STEREO;
+            AVChannelLayout outLayout = {};
+            av_channel_layout_default(&outLayout, std::max(1, m_dstChannels));
+
+            int inRate = tmp->sample_rate > 0 ? tmp->sample_rate : m_srcRate;
+            if (inRate <= 0) {
+                inRate = m_dstRate;
+            }
+            AVSampleFormat inFmt = (AVSampleFormat)tmp->format;
             int outRate = m_dstRate;
             AVSampleFormat outFmt = m_dstFormat;
 
-            swr_alloc_set_opts2(&m_swr,
-                                &outLayout, outFmt, outRate,
-                                &inLayout, inFmt, inRate,
-                                0, nullptr);
-            swr_init(m_swr);
+            if (m_swr) {
+                swr_free(&m_swr);
+            }
+
+            int ret = swr_alloc_set_opts2(&m_swr,
+                                          &outLayout, outFmt, outRate,
+                                          &inLayout, inFmt, inRate,
+                                          0, nullptr);
+            if (ret < 0 || !m_swr) {
+                qWarning() << "AudioPlayer: Resampler allocation failed:" << AvErrorString(ret);
+                av_channel_layout_uninit(&inLayout);
+                av_channel_layout_uninit(&outLayout);
+                av_frame_unref(tmp);
+                av_frame_free(&tmp);
+                break;
+            }
+
+            ret = swr_init(m_swr);
+            if (ret < 0) {
+                qWarning() << "AudioPlayer: Resampler init failed:" << AvErrorString(ret);
+                swr_free(&m_swr);
+                av_channel_layout_uninit(&inLayout);
+                av_channel_layout_uninit(&outLayout);
+                av_frame_unref(tmp);
+                av_frame_free(&tmp);
+                break;
+            }
 
             m_first = false;
-            qDebug() << "AudioPlayer: Resampler initialized - Input:" << inRate << "Hz -> Output:" << outRate << "Hz";
+            qDebug() << "AudioPlayer: Resampler initialized - input:"
+                     << inRate << "Hz," << ChannelLayoutName(inLayout) << ","
+                     << av_get_sample_fmt_name(inFmt)
+                     << "-> output:" << outRate << "Hz,"
+                     << ChannelLayoutName(outLayout) << ","
+                     << av_get_sample_fmt_name(outFmt);
+
+            av_channel_layout_uninit(&inLayout);
+            av_channel_layout_uninit(&outLayout);
         }
 
+        if (!m_swr) {
+            qWarning() << "AudioPlayer: Resampler is not initialized, stopping audio playback";
+            av_frame_unref(tmp);
+            av_frame_free(&tmp);
+            break;
+        }
+
+        const int inputRate = tmp->sample_rate > 0 ? tmp->sample_rate : m_srcRate;
         int dstSamples = av_rescale_rnd(tmp->nb_samples,
                                         m_dstRate,
-                                        tmp->sample_rate,
+                                        inputRate > 0 ? inputRate : m_dstRate,
                                         AV_ROUND_UP);
 
         int neededSize = dstSamples * m_dstChannels * m_bytesPerSample;

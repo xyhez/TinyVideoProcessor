@@ -21,6 +21,9 @@
 
 extern "C" {
 #include <libswresample/swresample.h>
+#include <libavutil/channel_layout.h>
+#include <libavutil/error.h>
+#include <libavutil/samplefmt.h>
 #include <libavutil/time.h>
 #include <libavutil/frame.h>
 #include <libavutil/rational.h>
@@ -143,9 +146,11 @@ private:
     QAudioSink *m_audioSink = nullptr;
     QIODevice *m_ioDevice = nullptr;
 
+    int m_srcRate = 44100;
+    int m_srcChannels = 2;
     int m_dstRate = 44100;
     int m_dstChannels = 2;
-    const AVSampleFormat m_dstFormat = AV_SAMPLE_FMT_S16;
+    AVSampleFormat m_dstFormat = AV_SAMPLE_FMT_S16;
     int m_bytesPerSample = 2;
 
     qint64 m_totalBytesWritten = 0;

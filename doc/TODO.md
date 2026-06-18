@@ -498,3 +498,128 @@ MainWindow
 - [x] 点击画面切换 active stream 和音频符合预期。
 - [x] 无音频流点击后无声。
 - [x] 关闭程序不阻塞。
+
+## Phase 3.4 MultiViewRenderer 预研
+
+**目标**：在不改代码的前提下，明确从“多个 `VideoRender` + 多个 `QWidget` 容器”迁移到“单个 `MultiViewRenderer` + 多纹理渲染”的架构边界和实施路径。
+
+## 3.4.1 当前渲染链路复盘
+
+**目标**：确认现有渲染职责分布，找出进入统一渲染前必须拆分的边界。
+
+- [x] 梳理 `MediaPipeline -> VideoRender -> rendererContainer` 当前链路。
+- [x] 梳理 `VideoRender` 当前承担的职责。
+- [x] 梳理 `MediaPipeline` 当前直接创建 `VideoRender` 的影响。
+- [x] 梳理多个 `QOpenGLWidget` 方案的优势和限制。
+
+**产出**：
+
+- [x] `doc/Phase3_4_MultiViewRenderer预研报告.md`
+
+## 3.4.2 MultiViewRenderer 边界判断
+
+**目标**：明确 `MultiViewRenderer` 应属于哪个层，以及它不应该承担哪些职责。
+
+- [x] 判断 `MultiViewRenderer` 所属层级。
+- [x] 明确它是否持有解码器、demuxer、音频播放器。
+- [x] 明确它是否参与 active audio 策略。
+- [x] 明确它是否负责布局、点击命中和 active stream 视觉标记。
+
+## 3.4.3 帧输出抽象预研
+
+**目标**：明确 `MediaPipeline` 是否应从“直接创建渲染控件”改为“输出视频帧给外部渲染器”。
+
+- [x] 分析是否需要新增视频帧输出接口。
+- [x] 分析 `VideoRender` 可拆分的职责。
+- [x] 分析帧所有权和释放责任。
+- [x] 分析 seek、stop、remove stream 时的帧清理要求。
+
+## 3.4.4 迁移路线判断
+
+**目标**：给出后续可执行的最小迁移路径，不直接推翻当前稳定链路。
+
+- [x] 明确不建议直接实现完整 `MultiViewRenderer`。
+- [x] 给出先抽象帧输出、再接入统一渲染的迁移顺序。
+- [x] 明确每一步的验收标准。
+- [x] 明确保留当前多 `VideoRender` 方案作为回退路径。
+
+## 3.4.5 Phase 3.4 验收标准
+
+- [x] 能说明为什么当前多个 `QOpenGLWidget` 不是最终方案。
+- [x] 能说明为什么不能直接让 `MultiViewRenderer` 管理解码管线。
+- [x] 能说明 `MediaPipeline` 后续需要抽象出的渲染边界。
+- [x] 能说明从当前方案迁移到统一渲染的最小安全路径。
+- [x] 不直接修改播放代码。
+
+## Phase 3.5 音视频格式归一化预研
+
+**目标**：在继续推进 `MultiViewRenderer` 和视频帧输出边界前，先明确音频输出格式、视频解码输出格式和渲染输入格式的归一化策略。
+
+## 3.5.1 音频输出格式链路复盘
+
+**目标**：确认当前 `AudioPlayer` 的采样率、声道布局、采样格式和 Qt 输出格式是否一致。
+
+- [x] 梳理 `codecPar -> QAudioFormat -> SwrContext -> PCM bytes` 链路。
+- [x] 分析固定 stereo outLayout 与 `m_dstChannels` 不一致的风险。
+- [x] 分析设备 preferred format fallback 对重采样参数的影响。
+- [x] 明确音频格式归一化的推荐策略。
+
+## 3.5.2 视频帧格式链路复盘
+
+**目标**：确认当前 decoder 输出帧和 `VideoRender` 输入格式之间的约束。
+
+- [x] 梳理软解和硬解输出路径。
+- [x] 分析 `VideoRender` 只支持 `AV_PIX_FMT_YUV420P` 的限制。
+- [x] 分析 4K MKV / 10-bit / HDR / BT.2020 / limited range 的风险。
+- [x] 明确视频帧格式归一化的推荐策略。
+
+## 3.5.3 后续实施边界
+
+**目标**：确定哪些问题应在进入统一渲染前解决，哪些可以留给 `MultiViewRenderer` 阶段。
+
+- [x] 明确音频重采样应先保证输出格式一致。
+- [x] 明确视频解码输出应先归一化到 renderer 可消费格式。
+- [x] 明确当前阶段不直接实现 HDR tone mapping。
+- [x] 明确格式归一化应作为帧输出边界抽象的前置条件。
+
+**产出**：
+
+- [x] `doc/Phase3_5_音视频格式归一化预研报告.md`
+
+## 3.5.4 音频输出格式归一化实现
+
+**目标**：先修正音频输出格式链路，确保重采样输出、Qt 音频设备格式、PCM 字节计算和音频时钟推进使用同一套最终输出参数。
+
+- [x] 统一最终输出采样率、声道数、声道布局和采样格式。
+- [x] 使用最终输出格式初始化 `QAudioFormat`。
+- [x] 使用同一套最终输出格式初始化 `SwrContext`。
+- [x] 修正 PCM 字节数和 `bytesPerSampleFrame` 计算。
+- [x] 为输入 `AVChannelLayout` 缺失场景增加兜底。
+- [x] 检查 `swr_alloc_set_opts2()` 和 `swr_init()` 返回值。
+- [x] 输出音频输入格式、重采样输出格式和 Qt 设备格式日志。
+
+**验收标准**：
+
+- [ ] AAC 44100Hz 文件无撕裂。
+- [ ] 普通 MP4 音频正常。
+- [ ] 无音频流视频不受影响。
+- [ ] 音画同步不退化。
+
+## 3.5.5 视频输出格式归一化实现
+
+**目标**：在音频格式链路稳定后，再统一视频 decoder 输出格式，让当前 `VideoRender` 先稳定消费一种格式。
+
+- [ ] 在视频 decoder 输出侧识别非 `AV_PIX_FMT_YUV420P` 帧。
+- [ ] 使用 `sws_scale` 将可转换视频帧归一化为 `AV_PIX_FMT_YUV420P`。
+- [ ] 保留 `pts`、`time_base`、`sample_aspect_ratio`、`color_range`、`colorspace` 等关键元数据。
+- [ ] 对无法转换的视频帧输出明确日志并安全丢弃。
+- [ ] 保持 `VideoRender` 第一版只消费 `AV_PIX_FMT_YUV420P`。
+- [ ] 暂不实现 HDR tone mapping。
+
+**验收标准**：
+
+- [ ] 普通 H.264 MP4 播放不退化。
+- [ ] 4K MKV 能完整显示画面。
+- [ ] 4K MKV 色彩明显异常问题改善。
+- [ ] seek 后画面正常恢复。
+- [ ] 多路显示不退化。
