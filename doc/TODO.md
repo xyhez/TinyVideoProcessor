@@ -396,11 +396,11 @@ MainWindow
 
 **目标**：在 MainWindow 中准备多个视频容器，用于承载多个 `VideoRender`。
 
-- [ ] 准备 4 个视频容器。
-- [ ] 添加布局切换控件。
-- [ ] 保留现有播放控制区。
-- [ ] 保留 `Streams` 验证列表。
-- [ ] 不让 UI 直接访问 `MultiStreamManager`。
+- [x] 准备 4 个视频容器。
+- [x] 添加布局切换控件。
+- [x] 保留现有播放控制区。
+- [x] 保留 `Streams` 验证列表。
+- [x] 不让 UI 直接访问 `MultiStreamManager`。
 
 **验收标准**：
 

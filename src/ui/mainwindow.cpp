@@ -25,15 +25,14 @@ MainWindow::MainWindow(QWidget *parent)
     ui->listWidget_streams->setSelectionMode(QAbstractItemView::SingleSelection);
     setMouseTracking(true);
     ui->centralwidget->setMouseTracking(true);
-    ui->video_widget->setMouseTracking(true);
     ui->widget_func->setMouseTracking(true);
     ui->listWidget_files->setMouseTracking(true);
     ui->listWidget_streams->setMouseTracking(true);
     ui->centralwidget->installEventFilter(this);
-    ui->video_widget->installEventFilter(this);
     ui->widget_func->installEventFilter(this);
     ui->listWidget_files->installEventFilter(this);
     ui->listWidget_streams->installEventFilter(this);
+    InitializeVideoContainers();
     InitializePlayModeComboBox();
     InitializeVolumeControls();
     InitializePlaybackSpeedComboBox();
@@ -172,6 +171,16 @@ void MainWindow::CreateConnects() {
         }
 
         mediaPlayController_->SetPlaybackSpeed(speed);
+    });
+
+    connect(ui->comboBox_layout, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int index) {
+        bool ok = false;
+        const int layoutValue = ui->comboBox_layout->itemData(index).toInt(&ok);
+        if (!ok) {
+            return;
+        }
+
+        SetMultiViewLayout(static_cast<MultiViewLayout>(layoutValue));
     });
 
     connect(ui->pushButton_fullscreen, &QPushButton::clicked,
@@ -407,8 +416,26 @@ void MainWindow::InitializeCursorHideTimer() {
             this, &MainWindow::HideCursorIfFullScreen);
 }
 
+void MainWindow::InitializeVideoContainers() {
+    ui->widget_videoArea->setMouseTracking(true);
+    ui->widget_videoArea->installEventFilter(this);
+
+    for (QWidget* container : VideoContainers()) {
+        if (!container) {
+            continue;
+        }
+
+        container->setMouseTracking(true);
+        container->installEventFilter(this);
+    }
+}
+
 void MainWindow::InitializeMultiViewLayout() {
-    SetMultiViewLayout(MultiViewLayout::Single);
+    ui->comboBox_layout->clear();
+    ui->comboBox_layout->addItem("Single", static_cast<int>(MultiViewLayout::Single));
+    ui->comboBox_layout->addItem("2x2", static_cast<int>(MultiViewLayout::Grid2x2));
+    UpdateLayoutComboBox(multiViewLayout_);
+    RefreshMultiViewLayout();
 }
 
 void MainWindow::SetMultiViewLayout(MultiViewLayout layout) {
@@ -417,6 +444,8 @@ void MainWindow::SetMultiViewLayout(MultiViewLayout layout) {
     }
 
     multiViewLayout_ = layout;
+    UpdateLayoutComboBox(multiViewLayout_);
+    RefreshMultiViewLayout();
     qInfo() << "Multi view layout changed, max visible streams:" << MaxVisibleStreams();
 }
 
@@ -437,6 +466,37 @@ int MainWindow::MaxVisibleStreamsForLayout(MultiViewLayout layout) const {
 
 int MainWindow::MaxVisibleStreams() const {
     return MaxVisibleStreamsForLayout(CurrentMultiViewLayout());
+}
+
+std::array<QWidget*, 4> MainWindow::VideoContainers() const {
+    return {ui->video_widget, ui->video_widget_1, ui->video_widget_2, ui->video_widget_3};
+}
+
+QWidget* MainWindow::PrimaryVideoContainer() const {
+    return ui->video_widget;
+}
+
+void MainWindow::RefreshMultiViewLayout() {
+    const std::array<QWidget*, 4> containers = VideoContainers();
+    for (int index = 0; index < static_cast<int>(containers.size()); ++index) {
+        QWidget* container = containers.at(index);
+        if (!container) {
+            continue;
+        }
+
+        const bool visible = CurrentMultiViewLayout() == MultiViewLayout::Grid2x2 || index == 0;
+        container->setVisible(visible);
+    }
+}
+
+void MainWindow::UpdateLayoutComboBox(MultiViewLayout layout) {
+    const int index = ui->comboBox_layout->findData(static_cast<int>(layout));
+    if (index < 0 || ui->comboBox_layout->currentIndex() == index) {
+        return;
+    }
+
+    QSignalBlocker blocker(ui->comboBox_layout);
+    ui->comboBox_layout->setCurrentIndex(index);
 }
 
 void MainWindow::UpdatePlaybackSpeedComboBox(double speed) {
@@ -645,7 +705,7 @@ void MainWindow::AddMultiStreamFiles() {
     for (const QString& filePath : filePaths) {
         std::shared_ptr<IMediaSource> mediaSource = std::make_shared<FileMediaSource>(filePath);
         const MediaPlayController::StreamId streamId =
-            mediaPlayController_->AddStream(mediaSource, ui->video_widget);
+            mediaPlayController_->AddStream(mediaSource, PrimaryVideoContainer());
         if (streamId == MediaPlayController::InvalidStreamId) {
             qWarning() << "Add stream failed:" << filePath;
             continue;
@@ -720,7 +780,7 @@ bool MainWindow::SwitchToPlaylistIndex(int index, bool autoStart) {
     const int previousIndex = playlistManager_->CurrentIndex();
     const PlaylistItem item = items.at(index);
     std::shared_ptr<IMediaSource> mediaSource = std::make_shared<FileMediaSource>(item.filePath);
-    if (!mediaPlayController_->SwitchSource(mediaSource, ui->video_widget, autoStart)) {
+    if (!mediaPlayController_->SwitchSource(mediaSource, PrimaryVideoContainer(), autoStart)) {
         qWarning() << "Switch playlist item failed:" << item.filePath;
         if (previousIndex >= 0 && previousIndex < playlistManager_->Count()) {
             playlistManager_->SetCurrentIndex(previousIndex);

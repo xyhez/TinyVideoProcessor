@@ -9,6 +9,7 @@
 #include <QLabel>
 #include <QTimer>
 #include <QMap>
+#include <array>
 #include <memory>
 
 #include "application/MediaPlayController.h"
@@ -168,6 +169,11 @@ private:
     void InitializeCursorHideTimer();
 
     /**
+     * @brief InitializeVideoContainers 初始化多路视频容器状态
+     */
+    void InitializeVideoContainers();
+
+    /**
      * @brief InitializeMultiViewLayout 初始化多路显示布局状态
      */
     void InitializeMultiViewLayout();
@@ -196,6 +202,29 @@ private:
      * @return 最大可见路数
      */
     int MaxVisibleStreams() const;
+
+    /**
+     * @brief VideoContainers 获取当前 UI 中的多路视频容器
+     * @return 视频容器指针数组
+     */
+    std::array<QWidget*, 4> VideoContainers() const;
+
+    /**
+     * @brief PrimaryVideoContainer 获取兼容当前单路播放的主视频容器
+     * @return 主视频容器
+     */
+    QWidget* PrimaryVideoContainer() const;
+
+    /**
+     * @brief RefreshMultiViewLayout 根据当前布局刷新视频容器显示状态
+     */
+    void RefreshMultiViewLayout();
+
+    /**
+     * @brief UpdateLayoutComboBox 根据当前布局同步布局下拉框
+     * @param layout 当前布局
+     */
+    void UpdateLayoutComboBox(MultiViewLayout layout);
 
     /**
      * @brief UpdatePlaybackSpeedComboBox 根据当前速度同步播放速度下拉框
