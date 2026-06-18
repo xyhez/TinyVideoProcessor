@@ -38,6 +38,7 @@ MainWindow::MainWindow(QWidget *parent)
     InitializeVolumeControls();
     InitializePlaybackSpeedComboBox();
     InitializeCursorHideTimer();
+    InitializeMultiViewLayout();
 
     CreateConnects();
 
@@ -404,6 +405,38 @@ void MainWindow::InitializeCursorHideTimer() {
     cursorHideTimer_->setSingleShot(true);
     connect(cursorHideTimer_.get(), &QTimer::timeout,
             this, &MainWindow::HideCursorIfFullScreen);
+}
+
+void MainWindow::InitializeMultiViewLayout() {
+    SetMultiViewLayout(MultiViewLayout::Single);
+}
+
+void MainWindow::SetMultiViewLayout(MultiViewLayout layout) {
+    if (multiViewLayout_ == layout) {
+        return;
+    }
+
+    multiViewLayout_ = layout;
+    qInfo() << "Multi view layout changed, max visible streams:" << MaxVisibleStreams();
+}
+
+MainWindow::MultiViewLayout MainWindow::CurrentMultiViewLayout() const {
+    return multiViewLayout_;
+}
+
+int MainWindow::MaxVisibleStreamsForLayout(MultiViewLayout layout) const {
+    switch (layout) {
+    case MultiViewLayout::Single:
+        return 1;
+    case MultiViewLayout::Grid2x2:
+        return 4;
+    }
+
+    return 1;
+}
+
+int MainWindow::MaxVisibleStreams() const {
+    return MaxVisibleStreamsForLayout(CurrentMultiViewLayout());
 }
 
 void MainWindow::UpdatePlaybackSpeedComboBox(double speed) {

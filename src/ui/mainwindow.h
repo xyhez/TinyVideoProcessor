@@ -115,6 +115,11 @@ private slots:
     void on_pushButton_pause_clicked();
 
 private:
+    enum class MultiViewLayout {
+        Single,
+        Grid2x2
+    };
+
     Ui::MainWindow *ui;
 
     std::unique_ptr<MediaPlayController> mediaPlayController_ = nullptr;
@@ -161,6 +166,36 @@ private:
      * @brief InitializeCursorHideTimer 初始化全屏鼠标隐藏定时器
      */
     void InitializeCursorHideTimer();
+
+    /**
+     * @brief InitializeMultiViewLayout 初始化多路显示布局状态
+     */
+    void InitializeMultiViewLayout();
+
+    /**
+     * @brief SetMultiViewLayout 切换多路显示布局状态
+     * @param layout 目标布局
+     */
+    void SetMultiViewLayout(MultiViewLayout layout);
+
+    /**
+     * @brief CurrentMultiViewLayout 获取当前多路显示布局
+     * @return 当前布局
+     */
+    MultiViewLayout CurrentMultiViewLayout() const;
+
+    /**
+     * @brief MaxVisibleStreamsForLayout 获取指定布局最大可见路数
+     * @param layout 目标布局
+     * @return 最大可见路数
+     */
+    int MaxVisibleStreamsForLayout(MultiViewLayout layout) const;
+
+    /**
+     * @brief MaxVisibleStreams 获取当前布局最大可见路数
+     * @return 最大可见路数
+     */
+    int MaxVisibleStreams() const;
 
     /**
      * @brief UpdatePlaybackSpeedComboBox 根据当前速度同步播放速度下拉框
@@ -282,6 +317,7 @@ private:
     bool isSliderDragging_ = false;
     bool isFullScreenMode_ = false;
     bool isCursorHidden_ = false;
+    MultiViewLayout multiViewLayout_ = MultiViewLayout::Single;
     QMap<MediaPlayController::StreamId, QString> streamDisplayNames_;
 
     /**

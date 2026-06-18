@@ -325,10 +325,176 @@ MainWindow
 
 ## Phase 3.2 完成标准
 
-- [ ] `MultiStreamManager` 可以管理多个 `MediaPipeline`。
-- [ ] `StreamId` 只存在于 Manager 层。
-- [ ] `MediaPipeline` 继续保持单路无 id。
-- [ ] Controller 可以通过 Manager 操作 active stream。
-- [ ] 文件源多路生命周期验证通过。
-- [ ] 无音频视频多路验证通过。
-- [ ] 多路音频策略不混乱。
+- [x] `MultiStreamManager` 可以管理多个 `MediaPipeline`。
+- [x] `StreamId` 只存在于 Manager 层。
+- [x] `MediaPipeline` 继续保持单路无 id。
+- [x] Controller 可以通过 Manager 操作 active stream。
+- [x] 文件源多路生命周期验证通过。
+- [x] 无音频视频多路验证通过。
+- [x] 多路音频策略不混乱。
+
+## Phase 3.3 多路显示布局
+
+**目标**：在多路管理能力稳定后，设计多路画面显示、布局切换和后续渲染优化路线。
+
+## 3.3.1 多路显示布局预研
+
+**目标**：先明确多路显示方案，不直接改代码。
+
+- [x] 梳理当前 `MediaPipeline -> VideoRender -> rendererContainer` 链路。
+- [x] 分析多个 `VideoRender` + 多个 QWidget 容器方案。
+- [x] 分析统一 `MultiViewRenderer` 方案。
+- [x] 明确第一步不直接实现 `MultiViewRenderer`。
+- [x] 明确 active stream 和多画面选中态关系。
+- [x] 明确第一版布局范围。
+
+**产出**：
+
+- [x] `doc/Phase3_3_多路显示布局预研报告.md`
+
+**验收标准**：
+
+- [x] 能说明当前渲染链路的问题。
+- [x] 能说明为什么第一步先用多个 QWidget 容器。
+- [x] 能说明后续引入 `MultiViewRenderer` 前需要抽象哪些边界。
+
+## 3.3.2 多路显示布局实施计划
+
+**目标**：将 Phase 3.3 拆成可执行小步。
+
+- [x] 形成 `doc/Phase3_3_多路显示布局实施计划.md`。
+- [x] 拆分布局模型任务。
+- [x] 拆分多容器 UI 任务。
+- [x] 拆分 stream 与 container 绑定任务。
+- [x] 拆分 active stream 画面选择任务。
+- [x] 拆分 2x2 布局验证任务。
+- [x] 记录不做范围。
+
+**验收标准**：
+
+- [x] 每个任务都能独立验证。
+- [x] 不直接跳到统一 OpenGL 多纹理。
+- [x] 不破坏 Phase 3.2 多路管理边界。
+
+## 3.3.3 布局模型定义
+
+**目标**：先定义多路显示布局枚举和基础语义，不接入 UI，不创建容器。
+
+- [x] 定义 `MultiViewLayout`。
+- [x] 定义当前布局状态。
+- [x] 定义布局切换入口。
+- [x] 明确 `Single` 和 `Grid2x2` 的最大可见路数。
+- [x] 不引入 `MultiViewRenderer`。
+
+**验收标准**：
+
+- [x] 能在代码中表示当前布局。
+- [x] 能在 `Single` 和 `Grid2x2` 之间切换状态。
+- [x] 不改变现有播放行为。
+
+## 3.3.4 多容器 UI 骨架
+
+**目标**：在 MainWindow 中准备多个视频容器，用于承载多个 `VideoRender`。
+
+- [ ] 准备 4 个视频容器。
+- [ ] 添加布局切换控件。
+- [ ] 保留现有播放控制区。
+- [ ] 保留 `Streams` 验证列表。
+- [ ] 不让 UI 直接访问 `MultiStreamManager`。
+
+**验收标准**：
+
+- [ ] 程序启动后 UI 正常。
+- [ ] `Single` 模式显示一个视频区域。
+- [ ] `2x2` 模式显示四个视频区域。
+- [ ] 切换布局不崩溃。
+
+## 3.3.5 Stream 与容器绑定
+
+**目标**：添加 stream 时为其分配一个可用视频容器。
+
+- [ ] 在 `MainWindow` 维护 `StreamId -> QWidget*` 的 UI 绑定表。
+- [ ] 添加 stream 时分配第一个空闲容器。
+- [ ] 添加 stream 时把对应容器传给 `MediaPlayController::AddStream()`。
+- [ ] 移除 stream 后释放容器占用。
+- [ ] 容器满时拒绝继续添加显示流并输出日志。
+
+**验收标准**：
+
+- [ ] 添加第 1 路显示在一个容器。
+- [ ] 添加第 2 路显示在另一个容器。
+- [ ] 最多添加 4 路显示流。
+- [ ] 移除一路后容器可再次复用。
+- [ ] UI 仍只通过 Controller 添加和移除 stream。
+
+## 3.3.6 Active Stream 画面选择
+
+**目标**：点击某个视频容器时切换 active stream，并同步音频策略。
+
+- [ ] 为每个视频容器添加点击处理。
+- [ ] 根据容器找到对应 `StreamId`。
+- [ ] 点击画面时调用 `SetActiveStream(streamId)`。
+- [ ] 有音频流点击后调用 `SetActiveAudioStream(streamId)`。
+- [ ] 无音频流点击后调用 `SetActiveAudioStream(InvalidStreamId)`。
+- [ ] UI 标记 active stream。
+
+**验收标准**：
+
+- [ ] 点击有音频画面后，进度条和声音都切换到该路。
+- [ ] 点击无音频画面后，进度条切换到该路，程序无声。
+- [ ] 不出现画面和声音来自不同路的情况。
+- [ ] `MainWindow` 不直接访问 `MultiStreamManager`。
+
+## 3.3.7 Single 布局行为
+
+**目标**：定义并实现 `Single` 布局的最小行为。
+
+- [ ] `Single` 只显示 active stream 对应容器。
+- [ ] 非 active stream 容器隐藏。
+- [ ] active stream 变化时刷新容器可见性。
+- [ ] 没有 active stream 时显示空白容器。
+
+**验收标准**：
+
+- [ ] 单路播放体验不退化。
+- [ ] 多路存在时只显示 active stream。
+- [ ] 切换 active stream 后画面区域跟随变化。
+
+## 3.3.8 Grid2x2 布局行为
+
+**目标**：实现第一版 2x2 多画面显示。
+
+- [ ] 实现 `Grid2x2` 容器布局。
+- [ ] 切换到 `Grid2x2` 后显示所有已绑定容器。
+- [ ] 空容器保持空白。
+- [ ] active stream 变化后刷新视觉标记。
+
+**验收标准**：
+
+- [ ] 两路文件可以同时显示。
+- [ ] 四路文件可以同时显示。
+- [ ] 布局切换不影响播放生命周期。
+- [ ] 移除任意一路后布局保持稳定。
+- [ ] 无音频流显示正常。
+
+## 3.3.9 Phase 3.3 验收报告
+
+**目标**：收口多路显示布局第一版。
+
+- [ ] 形成 `doc/Phase3_3_多路显示布局实现报告.md`。
+- [ ] 记录最终布局策略。
+- [ ] 记录多容器 UI 实现方式。
+- [ ] 记录 stream 与 container 绑定策略。
+- [ ] 记录 active stream / active audio stream 点击策略。
+- [ ] 记录 Single 和 2x2 验证结果。
+- [ ] 记录已知限制。
+- [ ] 记录是否具备进入 `MultiViewRenderer` 预研的条件。
+
+**验收标准**：
+
+- [ ] 单路 UI 不退化。
+- [ ] 2 路显示通过。
+- [ ] 4 路显示通过。
+- [ ] 点击画面切换 active stream 和音频符合预期。
+- [ ] 无音频流点击后无声。
+- [ ] 关闭程序不阻塞。
