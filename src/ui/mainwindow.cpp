@@ -7,8 +7,10 @@
 #include <QDebug>
 #include <QEvent>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QListWidgetItem>
 #include <QSignalBlocker>
+#include <QStringList>
 #include <QTimer>
 
 MainWindow::MainWindow(QWidget *parent)
@@ -20,15 +22,18 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
     this->setWindowTitle("modernFFplay-V2.0");
     ui->listWidget_files->setSelectionMode(QAbstractItemView::SingleSelection);
+    ui->listWidget_streams->setSelectionMode(QAbstractItemView::SingleSelection);
     setMouseTracking(true);
     ui->centralwidget->setMouseTracking(true);
     ui->video_widget->setMouseTracking(true);
     ui->widget_func->setMouseTracking(true);
     ui->listWidget_files->setMouseTracking(true);
+    ui->listWidget_streams->setMouseTracking(true);
     ui->centralwidget->installEventFilter(this);
     ui->video_widget->installEventFilter(this);
     ui->widget_func->installEventFilter(this);
     ui->listWidget_files->installEventFilter(this);
+    ui->listWidget_streams->installEventFilter(this);
     InitializePlayModeComboBox();
     InitializeVolumeControls();
     InitializePlaybackSpeedComboBox();
@@ -44,6 +49,7 @@ MainWindow::MainWindow(QWidget *parent)
     }
 
     UpdatePlaybackControls(mediaPlayController_->State());
+    RefreshStreamView();
 }
 
 void MainWindow::CreateConnects() {
@@ -79,6 +85,30 @@ void MainWindow::CreateConnects() {
     connect(mediaPlayController_.get(), &MediaPlayController::MuteChanged,
             this, &MainWindow::UpdateMuteButton);
 
+    connect(mediaPlayController_.get(), &MediaPlayController::StreamAdded,
+            this, [this](MediaPlayController::StreamId id) {
+                if (!streamDisplayNames_.contains(id)) {
+                    streamDisplayNames_.insert(id, QString("Stream %1").arg(id));
+                }
+                RefreshStreamView();
+            });
+
+    connect(mediaPlayController_.get(), &MediaPlayController::StreamRemoved,
+            this, [this](MediaPlayController::StreamId id) {
+                streamDisplayNames_.remove(id);
+                RefreshStreamView();
+            });
+
+    connect(mediaPlayController_.get(), &MediaPlayController::ActiveStreamChanged,
+            this, [this](MediaPlayController::StreamId) {
+                RefreshStreamView();
+            });
+
+    connect(mediaPlayController_.get(), &MediaPlayController::ActiveAudioStreamChanged,
+            this, [this](MediaPlayController::StreamId) {
+                RefreshStreamView();
+            });
+
     connect(playlistManager_.get(), &PlaylistManager::PlaylistChanged, this, [this]() {
         RefreshPlaylistView();
     });
@@ -105,6 +135,11 @@ void MainWindow::CreateConnects() {
         const int index = ui->listWidget_files->row(item);
         SwitchToPlaylistIndex(index, true);
     });
+
+    connect(ui->listWidget_streams, &QListWidget::currentRowChanged,
+            this, [this](int) {
+                UpdateStreamControls();
+            });
 
     connect(ui->pushButton_prev, &QPushButton::clicked, this, &MainWindow::PlayPrevious);
 
@@ -140,6 +175,30 @@ void MainWindow::CreateConnects() {
 
     connect(ui->pushButton_fullscreen, &QPushButton::clicked,
             this, &MainWindow::ToggleFullScreen);
+
+    connect(ui->pushButton_addStream, &QPushButton::clicked,
+            this, &MainWindow::AddMultiStreamFiles);
+
+    connect(ui->pushButton_removeStream, &QPushButton::clicked,
+            this, &MainWindow::RemoveSelectedStream);
+
+    connect(ui->pushButton_activeStream, &QPushButton::clicked,
+            this, &MainWindow::SetSelectedActiveStream);
+
+    connect(ui->pushButton_activeAudio, &QPushButton::clicked,
+            this, &MainWindow::SetSelectedActiveAudioStream);
+
+    connect(ui->pushButton_startAll, &QPushButton::clicked, this, [this]() {
+        mediaPlayController_->StartAll();
+    });
+
+    connect(ui->pushButton_pauseAll, &QPushButton::clicked, this, [this]() {
+        mediaPlayController_->PauseAll();
+    });
+
+    connect(ui->pushButton_stopAll, &QPushButton::clicked, this, [this]() {
+        mediaPlayController_->StopAll();
+    });
 
     connect(ui->slider_progress,&QSlider::sliderPressed,this,[this](){
         isSliderDragging_ = true;
@@ -499,6 +558,126 @@ void MainWindow::RefreshPlaylistView() {
     ui->pushButton_next->setEnabled(hasPlaylistItem);
 }
 
+void MainWindow::RefreshStreamView() {
+    const MediaPlayController::StreamId selectedStreamId = SelectedStreamId();
+
+    ui->listWidget_streams->clear();
+    const QList<MediaPlayController::StreamId> streamIds = mediaPlayController_->StreamIds();
+    for (MediaPlayController::StreamId id : streamIds) {
+        const bool isActiveStream = id == mediaPlayController_->ActiveStream();
+        const bool isActiveAudio = id == mediaPlayController_->ActiveAudioStream();
+        QStringList marks;
+        if (isActiveStream) {
+            marks.append("View");
+        }
+        if (isActiveAudio) {
+            marks.append("Audio");
+        }
+
+        const QString displayName = streamDisplayNames_.value(id, QString("Stream %1").arg(id));
+        QString text = QString("#%1 %2").arg(id).arg(displayName);
+        if (!marks.isEmpty()) {
+            text += QString(" [%1]").arg(marks.join(", "));
+        }
+
+        auto* item = new QListWidgetItem(text, ui->listWidget_streams);
+        item->setData(Qt::UserRole, id);
+        if (id == selectedStreamId) {
+            ui->listWidget_streams->setCurrentItem(item);
+        }
+    }
+
+    UpdateStreamControls();
+}
+
+void MainWindow::UpdateStreamControls() {
+    const bool hasStream = !mediaPlayController_->StreamIds().isEmpty();
+    const bool hasSelectedStream = SelectedStreamId() != MediaPlayController::InvalidStreamId;
+
+    ui->pushButton_removeStream->setEnabled(hasSelectedStream);
+    ui->pushButton_activeStream->setEnabled(hasSelectedStream);
+    ui->pushButton_activeAudio->setEnabled(hasSelectedStream);
+    ui->pushButton_startAll->setEnabled(hasStream);
+    ui->pushButton_pauseAll->setEnabled(hasStream);
+    ui->pushButton_stopAll->setEnabled(hasStream);
+}
+
+void MainWindow::AddMultiStreamFiles() {
+    const QStringList filePaths = QFileDialog::getOpenFileNames(
+        this,
+        "选择多路视频文件",
+        QString(),
+        "Video Files (*.mp4 *.mkv *.avi *.mov *.flv);;All Files (*.*)");
+
+    for (const QString& filePath : filePaths) {
+        std::shared_ptr<IMediaSource> mediaSource = std::make_shared<FileMediaSource>(filePath);
+        const MediaPlayController::StreamId streamId =
+            mediaPlayController_->AddStream(mediaSource, ui->video_widget);
+        if (streamId == MediaPlayController::InvalidStreamId) {
+            qWarning() << "Add stream failed:" << filePath;
+            continue;
+        }
+
+        streamDisplayNames_.insert(streamId, QFileInfo(filePath).fileName());
+    }
+
+    RefreshStreamView();
+}
+
+void MainWindow::RemoveSelectedStream() {
+    const MediaPlayController::StreamId streamId = SelectedStreamId();
+    if (streamId == MediaPlayController::InvalidStreamId) {
+        return;
+    }
+
+    if (!mediaPlayController_->RemoveStream(streamId)) {
+        qWarning() << "Remove stream failed:" << streamId;
+    }
+}
+
+void MainWindow::SetSelectedActiveStream() {
+    const MediaPlayController::StreamId streamId = SelectedStreamId();
+    if (streamId == MediaPlayController::InvalidStreamId) {
+        return;
+    }
+
+    if (!mediaPlayController_->SetActiveStream(streamId)) {
+        qWarning() << "Set active stream failed:" << streamId;
+        return;
+    }
+
+    RefreshStreamView();
+}
+
+void MainWindow::SetSelectedActiveAudioStream() {
+    const MediaPlayController::StreamId streamId = SelectedStreamId();
+    if (streamId == MediaPlayController::InvalidStreamId) {
+        return;
+    }
+
+    if (!mediaPlayController_->SetActiveAudioStream(streamId)) {
+        qWarning() << "Set active audio stream failed:" << streamId;
+        return;
+    }
+
+    RefreshStreamView();
+}
+
+MediaPlayController::StreamId MainWindow::SelectedStreamId() const {
+    QListWidgetItem* selectedItem = ui->listWidget_streams->currentItem();
+    if (!selectedItem) {
+        return MediaPlayController::InvalidStreamId;
+    }
+
+    bool ok = false;
+    const int streamId = selectedItem->data(Qt::UserRole).toInt(&ok);
+    if (!ok) {
+        return MediaPlayController::InvalidStreamId;
+    }
+
+    return streamId;
+}
+
 bool MainWindow::SwitchToPlaylistIndex(int index, bool autoStart) {
     const QList<PlaylistItem> items = playlistManager_->Items();
     if (index < 0 || index >= items.size()) {
@@ -517,6 +696,11 @@ bool MainWindow::SwitchToPlaylistIndex(int index, bool autoStart) {
     }
 
     playlistManager_->SetCurrentIndex(index);
+    const MediaPlayController::StreamId activeStreamId = mediaPlayController_->ActiveStream();
+    if (activeStreamId != MediaPlayController::InvalidStreamId) {
+        streamDisplayNames_.insert(activeStreamId, item.displayName);
+        RefreshStreamView();
+    }
     return true;
 }
 

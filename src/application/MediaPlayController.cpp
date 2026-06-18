@@ -36,22 +36,16 @@ MediaPlayController::~MediaPlayController() {
 }
 
 bool MediaPlayController::Initialize(std::shared_ptr<IMediaSource> mediaSource, QWidget *rendererContainer) {
-    if (!mediaSource) {
-        qCritical() << "Media source is null";
-        return false;
-    }
-
-    const MultiStreamManager::StreamId streamId =
-        multiStreamManager_->AddStream(mediaSource, rendererContainer);
-    if (streamId == MultiStreamManager::InvalidStreamId) {
+    const StreamId streamId = AddStream(mediaSource, rendererContainer);
+    if (streamId == InvalidStreamId) {
         qCritical() << "Failed to initialize media stream";
         SetState(PlaybackState::Stopped);
         return false;
     }
 
-    if (!multiStreamManager_->SetActiveStream(streamId)) {
+    if (!SetActiveStream(streamId)) {
         qCritical() << "Failed to set active stream";
-        multiStreamManager_->RemoveStream(streamId);
+        RemoveStream(streamId);
         SetState(PlaybackState::Stopped);
         return false;
     }
@@ -75,9 +69,8 @@ bool MediaPlayController::SwitchSource(std::shared_ptr<IMediaSource> mediaSource
     multiStreamManager_->ShutdownAll();
     SetState(PlaybackState::Stopped);
 
-    const MultiStreamManager::StreamId streamId =
-        multiStreamManager_->AddStream(mediaSource, rendererContainer);
-    if (streamId == MultiStreamManager::InvalidStreamId) {
+    const StreamId streamId = AddStream(mediaSource, rendererContainer);
+    if (streamId == InvalidStreamId) {
         qWarning() << "SwitchSource failed: initialize new media source failed";
         SetState(PlaybackState::Stopped);
         emit DurationChanged(0.0);
@@ -85,9 +78,9 @@ bool MediaPlayController::SwitchSource(std::shared_ptr<IMediaSource> mediaSource
         return false;
     }
 
-    if (!multiStreamManager_->SetActiveStream(streamId)) {
+    if (!SetActiveStream(streamId)) {
         qWarning() << "SwitchSource failed: set active stream failed";
-        multiStreamManager_->RemoveStream(streamId);
+        RemoveStream(streamId);
         SetState(PlaybackState::Stopped);
         emit DurationChanged(0.0);
         emit PositionChanged(0.0);
@@ -106,14 +99,171 @@ bool MediaPlayController::SwitchSource(std::shared_ptr<IMediaSource> mediaSource
     return true;
 }
 
+MediaPlayController::StreamId MediaPlayController::AddStream(std::shared_ptr<IMediaSource> mediaSource,
+                                                             QWidget* rendererContainer)
+{
+    if (!multiStreamManager_) {
+        qWarning() << "AddStream failed: multi stream manager is not initialized";
+        return InvalidStreamId;
+    }
+
+    if (!mediaSource) {
+        qWarning() << "AddStream failed: media source is null";
+        return InvalidStreamId;
+    }
+
+    const MultiStreamManager::StreamId streamId =
+        multiStreamManager_->AddStream(mediaSource, rendererContainer);
+    if (streamId == MultiStreamManager::InvalidStreamId) {
+        return InvalidStreamId;
+    }
+
+    multiStreamManager_->SetStreamPlaybackSpeed(streamId, playbackSpeed_);
+
+    return streamId;
+}
+
+bool MediaPlayController::RemoveStream(StreamId id)
+{
+    if (!multiStreamManager_) {
+        return false;
+    }
+
+    const bool removed = multiStreamManager_->RemoveStream(id);
+    if (!removed) {
+        return false;
+    }
+
+    if (multiStreamManager_->StreamIds().isEmpty()) {
+        SetState(PlaybackState::Stopped);
+        emit DurationChanged(0.0);
+        emit PositionChanged(0.0);
+    }
+
+    return true;
+}
+
+QList<MediaPlayController::StreamId> MediaPlayController::StreamIds() const
+{
+    return multiStreamManager_ ? multiStreamManager_->StreamIds() : QList<StreamId>();
+}
+
+MediaPlayController::StreamId MediaPlayController::ActiveStream() const
+{
+    return multiStreamManager_ ? multiStreamManager_->ActiveStream() : InvalidStreamId;
+}
+
+bool MediaPlayController::SetActiveStream(StreamId id)
+{
+    if (!multiStreamManager_) {
+        return false;
+    }
+
+    const bool changed = multiStreamManager_->SetActiveStream(id);
+    if (!changed) {
+        return false;
+    }
+
+    ApplyUserSettingsToActiveStream();
+    emit DurationChanged(Duration());
+    emit PositionChanged(Position());
+
+    return true;
+}
+
+MediaPlayController::StreamId MediaPlayController::ActiveAudioStream() const
+{
+    return multiStreamManager_ ? multiStreamManager_->ActiveAudioStream() : InvalidStreamId;
+}
+
+bool MediaPlayController::SetActiveAudioStream(StreamId id)
+{
+    if (!multiStreamManager_) {
+        return false;
+    }
+
+    const bool changed = multiStreamManager_->SetActiveAudioStream(id);
+    if (!changed) {
+        return false;
+    }
+
+    emit VolumeChanged(volume_);
+    emit MuteChanged(muted_);
+
+    return true;
+}
+
+void MediaPlayController::StartAll()
+{
+    if (!multiStreamManager_ || multiStreamManager_->StreamIds().isEmpty()) {
+        qWarning() << "StartAll failed: no media streams";
+        return;
+    }
+
+    multiStreamManager_->StartAll();
+    SetState(PlaybackState::Playing);
+}
+
+void MediaPlayController::PauseAll()
+{
+    if (!multiStreamManager_ || multiStreamManager_->StreamIds().isEmpty()) {
+        qWarning() << "PauseAll failed: no media streams";
+        return;
+    }
+
+    multiStreamManager_->PauseAll();
+    SetState(PlaybackState::Paused);
+}
+
+void MediaPlayController::StopAll()
+{
+    if (!multiStreamManager_) {
+        SetState(PlaybackState::Stopped);
+        return;
+    }
+
+    multiStreamManager_->StopAll();
+    SetState(PlaybackState::Stopped);
+}
+
 void MediaPlayController::ConnectManagerSignals()
 {
     if (!multiStreamManager_) {
         return;
     }
 
+    connect(multiStreamManager_.get(), &MultiStreamManager::StreamAdded,
+            this, [this](MultiStreamManager::StreamId id) {
+                emit StreamAdded(id);
+            });
+
+    connect(multiStreamManager_.get(), &MultiStreamManager::StreamRemoved,
+            this, [this](MultiStreamManager::StreamId id) {
+                emit StreamRemoved(id);
+            });
+
+    connect(multiStreamManager_.get(), &MultiStreamManager::ActiveStreamChanged,
+            this, [this](MultiStreamManager::StreamId id) {
+                emit ActiveStreamChanged(id);
+                emit DurationChanged(Duration());
+                emit PositionChanged(Position());
+            });
+
+    connect(multiStreamManager_.get(), &MultiStreamManager::ActiveAudioStreamChanged,
+            this, [this](MultiStreamManager::StreamId id) {
+                emit ActiveAudioStreamChanged(id);
+                emit VolumeChanged(volume_);
+                emit MuteChanged(muted_);
+            });
+
+    connect(multiStreamManager_.get(), &MultiStreamManager::StreamErrorOccurred,
+            this, [this](MultiStreamManager::StreamId id, const QString& message) {
+                emit StreamErrorOccurred(id, message);
+            });
+
     connect(multiStreamManager_.get(), &MultiStreamManager::StreamDurationChanged,
             this, [this](MultiStreamManager::StreamId id, double seconds) {
+                emit StreamDurationChanged(id, seconds);
                 if (id == multiStreamManager_->ActiveStream()) {
                     emit DurationChanged(seconds);
                 }
@@ -121,6 +271,7 @@ void MediaPlayController::ConnectManagerSignals()
 
     connect(multiStreamManager_.get(), &MultiStreamManager::StreamPositionChanged,
             this, [this](MultiStreamManager::StreamId id, double seconds) {
+                emit StreamPositionChanged(id, seconds);
                 if (id == multiStreamManager_->ActiveStream()) {
                     emit PositionChanged(seconds);
                 }
@@ -128,6 +279,7 @@ void MediaPlayController::ConnectManagerSignals()
 
     connect(multiStreamManager_.get(), &MultiStreamManager::StreamPlaybackFinished,
             this, [this](MultiStreamManager::StreamId id) {
+                emit StreamPlaybackFinished(id);
                 if (id == multiStreamManager_->ActiveStream()) {
                     SetState(PlaybackState::Stopped);
                     emit PlaybackFinished();
@@ -136,6 +288,7 @@ void MediaPlayController::ConnectManagerSignals()
 
     connect(multiStreamManager_.get(), &MultiStreamManager::StreamVolumeChanged,
             this, [this](MultiStreamManager::StreamId id, double volume) {
+                emit StreamVolumeChanged(id, volume);
                 if (id != multiStreamManager_->ActiveAudioStream()) {
                     return;
                 }
@@ -148,6 +301,7 @@ void MediaPlayController::ConnectManagerSignals()
 
     connect(multiStreamManager_.get(), &MultiStreamManager::StreamMuteChanged,
             this, [this](MultiStreamManager::StreamId id, bool muted) {
+                emit StreamMuteChanged(id, muted);
                 if (id != multiStreamManager_->ActiveAudioStream()) {
                     return;
                 }

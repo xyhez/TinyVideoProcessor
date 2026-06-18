@@ -2,7 +2,9 @@
 #ifndef TINYVIDEOPROCESSOR_MEDIAPLAYCONTROLLER_H
 #define TINYVIDEOPROCESSOR_MEDIAPLAYCONTROLLER_H
 
+#include <QList>
 #include <QObject>
+#include <QString>
 #include <memory>
 
 #include "domain/IMediaSource.h"
@@ -26,6 +28,9 @@ public:
         Playing,
         Paused
     };
+
+    using StreamId = int;
+    static constexpr StreamId InvalidStreamId = -1;
 
     /**
      * @brief MediaPlayController 构造函数
@@ -59,6 +64,69 @@ public:
     bool SwitchSource(std::shared_ptr<IMediaSource> mediaSource,
                       QWidget* rendererContainer,
                       bool autoStart);
+
+    /**
+     * @brief AddStream 添加一路媒体源
+     * @param mediaSource 媒体源抽象
+     * @param rendererContainer 视频渲染容器
+     * @return 新增流 ID，失败返回 InvalidStreamId
+     */
+    StreamId AddStream(std::shared_ptr<IMediaSource> mediaSource,
+                       QWidget* rendererContainer);
+
+    /**
+     * @brief RemoveStream 移除一路媒体源
+     * @param id 目标流 ID
+     * @return true 移除成功
+     */
+    bool RemoveStream(StreamId id);
+
+    /**
+     * @brief StreamIds 获取当前全部流 ID
+     * @return 流 ID 列表
+     */
+    QList<StreamId> StreamIds() const;
+
+    /**
+     * @brief ActiveStream 获取当前活动显示流
+     * @return 当前活动显示流 ID
+     */
+    StreamId ActiveStream() const;
+
+    /**
+     * @brief SetActiveStream 设置当前活动显示流
+     * @param id 目标流 ID
+     * @return true 设置成功
+     */
+    bool SetActiveStream(StreamId id);
+
+    /**
+     * @brief ActiveAudioStream 获取当前活动音频流
+     * @return 当前活动音频流 ID
+     */
+    StreamId ActiveAudioStream() const;
+
+    /**
+     * @brief SetActiveAudioStream 设置当前活动音频流
+     * @param id 目标流 ID
+     * @return true 设置成功
+     */
+    bool SetActiveAudioStream(StreamId id);
+
+    /**
+     * @brief StartAll 启动或恢复全部媒体流
+     */
+    void StartAll();
+
+    /**
+     * @brief PauseAll 暂停全部媒体流
+     */
+    void PauseAll();
+
+    /**
+     * @brief StopAll 停止全部媒体流
+     */
+    void StopAll();
 
     /**
      * @brief Start 启动或恢复播放
@@ -208,6 +276,71 @@ signals:
      * @param muted 是否静音
      */
     void MuteChanged(bool muted);
+
+    /**
+     * @brief StreamAdded 媒体流添加信号
+     * @param id 新增流 ID
+     */
+    void StreamAdded(MediaPlayController::StreamId id);
+
+    /**
+     * @brief StreamRemoved 媒体流移除信号
+     * @param id 被移除流 ID
+     */
+    void StreamRemoved(MediaPlayController::StreamId id);
+
+    /**
+     * @brief ActiveStreamChanged 活动显示流变化信号
+     * @param id 新活动显示流 ID
+     */
+    void ActiveStreamChanged(MediaPlayController::StreamId id);
+
+    /**
+     * @brief ActiveAudioStreamChanged 活动音频流变化信号
+     * @param id 新活动音频流 ID
+     */
+    void ActiveAudioStreamChanged(MediaPlayController::StreamId id);
+
+    /**
+     * @brief StreamErrorOccurred 媒体流错误信号
+     * @param id 发生错误的流 ID
+     * @param message 错误信息
+     */
+    void StreamErrorOccurred(MediaPlayController::StreamId id, QString message);
+
+    /**
+     * @brief StreamPositionChanged 指定媒体流播放位置变化信号
+     * @param id 目标流 ID
+     * @param seconds 当前播放位置，单位秒
+     */
+    void StreamPositionChanged(MediaPlayController::StreamId id, double seconds);
+
+    /**
+     * @brief StreamDurationChanged 指定媒体流时长变化信号
+     * @param id 目标流 ID
+     * @param seconds 媒体总时长，单位秒
+     */
+    void StreamDurationChanged(MediaPlayController::StreamId id, double seconds);
+
+    /**
+     * @brief StreamPlaybackFinished 指定媒体流自然播放结束信号
+     * @param id 目标流 ID
+     */
+    void StreamPlaybackFinished(MediaPlayController::StreamId id);
+
+    /**
+     * @brief StreamVolumeChanged 指定媒体流音量变化信号
+     * @param id 目标流 ID
+     * @param volume 当前音量，范围 0.0-1.0
+     */
+    void StreamVolumeChanged(MediaPlayController::StreamId id, double volume);
+
+    /**
+     * @brief StreamMuteChanged 指定媒体流静音状态变化信号
+     * @param id 目标流 ID
+     * @param muted 是否静音
+     */
+    void StreamMuteChanged(MediaPlayController::StreamId id, bool muted);
 
 private:
     std::unique_ptr<MultiStreamManager> multiStreamManager_;

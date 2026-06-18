@@ -41,6 +41,69 @@
         </item>
        </layout>
       </item>
+      <item>
+       <widget class="QLabel" name="label_streams">
+        <property name="text">
+         <string>Streams</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QListWidget" name="listWidget_streams"/>
+      </item>
+      <item>
+       <layout class="QGridLayout" name="gridLayout_streams">
+        <item row="0" column="0">
+         <widget class="QPushButton" name="pushButton_addStream">
+          <property name="text">
+           <string>Add</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="1">
+         <widget class="QPushButton" name="pushButton_removeStream">
+          <property name="text">
+           <string>Remove</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="0">
+         <widget class="QPushButton" name="pushButton_activeStream">
+          <property name="text">
+           <string>View</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="1">
+         <widget class="QPushButton" name="pushButton_activeAudio">
+          <property name="text">
+           <string>Audio</string>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="0">
+         <widget class="QPushButton" name="pushButton_startAll">
+          <property name="text">
+           <string>Start All</string>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="1">
+         <widget class="QPushButton" name="pushButton_pauseAll">
+          <property name="text">
+           <string>Pause All</string>
+          </property>
+         </widget>
+        </item>
+        <item row="3" column="0" colspan="2">
+         <widget class="QPushButton" name="pushButton_stopAll">
+          <property name="text">
+           <string>Stop All</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
      </layout>
     </item>
     <item>

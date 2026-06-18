@@ -8,6 +8,7 @@
 #include <QPropertyAnimation>
 #include <QLabel>
 #include <QTimer>
+#include <QMap>
 #include <memory>
 
 #include "application/MediaPlayController.h"
@@ -234,6 +235,42 @@ private:
     void RefreshPlaylistView();
 
     /**
+     * @brief RefreshStreamView 刷新多路流验证列表显示
+     */
+    void RefreshStreamView();
+
+    /**
+     * @brief UpdateStreamControls 根据多路流选择状态更新按钮
+     */
+    void UpdateStreamControls();
+
+    /**
+     * @brief AddMultiStreamFiles 添加多路文件源
+     */
+    void AddMultiStreamFiles();
+
+    /**
+     * @brief RemoveSelectedStream 移除当前选中的流
+     */
+    void RemoveSelectedStream();
+
+    /**
+     * @brief SetSelectedActiveStream 将当前选中流设为活动显示流
+     */
+    void SetSelectedActiveStream();
+
+    /**
+     * @brief SetSelectedActiveAudioStream 将当前选中流设为活动音频流
+     */
+    void SetSelectedActiveAudioStream();
+
+    /**
+     * @brief SelectedStreamId 获取当前选中的流 ID
+     * @return 当前选中流 ID，未选中时返回 InvalidStreamId
+     */
+    MediaPlayController::StreamId SelectedStreamId() const;
+
+    /**
      * @brief SwitchToPlaylistIndex 切换到播放列表指定索引
      * @param index 播放列表索引
      * @param autoStart 切换成功后是否立即播放
@@ -245,6 +282,7 @@ private:
     bool isSliderDragging_ = false;
     bool isFullScreenMode_ = false;
     bool isCursorHidden_ = false;
+    QMap<MediaPlayController::StreamId, QString> streamDisplayNames_;
 
     /**
      * @brief formatTime 将秒数格式化为 UI 时间字符串
