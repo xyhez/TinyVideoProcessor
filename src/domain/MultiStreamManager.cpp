@@ -1,5 +1,6 @@
 #include "MultiStreamManager.h"
 
+#include <algorithm>
 #include <utility>
 
 MultiStreamManager::MultiStreamManager(QObject* parent)
@@ -36,6 +37,16 @@ MultiStreamManager::StreamId MultiStreamManager::AddStream(std::shared_ptr<IMedi
     ConnectPipelineSignals(id, slot.pipeline.get());
     streams_.emplace(id, std::move(slot));
 
+    if (StreamHasAudio(id)) {
+        if (activeAudioStreamId_ == InvalidStreamId) {
+            activeAudioStreamId_ = id;
+            ApplyAudioSettingsToStream(activeAudioStreamId_);
+            emit ActiveAudioStreamChanged(activeAudioStreamId_);
+        } else {
+            SetStreamMuted(id, true);
+        }
+    }
+
     emit StreamAdded(id);
     if (activeStreamId_ == InvalidStreamId) {
         activeStreamId_ = id;
@@ -64,7 +75,10 @@ bool MultiStreamManager::RemoveStream(StreamId id) {
     }
 
     if (activeAudioStreamId_ == id) {
-        activeAudioStreamId_ = InvalidStreamId;
+        activeAudioStreamId_ = SelectFallbackAudioStream();
+        if (activeAudioStreamId_ != InvalidStreamId) {
+            ApplyAudioSettingsToStream(activeAudioStreamId_);
+        }
         emit ActiveAudioStreamChanged(activeAudioStreamId_);
     }
 
@@ -125,7 +139,7 @@ MultiStreamManager::StreamId MultiStreamManager::ActiveAudioStream() const {
 }
 
 bool MultiStreamManager::SetActiveAudioStream(StreamId id) {
-    if (id != InvalidStreamId && !HasStream(id)) {
+    if (id != InvalidStreamId && !StreamHasAudio(id)) {
         return false;
     }
 
@@ -133,9 +147,40 @@ bool MultiStreamManager::SetActiveAudioStream(StreamId id) {
         return true;
     }
 
+    const StreamId previousAudioStreamId = activeAudioStreamId_;
+    if (previousAudioStreamId != InvalidStreamId) {
+        SetStreamMuted(previousAudioStreamId, true);
+    }
+
     activeAudioStreamId_ = id;
+    if (activeAudioStreamId_ != InvalidStreamId) {
+        ApplyAudioSettingsToStream(activeAudioStreamId_);
+    }
+
     emit ActiveAudioStreamChanged(activeAudioStreamId_);
     return true;
+}
+
+void MultiStreamManager::SetAudioVolume(double volume) {
+    audioVolume_ = std::clamp(volume, 0.0, 1.0);
+    if (activeAudioStreamId_ != InvalidStreamId) {
+        SetStreamVolume(activeAudioStreamId_, audioVolume_);
+    }
+}
+
+double MultiStreamManager::AudioVolume() const {
+    return audioVolume_;
+}
+
+void MultiStreamManager::SetAudioMuted(bool muted) {
+    audioMuted_ = muted;
+    if (activeAudioStreamId_ != InvalidStreamId) {
+        SetStreamMuted(activeAudioStreamId_, audioMuted_);
+    }
+}
+
+bool MultiStreamManager::IsAudioMuted() const {
+    return audioMuted_;
 }
 
 void MultiStreamManager::ShutdownAll() {
@@ -267,6 +312,10 @@ bool MultiStreamManager::SetStreamMuted(StreamId id, bool muted) {
         return false;
     }
 
+    if (!muted && StreamHasAudio(id) && id != activeAudioStreamId_) {
+        return false;
+    }
+
     pipeline->SetMuted(muted);
     return true;
 }
@@ -277,6 +326,30 @@ MultiStreamManager::StreamId MultiStreamManager::SelectFallbackStream() const {
     }
 
     return streams_.begin()->first;
+}
+
+MultiStreamManager::StreamId MultiStreamManager::SelectFallbackAudioStream() const {
+    for (const auto& stream : streams_) {
+        if (StreamHasAudio(stream.first)) {
+            return stream.first;
+        }
+    }
+
+    return InvalidStreamId;
+}
+
+bool MultiStreamManager::StreamHasAudio(StreamId id) const {
+    auto it = streams_.find(id);
+    if (it == streams_.end() || !it->second.mediaSource) {
+        return false;
+    }
+
+    return it->second.mediaSource->GetSourceInfo().hasAudio_;
+}
+
+void MultiStreamManager::ApplyAudioSettingsToStream(StreamId id) {
+    SetStreamVolume(id, audioVolume_);
+    SetStreamMuted(id, audioMuted_);
 }
 
 MediaPipeline* MultiStreamManager::FindPipeline(StreamId id) {

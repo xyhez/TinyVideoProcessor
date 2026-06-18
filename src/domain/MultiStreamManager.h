@@ -99,9 +99,34 @@ public:
      * @brief SetActiveAudioStream 设置当前活动音频流
      * @param id 目标 StreamId，允许 InvalidStreamId 清空状态
      * @return true 设置成功
-     * @return false id 不存在
+     * @return false id 不存在或对应流没有音频
      */
     bool SetActiveAudioStream(StreamId id);
+
+    /**
+     * @brief SetAudioVolume 设置全局音频音量，只下发给 active audio stream
+     * @param volume 音量值，范围 0.0-1.0
+     */
+    void SetAudioVolume(double volume);
+
+    /**
+     * @brief AudioVolume 获取全局音频音量
+     * @return 音量值，范围 0.0-1.0
+     */
+    double AudioVolume() const;
+
+    /**
+     * @brief SetAudioMuted 设置全局静音状态，只下发给 active audio stream
+     * @param muted 是否静音
+     */
+    void SetAudioMuted(bool muted);
+
+    /**
+     * @brief IsAudioMuted 获取全局静音状态
+     * @return true 静音
+     * @return false 未静音
+     */
+    bool IsAudioMuted() const;
 
     /**
      * @brief ShutdownAll 清空全部逻辑流状态
@@ -188,7 +213,7 @@ public:
      * @param id 目标 StreamId
      * @param muted 是否静音
      * @return true 操作已下发
-     * @return false id 不存在
+     * @return false id 不存在或非 active audio stream 不能解静音
      */
     bool SetStreamMuted(StreamId id, bool muted);
 
@@ -272,6 +297,26 @@ private:
     StreamId SelectFallbackStream() const;
 
     /**
+     * @brief SelectFallbackAudioStream 选择可用的兜底音频流
+     * @return 可用 StreamId；无音频流时返回 InvalidStreamId
+     */
+    StreamId SelectFallbackAudioStream() const;
+
+    /**
+     * @brief StreamHasAudio 判断指定逻辑流是否有音频
+     * @param id 目标 StreamId
+     * @return true 有音频
+     * @return false 不存在或没有音频
+     */
+    bool StreamHasAudio(StreamId id) const;
+
+    /**
+     * @brief ApplyAudioSettingsToStream 将全局音频参数下发到指定逻辑流
+     * @param id 目标 StreamId
+     */
+    void ApplyAudioSettingsToStream(StreamId id);
+
+    /**
      * @brief FindPipeline 查找指定逻辑流的播放管线
      * @param id 目标 StreamId
      * @return MediaPipeline 指针；id 不存在时返回 nullptr
@@ -296,6 +341,8 @@ private:
     StreamId nextStreamId_ = 1;
     StreamId activeStreamId_ = InvalidStreamId;
     StreamId activeAudioStreamId_ = InvalidStreamId;
+    double audioVolume_ = 1.0;
+    bool audioMuted_ = false;
 };
 
 #endif // TINYVIDEOPROCESSOR_MULTISTREAMMANAGER_H

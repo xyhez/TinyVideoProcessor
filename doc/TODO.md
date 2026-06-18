@@ -195,18 +195,18 @@ MainWindow
 
 **目标**：避免多路同时输出音频。
 
-- [ ] Manager 保存 `activeAudioStreamId_`。
-- [ ] 第一条有音频流默认成为 active audio stream。
-- [ ] 非 active audio stream 默认静音。
-- [ ] 切换 active audio stream 时旧路静音。
-- [ ] 切换 active audio stream 时新路恢复当前 volume/muted。
-- [ ] 无音频流不能成为有效 active audio stream。
+- [x] Manager 保存 `activeAudioStreamId_`。
+- [x] 第一条有音频流默认成为 active audio stream。
+- [x] 非 active audio stream 默认静音。
+- [x] 切换 active audio stream 时旧路静音。
+- [x] 切换 active audio stream 时新路恢复当前 volume/muted。
+- [x] 无音频流不能成为有效 active audio stream。
 
 **验收标准**：
 
-- [ ] 多路播放时最多一路有声音。
-- [ ] 切换 active audio stream 后音频输出符合预期。
-- [ ] 无音频视频不影响音频策略。
+- [x] 多路播放时最多一路有声音。
+- [x] 切换 active audio stream 后音频输出符合预期。
+- [x] 无音频视频不影响音频策略。
 
 ## 3.2.9 Controller 接入 Manager
 
