@@ -440,19 +440,19 @@ MainWindow
 
 **验收标准**：
 
-- [ ] 点击有音频画面后，进度条和声音都切换到该路。
-- [ ] 点击无音频画面后，进度条切换到该路，程序无声。
-- [ ] 不出现画面和声音来自不同路的情况。
-- [ ] `MainWindow` 不直接访问 `MultiStreamManager`。
+- [x] 点击有音频画面后，进度条和声音都切换到该路。
+- [x] 点击无音频画面后，进度条切换到该路，程序无声。
+- [x] 不出现画面和声音来自不同路的情况。
+- [x] `MainWindow` 不直接访问 `MultiStreamManager`。
 
 ## 3.3.7 Single 布局行为
 
 **目标**：定义并实现 `Single` 布局的最小行为。
 
-- [ ] `Single` 只显示 active stream 对应容器。
-- [ ] 非 active stream 容器隐藏。
-- [ ] active stream 变化时刷新容器可见性。
-- [ ] 没有 active stream 时显示空白容器。
+- [x] `Single` 只显示 active stream 对应容器。
+- [x] 非 active stream 容器隐藏。
+- [x] active stream 变化时刷新容器可见性。
+- [x] 没有 active stream 时显示空白容器。
 
 **验收标准**：
 

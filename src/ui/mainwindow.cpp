@@ -601,13 +601,19 @@ bool MainWindow::ActivateStreamFromVideoContainer(int containerIndex) {
 
 void MainWindow::RefreshMultiViewLayout() {
     const std::array<QWidget*, 4> containers = VideoContainers();
+    int singleVisibleIndex = ContainerIndexForStream(mediaPlayController_->ActiveStream());
+    if (singleVisibleIndex < 0) {
+        singleVisibleIndex = 0;
+    }
+
     for (int index = 0; index < static_cast<int>(containers.size()); ++index) {
         QWidget* container = containers.at(index);
         if (!container) {
             continue;
         }
 
-        const bool visible = CurrentMultiViewLayout() == MultiViewLayout::Grid2x2 || index == 0;
+        const bool visible = CurrentMultiViewLayout() == MultiViewLayout::Grid2x2
+            || index == singleVisibleIndex;
         container->setVisible(visible);
     }
 }
@@ -808,6 +814,7 @@ void MainWindow::RefreshStreamView() {
     }
 
     UpdateStreamControls();
+    RefreshMultiViewLayout();
 }
 
 void MainWindow::UpdateStreamControls() {
