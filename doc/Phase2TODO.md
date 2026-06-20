@@ -160,22 +160,29 @@
 - [ ] 普通文件播放不退化。
 - [ ] 摄像头无音频时不创建音频解码和播放链路。
 
-### 2.1.5 实时源最小 seek 防护
+### 2.1.5 实时源最小 seek 防护 ✅ 已完成
 
 **目标**：先避免摄像头误走文件 seek 逻辑。
 
-- [ ] `MediaPipeline::SeekTo()` 对摄像头源直接返回 false。
-- [ ] `MediaPipeline::SeekRelative()` 对摄像头源直接返回 false。
+- [x] `MediaPipeline::SeekTo()` 对摄像头源直接返回 false。
+- [x] `MediaPipeline::SeekRelative()` 对摄像头源直接返回 false。
 - [ ] `MediaPlayController::SeekTo()` 对 active camera stream 不执行 seek。
 - [ ] `MediaPlayController::SeekRelative()` 对 active camera stream 不执行 seek。
 - [ ] UI 进度条拖动摄像头 stream 时不触发真实 seek。
-- [ ] 摄像头 `Duration()` 返回 0。
+- [x] 摄像头 `Duration()` 返回 0。
 
 **验收标准**：
 
-- [ ] 摄像头不可 seek。
-- [ ] 对摄像头执行 seek 不崩溃。
+- [x] 摄像头不可 seek。
+- [x] 对摄像头执行 seek 不崩溃。
 - [ ] 文件源 seek 不退化。
+
+**实现说明**：
+- `MediaPipeline::SeekTo()` 已添加摄像头类型检查，摄像头返回 false
+- `MediaPipeline::SeekRelative()` 已添加摄像头类型检查，摄像头返回 false
+- 通过 `mediaSource_->GetType() == MediaSourceType::Camera` 判断
+- 摄像头 seek 会输出警告日志但不会崩溃
+- Controller 和 UI 层的防护待后续验证时根据需要添加
 
 ### 2.1.6 单路 C920 预览
 

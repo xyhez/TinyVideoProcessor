@@ -136,6 +136,12 @@ bool MediaPipeline::SeekTo(double seconds)
         return false;
     }
 
+    // 实时源（摄像头）不支持 seek
+    if (mediaSource_ && mediaSource_->GetType() == MediaSourceType::Camera) {
+        qWarning() << "MediaPipeline seek rejected: camera source is not seekable";
+        return false;
+    }
+
     double targetSeconds = seconds;
     if (targetSeconds < 0.0) {
         targetSeconds = 0.0;
@@ -176,6 +182,12 @@ bool MediaPipeline::SeekRelative(double seconds)
     if (!demuxer_) {
         qWarning() << "MediaPipeline seek failed: demuxer is not initialized";
         emit ErrorOccurred("Demuxer is not initialized");
+        return false;
+    }
+
+    // 实时源（摄像头）不支持 seek
+    if (mediaSource_ && mediaSource_->GetType() == MediaSourceType::Camera) {
+        qWarning() << "MediaPipeline seek rejected: camera source is not seekable";
         return false;
     }
 
