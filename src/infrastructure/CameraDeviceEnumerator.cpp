@@ -42,11 +42,15 @@ QList<CameraDeviceInfo> CameraDeviceEnumerator::EnumerateDevices()
         AVDeviceInfo* device = deviceList->devices[i];
 
         CameraDeviceInfo info;
-        info.deviceName = QString::fromUtf8(device->device_name);
+        // device_name 是 PnP 路径或唯一标识符
+        // device_description 是友好名称
+        // dshow 可以使用友好名称打开设备，更简单
+        info.deviceName = QString::fromUtf8(device->device_description);
         info.friendlyName = QString::fromUtf8(device->device_description);
-        info.description = info.friendlyName; // 暂时使用友好名称作为描述
+        info.description = info.friendlyName;
 
         qDebug() << "  Device" << i << ":" << info.deviceName;
+        qDebug() << "    PnP Path:" << QString::fromUtf8(device->device_name);
         qDebug() << "    Description:" << info.friendlyName;
 
         // 查询设备格式选项
@@ -126,7 +130,7 @@ QList<CameraFormatOption> CameraDeviceEnumerator::GetHardcodedC920Formats()
     h264_1080p30.minFrameRate = 15;
     h264_1080p30.maxFrameRate = 30;
     h264_1080p30.codec = "h264";
-    h264_1080p30.pixelFormat = "h264";
+    h264_1080p30.pixelFormat = ""; // 让 FFmpeg 自动选择
     formats.append(h264_1080p30);
 
     CameraFormatOption h264_720p30;
@@ -135,7 +139,7 @@ QList<CameraFormatOption> CameraDeviceEnumerator::GetHardcodedC920Formats()
     h264_720p30.minFrameRate = 15;
     h264_720p30.maxFrameRate = 30;
     h264_720p30.codec = "h264";
-    h264_720p30.pixelFormat = "h264";
+    h264_720p30.pixelFormat = ""; // 让 FFmpeg 自动选择
     formats.append(h264_720p30);
 
     CameraFormatOption h264_480p30;
@@ -144,7 +148,7 @@ QList<CameraFormatOption> CameraDeviceEnumerator::GetHardcodedC920Formats()
     h264_480p30.minFrameRate = 15;
     h264_480p30.maxFrameRate = 30;
     h264_480p30.codec = "h264";
-    h264_480p30.pixelFormat = "h264";
+    h264_480p30.pixelFormat = ""; // 让 FFmpeg 自动选择
     formats.append(h264_480p30);
 
     // C920 支持的 YUYV422 格式（raw）
