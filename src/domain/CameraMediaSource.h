@@ -4,6 +4,7 @@
 #define TINYVIDEOPROCESSOR_CAMERAMEDIASOURCE_H
 
 #include "IMediaSource.h"
+#include "CameraTypes.h"
 
 /**
  * @brief CameraMediaSource 摄像头媒体源实现
@@ -23,6 +24,12 @@ public:
      * @param deviceName 摄像头设备名（如 "HD Pro Webcam C920"）
      */
     explicit CameraMediaSource(QString deviceName);
+
+    /**
+     * @brief CameraMediaSource 使用打开选项构造摄像头媒体源
+     * @param options 摄像头打开选项
+     */
+    explicit CameraMediaSource(const CameraOpenOptions& options);
 
     /**
      * @brief ~CameraMediaSource 析构函数，释放摄像头资源
@@ -80,6 +87,12 @@ public:
      */
     void SetFrameRate(int frameRate);
 
+    /**
+     * @brief SetOpenOptions 设置打开选项
+     * @param options 摄像头打开选项
+     */
+    void SetOpenOptions(const CameraOpenOptions& options);
+
 private:
     AVFormatContext* formatContext_ = nullptr;
     Fileinfo sourceInfo_;
@@ -87,6 +100,9 @@ private:
     int width_ = 1280;
     int height_ = 720;
     int frameRate_ = 30;
+    int rtbufsize_ = 100;       ///< rtbufsize (MB)
+    QString pixelFormat_;       ///< 像素格式（可选）
+    QString codec_;             ///< 编码格式（可选）
 };
 
 #endif // TINYVIDEOPROCESSOR_CAMERAMEDIASOURCE_H

@@ -282,18 +282,29 @@
 
 **目标**：让用户不再手写设备名，逐步支持设备、分辨率、帧率、输入格式选择。
 
-### 2.2.1 设备和参数数据结构
+### 2.2.1 设备和参数数据结构 ✅ 已完成
 
-- [ ] 设计 `CameraDeviceInfo`。
-- [ ] 设计 `CameraFormatOption`。
-- [ ] 设计 `CameraOpenOptions`。
-- [ ] 明确 `CameraOpenOptions` 如何传给 `CameraMediaSource`。
-- [ ] 明确配置结构不依赖 UI 控件。
+- [x] 设计 `CameraDeviceInfo`。
+- [x] 设计 `CameraFormatOption`。
+- [x] 设计 `CameraOpenOptions`。
+- [x] 明确 `CameraOpenOptions` 如何传给 `CameraMediaSource`。
+- [x] 明确配置结构不依赖 UI 控件。
 
 **验收标准**：
 
-- [ ] 摄像头打开参数结构化。
-- [ ] UI 和 Source 不直接共享散乱字符串。
+- [x] 摄像头打开参数结构化。
+- [x] UI 和 Source 不直接共享散乱字符串。
+
+**实现说明**：
+- 创建 `src/domain/CameraTypes.h` 定义所有摄像头相关数据结构
+- `CameraFormatOption`：描述摄像头支持的一种格式（分辨率+帧率+编码）
+- `CameraDeviceInfo`：描述摄像头设备及其支持的格式列表
+- `CameraOpenOptions`：封装用户选择的打开参数
+- `CameraMediaSource` 新增构造函数：`CameraMediaSource(const CameraOpenOptions&)`
+- `CameraMediaSource` 新增方法：`SetOpenOptions(const CameraOpenOptions&)`
+- `Open()` 方法支持使用 `pixelFormat_` 和 `codec_` 参数
+- 所有数据结构均为纯数据类型，不依赖 UI 控件
+- 加入 CMakeLists.txt 构建系统
 
 ### 2.2.2 CameraDeviceEnumerator 预研与空壳
 

@@ -62,6 +62,7 @@ set(PROJECT_SOURCES
         src/domain/FileMediaSource.h
         src/domain/CameraMediaSource.cpp
         src/domain/CameraMediaSource.h
+        src/domain/CameraTypes.h
         src/domain/MediaPipeline.cpp
         src/domain/MediaPipeline.h
         src/application/MediaPlayController.h

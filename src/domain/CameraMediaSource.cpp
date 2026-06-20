@@ -10,6 +10,18 @@ CameraMediaSource::CameraMediaSource(QString deviceName)
     sourceInfo_.filepath_ = deviceName; // 对摄像头，filepath_ 存储设备名
 }
 
+CameraMediaSource::CameraMediaSource(const CameraOpenOptions& options)
+    : deviceName_(options.deviceName)
+    , width_(options.width)
+    , height_(options.height)
+    , frameRate_(options.frameRate)
+    , rtbufsize_(options.rtbufsize)
+    , pixelFormat_(options.pixelFormat)
+    , codec_(options.codec)
+{
+    sourceInfo_.filepath_ = options.deviceName;
+}
+
 CameraMediaSource::~CameraMediaSource()
 {
     if (formatContext_) {
@@ -42,10 +54,20 @@ bool CameraMediaSource::Open()
     AVDictionary* options = nullptr;
     av_dict_set(&options, "video_size", QString("%1x%2").arg(width_).arg(height_).toUtf8().constData(), 0);
     av_dict_set(&options, "framerate", QString::number(frameRate_).toUtf8().constData(), 0);
-    // 增大实时缓冲区大小，避免帧丢弃（默认约 3MB，增大到 100MB）
-    av_dict_set(&options, "rtbufsize", "100M", 0);
-    // 第一版使用 H.264 格式（C920 硬件编码）
-    // av_dict_set(&options, "vcodec", "h264", 0);
+
+    // 设置实时缓冲区大小
+    QString rtbufsizeStr = QString("%1M").arg(rtbufsize_);
+    av_dict_set(&options, "rtbufsize", rtbufsizeStr.toUtf8().constData(), 0);
+
+    // 如果指定了像素格式，设置 pixel_format
+    if (!pixelFormat_.isEmpty()) {
+        av_dict_set(&options, "pixel_format", pixelFormat_.toUtf8().constData(), 0);
+    }
+
+    // 如果指定了编码格式，设置 vcodec
+    if (!codec_.isEmpty()) {
+        av_dict_set(&options, "vcodec", codec_.toUtf8().constData(), 0);
+    }
 
     // 打开摄像头设备
     int ret = avformat_open_input(&formatContext_,
@@ -158,4 +180,16 @@ void CameraMediaSource::SetResolution(int width, int height)
 void CameraMediaSource::SetFrameRate(int frameRate)
 {
     frameRate_ = frameRate;
+}
+
+void CameraMediaSource::SetOpenOptions(const CameraOpenOptions& options)
+{
+    deviceName_ = options.deviceName;
+    width_ = options.width;
+    height_ = options.height;
+    frameRate_ = options.frameRate;
+    rtbufsize_ = options.rtbufsize;
+    pixelFormat_ = options.pixelFormat;
+    codec_ = options.codec;
+    sourceInfo_.filepath_ = options.deviceName;
 }
