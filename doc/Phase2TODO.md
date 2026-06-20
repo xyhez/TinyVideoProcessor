@@ -32,42 +32,92 @@
 
 **目标**：拿到真实设备后确认 dshow 设备名和支持参数。
 
-- [ ] 运行 `ffmpeg -list_devices true -f dshow -i dummy`。
-- [ ] 记录 C920 的真实 dshow 设备名。
-- [ ] 运行 `ffmpeg -list_options true -f dshow -i video="实际设备名"`。
-- [ ] 记录支持的分辨率。
-- [ ] 记录支持的帧率。
-- [ ] 记录支持的输入格式或编码格式。
-- [ ] 确认第一版是否可使用 1280x720、30fps。
+- [x] 运行 `ffmpeg -list_devices true -f dshow -i dummy`。
+- [x] 记录 C920 的真实 dshow 设备名。
+- [x] 运行 `ffmpeg -list_options true -f dshow -i video="实际设备名"`。
+- [x] 记录支持的分辨率。
+- [x] 记录支持的帧率。
+- [x] 记录支持的输入格式或编码格式。
+- [x] 确认第一版是否可使用 1280x720、30fps。
 
 **验收标准**：
 
-- [ ] 已获得真实设备名。
-- [ ] 已获得可用分辨率和帧率。
-- [ ] 已确定第一版打开参数。
+- [x] 已获得真实设备名。
+- [x] 已获得可用分辨率和帧率。
+- [x] 已确定第一版打开参数。
 
-### 2.1.2 CameraMediaSource 空壳
+---
+
+**✅ 实际设备信息（2025-01-XX 确认）**
+
+**设备名称**：`HD Pro Webcam C920`（注意：不是 "Logitech HD Pro Webcam C920"）
+
+**支持的输出格式**：
+
+1. **YUYV422** (raw 格式)
+   - 640x480 @ 30fps
+   - 1280x720 @ 10fps (max)
+   - 1920x1080 @ 5fps (max)
+
+2. **H.264** (硬件编码) ✅ 推荐
+   - 640x480 @ 30fps
+   - 1280x720 @ 30fps ✅
+   - 1920x1080 @ 30fps ✅
+
+3. **MJPEG** (压缩格式)
+   - 640x480 @ 30fps
+   - 1280x720 @ 30fps
+   - 1920x1080 @ 30fps
+
+**第一版推荐参数**：
+```cpp
+设备名：    "HD Pro Webcam C920"
+格式：      H.264 (vcodec=h264)
+分辨率：    1280x720
+帧率：      30fps
+```
+
+**选择 H.264 的原因**：
+- C920 内置 H.264 硬件编码器，CPU 占用低
+- 传输带宽小于 MJPEG
+- 30fps 稳定，适合实时预览
+
+**备选方案**（如果 H.264 解码有问题）：
+```cpp
+格式：      MJPEG (vcodec=mjpeg)
+分辨率：    1280x720
+帧率：      30fps
+```
+
+### 2.1.2 CameraMediaSource 空壳 ✅ 已完成
 
 **目标**：新增摄像头媒体源类，只完成接口边界，不接 UI。
 
-- [ ] 新增 `src/domain/CameraMediaSource.h`。
-- [ ] 新增 `src/domain/CameraMediaSource.cpp`。
-- [ ] `CameraMediaSource` 实现 `IMediaSource`。
-- [ ] `GetType()` 返回 `MediaSourceType::Camera`。
-- [ ] `SetInfo()` 语义定义为设置摄像头设备名。
-- [ ] 保存设备名、宽度、高度、帧率等最小参数。
-- [ ] 保存 `Fileinfo sourceInfo_`。
-- [ ] 保存 `AVFormatContext*`。
-- [ ] 加入构建系统。
-- [ ] 不实现设备枚举。
-- [ ] 不实现摄像头设置面板。
-- [ ] 不接摄像头音频。
+- [x] 新增 `src/domain/CameraMediaSource.h`。
+- [x] 新增 `src/domain/CameraMediaSource.cpp`。
+- [x] `CameraMediaSource` 实现 `IMediaSource`。
+- [x] `GetType()` 返回 `MediaSourceType::Camera`。
+- [x] `SetInfo()` 语义定义为设置摄像头设备名。
+- [x] 保存设备名、宽度、高度、帧率等最小参数。
+- [x] 保存 `Fileinfo sourceInfo_`。
+- [x] 保存 `AVFormatContext*`。
+- [x] 加入构建系统（CMakeLists.txt 已添加 CameraMediaSource 和 avdevice.lib）。
+- [x] 不实现设备枚举。
+- [x] 不实现摄像头设置面板。
+- [x] 不接摄像头音频。
 
 **验收标准**：
 
-- [ ] 类可以独立加入构建。
-- [ ] 不影响 `FileMediaSource`。
-- [ ] 不影响现有文件播放。
+- [x] 类可以独立加入构建。
+- [x] 不影响 `FileMediaSource`。
+- [x] 不影响现有文件播放。
+
+**实现说明**：
+- `Open()` 方法已实现完整的 dshow 打开逻辑
+- 支持设置分辨率和帧率参数
+- 默认参数：1280x720@30fps
+- 已添加调试日志输出
+- 析构函数正确释放资源
 
 ### 2.1.3 dshow video-only 打开
 

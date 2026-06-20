@@ -32,6 +32,7 @@ set(FFMPEG_LIBS
     ${FFMPEG_LIB_DIR}/avutil.lib
     ${FFMPEG_LIB_DIR}/swscale.lib
     ${FFMPEG_LIB_DIR}/swresample.lib
+    ${FFMPEG_LIB_DIR}/avdevice.lib
 )
 
 
@@ -59,6 +60,8 @@ set(PROJECT_SOURCES
         src/domain/IMediaSource.h
         src/domain/FileMediaSource.cpp
         src/domain/FileMediaSource.h
+        src/domain/CameraMediaSource.cpp
+        src/domain/CameraMediaSource.h
         src/domain/MediaPipeline.cpp
         src/domain/MediaPipeline.h
         src/application/MediaPlayController.h

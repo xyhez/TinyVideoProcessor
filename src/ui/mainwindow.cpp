@@ -41,7 +41,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     CreateConnects();
 
-    QString filepath = "D:\\githubProject\\TinyVideoProcessor\\resource\\动物发现自己被绿.mp4";
+    QString filepath = "../../resource/动物发现自己被绿.mp4";
     playlistManager_->AddFile(filepath);
     if (!SwitchToPlaylistIndex(playlistManager_->CurrentIndex(), false)) {
         qCritical() << "Controller 初始化失败";
