@@ -93,6 +93,24 @@ public:
      */
     void SetOpenOptions(const CameraOpenOptions& options);
 
+    /**
+     * @brief IsSeekable 摄像头不支持 seek
+     * @return false
+     */
+    bool IsSeekable() const override;
+
+    /**
+     * @brief HasDuration 摄像头没有确定的时长
+     * @return false
+     */
+    bool HasDuration() const override;
+
+    /**
+     * @brief IsRealtime 摄像头是实时源
+     * @return true
+     */
+    bool IsRealtime() const override;
+
 private:
     AVFormatContext* formatContext_ = nullptr;
     Fileinfo sourceInfo_;

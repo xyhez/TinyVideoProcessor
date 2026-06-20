@@ -64,6 +64,25 @@ public:
      * @param filepath 本地文件路径
      */
     void SetInfo(QString filepath) override;
+
+    /**
+     * @brief IsSeekable 文件源支持 seek
+     * @return true
+     */
+    bool IsSeekable() const override;
+
+    /**
+     * @brief HasDuration 文件源有确定的时长
+     * @return true
+     */
+    bool HasDuration() const override;
+
+    /**
+     * @brief IsRealtime 文件源不是实时源
+     * @return false
+     */
+    bool IsRealtime() const override;
+
 private:
     AVFormatContext* ic = nullptr;
     struct Fileinfo FileInfo_;

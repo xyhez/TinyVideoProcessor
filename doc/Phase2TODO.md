@@ -392,31 +392,77 @@
 - 第一版不显示音频选项（video-only）
 - 加入 CMakeLists.txt 构建系统
 
-### 2.2.5 Phase 2.2 报告
+### 2.2.5 Phase 2.2 报告 ✅ 已完成
 
-- [ ] 形成 `doc/Phase2_2_摄像头设备枚举与参数选择报告.md`。
-- [ ] 记录设备枚举方案。
-- [ ] 记录能力枚举方案。
-- [ ] 记录 UI 接入方式。
-- [ ] 记录已知限制。
+- [x] 形成 `doc/Phase2_2_摄像头设备枚举与参数选择报告.md`。
+- [x] 记录设备枚举方案。
+- [x] 记录能力枚举方案。
+- [x] 记录 UI 接入方式。
+- [x] 记录已知限制。
+
+**实现说明**：
+- 创建完整实现报告：`doc/Phase2_2_摄像头设备枚举与参数选择报告.md`
+- 记录数据结构设计（CameraTypes.h）
+- 记录设备枚举方案（FFmpeg dshow vs DirectShow COM vs Qt Multimedia）
+- 记录格式枚举方案（第一版硬编码 C920 格式）
+- 记录 UI 实现（CameraSettingsDialog）
+- 记录架构验证和职责分离
+- 记录关键问题和解决方案（设备名格式、H.264 参数）
+- 记录已知限制和后续优化方向
+- 对比 Phase 2.1 和 Phase 2.2 的用户体验提升
+
+---
+
+## ✅ Phase 2.2 总结
+
+**Phase 2.2 摄像头设备枚举与参数选择已全部完成！**
+
+核心成果：
+- ✅ 结构化的摄像头参数数据结构（CameraTypes.h）
+- ✅ 基于 FFmpeg dshow 的设备枚举服务
+- ✅ 硬编码的 C920 格式枚举
+- ✅ 用户友好的摄像头设置对话框
+- ✅ 不再硬编码设备名和参数
+
+用户体验提升：
+- 从硬编码 C920 到用户选择任意摄像头
+- 从固定 720p30 到选择任意支持的格式
+- 图形界面友好，支持刷新设备
+
+---
 
 ## Phase 2.3 实时源语义完善
 
 **目标**：把实时源能力从临时类型判断提升为接口能力，统一文件源、摄像头源、后续网络源的语义。
 
-### 2.3.1 IMediaSource 能力接口设计
+### 2.3.1 IMediaSource 能力接口设计 ✅ 已完成
 
-- [ ] 为 `IMediaSource` 设计 `IsSeekable()`。
-- [ ] 为 `IMediaSource` 设计 `HasDuration()`。
-- [ ] 为 `IMediaSource` 设计 `IsRealtime()`。
-- [ ] `FileMediaSource` 返回文件源能力。
-- [ ] `CameraMediaSource` 返回实时源能力。
-- [ ] 评估是否需要 `SupportsAudioInput()` 或类似能力。
+- [x] 为 `IMediaSource` 设计 `IsSeekable()`。
+- [x] 为 `IMediaSource` 设计 `HasDuration()`。
+- [x] 为 `IMediaSource` 设计 `IsRealtime()`。
+- [x] `FileMediaSource` 返回文件源能力。
+- [x] `CameraMediaSource` 返回实时源能力。
+- [x] 评估是否需要 `SupportsAudioInput()` 或类似能力。
 
 **验收标准**：
 
-- [ ] 文件源和摄像头源能力语义清晰。
-- [ ] 播放控制层不再只靠 `MediaSourceType::Camera` 判断。
+- [x] 文件源和摄像头源能力语义清晰。
+- [x] 播放控制层不再只靠 `MediaSourceType::Camera` 判断。
+
+**实现说明**：
+- 为 `IMediaSource` 添加三个能力查询接口：
+  - `IsSeekable()`: 是否支持 seek
+  - `HasDuration()`: 是否有确定的时长
+  - `IsRealtime()`: 是否为实时源
+- `FileMediaSource` 实现：
+  - `IsSeekable() = true` (文件支持 seek)
+  - `HasDuration() = true` (文件有时长)
+  - `IsRealtime() = false` (文件不是实时源)
+- `CameraMediaSource` 实现：
+  - `IsSeekable() = false` (摄像头不支持 seek)
+  - `HasDuration() = false` (摄像头无时长)
+  - `IsRealtime() = true` (摄像头是实时源)
+- 暂不添加 `SupportsAudioInput()`（第一版 video-only）
 
 ### 2.3.2 播放控制接入能力判断
 

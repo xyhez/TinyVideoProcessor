@@ -54,3 +54,15 @@ void FileMediaSource::SetInfo(QString filepath) {
     FileInfo_.filepath_ = filepath;
 }
 
+bool FileMediaSource::IsSeekable() const {
+    return true; // 文件源支持 seek
+}
+
+bool FileMediaSource::HasDuration() const {
+    return true; // 文件源有确定的时长
+}
+
+bool FileMediaSource::IsRealtime() const {
+    return false; // 文件源不是实时源
+}
+

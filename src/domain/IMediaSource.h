@@ -100,4 +100,28 @@ public:
      * @return 媒体源信息引用
      */
     virtual Fileinfo& GetSourceInfo() = 0;
+
+    /**
+     * @brief IsSeekable 媒体源是否支持 seek
+     * @return true 支持 seek，false 不支持
+     *
+     * 文件源通常返回 true，实时源（摄像头、网络流）通常返回 false
+     */
+    virtual bool IsSeekable() const = 0;
+
+    /**
+     * @brief HasDuration 媒体源是否有确定的时长
+     * @return true 有时长，false 无时长
+     *
+     * 文件源通常返回 true，实时源（摄像头、直播流）通常返回 false
+     */
+    virtual bool HasDuration() const = 0;
+
+    /**
+     * @brief IsRealtime 媒体源是否为实时源
+     * @return true 实时源，false 非实时源
+     *
+     * 摄像头、直播流等返回 true，文件源返回 false
+     */
+    virtual bool IsRealtime() const = 0;
 };

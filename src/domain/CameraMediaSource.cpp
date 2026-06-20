@@ -193,3 +193,15 @@ void CameraMediaSource::SetOpenOptions(const CameraOpenOptions& options)
     codec_ = options.codec;
     sourceInfo_.filepath_ = options.deviceName;
 }
+
+bool CameraMediaSource::IsSeekable() const {
+    return false; // 摄像头不支持 seek
+}
+
+bool CameraMediaSource::HasDuration() const {
+    return false; // 摄像头没有确定的时长
+}
+
+bool CameraMediaSource::IsRealtime() const {
+    return true; // 摄像头是实时源
+}
