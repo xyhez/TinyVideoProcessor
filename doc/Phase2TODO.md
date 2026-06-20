@@ -464,21 +464,33 @@
   - `IsRealtime() = true` (摄像头是实时源)
 - 暂不添加 `SupportsAudioInput()`（第一版 video-only）
 
-### 2.3.2 播放控制接入能力判断
+### 2.3.2 播放控制接入能力判断 ✅ 已完成
 
-- [ ] `MediaPipeline::SeekTo()` 使用 `IsSeekable()`。
-- [ ] `MediaPipeline::Duration()` 使用 `HasDuration()`。
-- [ ] `MediaPlayController::SeekTo()` 使用 active stream 能力。
-- [ ] `MediaPlayController::SeekRelative()` 使用 active stream 能力。
-- [ ] `MultiStreamManager` 提供 active stream 能力读取入口。
-- [ ] 文件源行为不退化。
-- [ ] 摄像头源行为符合 live 语义。
+- [x] `MediaPipeline::SeekTo()` 使用 `IsSeekable()`。
+- [x] `MediaPipeline::Duration()` 使用 `HasDuration()`。
+- [x] `MediaPlayController::SeekTo()` 使用 active stream 能力。
+- [x] `MediaPlayController::SeekRelative()` 使用 active stream 能力。
+- [x] `MultiStreamManager` 提供 active stream 能力读取入口。
+- [x] 文件源行为不退化。
+- [x] 摄像头源行为符合 live 语义。
 
 **验收标准**：
 
-- [ ] 文件源可 seek。
-- [ ] 摄像头源不可 seek。
-- [ ] Controller 不需要知道具体源类型也能做正确判断。
+- [x] 文件源可 seek。
+- [x] 摄像头源不可 seek。
+- [x] Controller 不需要知道具体源类型也能做正确判断。
+
+**实现说明**：
+- `MediaPipeline::SeekTo()` 改为使用 `IsSeekable()` 判断（替换类型判断）
+- `MultiStreamManager` 新增方法：
+  - `IsActiveStreamSeekable()`: 检查 active stream 是否可 seek
+  - `IsActiveStreamRealtime()`: 检查 active stream 是否为实时源
+  - `HasActiveStreamDuration()`: 检查 active stream 是否有时长
+- `MediaPlayController::SeekTo()` 使用 `IsActiveStreamSeekable()` 判断
+- `MediaPlayController::SeekRelative()` 使用 `IsActiveStreamSeekable()` 判断
+- 从类型判断（`GetType() == MediaSourceType::Camera`）改为能力判断
+- 文件源：可 seek，有时长，非实时
+- 摄像头源：不可 seek，无时长，实时
 
 ### 2.3.3 UI 实时源状态显示
 

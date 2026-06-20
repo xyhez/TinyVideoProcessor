@@ -479,6 +479,12 @@ void MediaPlayController::SeekTo(double seconds) {
         return;
     }
 
+    // 检查 active stream 是否支持 seek
+    if (!multiStreamManager_->IsActiveStreamSeekable()) {
+        qWarning() << "Seek rejected: active stream is not seekable";
+        return;
+    }
+
     double targetSeconds = seconds;
     if (targetSeconds < 0.0) {
         targetSeconds = 0.0;
@@ -503,6 +509,12 @@ void MediaPlayController::SeekRelative(double seconds) {
     if (!multiStreamManager_
         || multiStreamManager_->ActiveStream() == MultiStreamManager::InvalidStreamId) {
         qWarning() << "Seek failed: playback pipeline is not initialized";
+        return;
+    }
+
+    // 检查 active stream 是否支持 seek
+    if (!multiStreamManager_->IsActiveStreamSeekable()) {
+        qWarning() << "Seek rejected: active stream is not seekable";
         return;
     }
 

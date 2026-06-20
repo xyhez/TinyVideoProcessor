@@ -184,6 +184,45 @@ bool MultiStreamManager::IsAudioMuted() const {
     return audioMuted_;
 }
 
+bool MultiStreamManager::IsActiveStreamSeekable() const {
+    if (activeStreamId_ == InvalidStreamId) {
+        return false;
+    }
+
+    auto it = streams_.find(activeStreamId_);
+    if (it == streams_.end() || !it->second.mediaSource) {
+        return false;
+    }
+
+    return it->second.mediaSource->IsSeekable();
+}
+
+bool MultiStreamManager::IsActiveStreamRealtime() const {
+    if (activeStreamId_ == InvalidStreamId) {
+        return false;
+    }
+
+    auto it = streams_.find(activeStreamId_);
+    if (it == streams_.end() || !it->second.mediaSource) {
+        return false;
+    }
+
+    return it->second.mediaSource->IsRealtime();
+}
+
+bool MultiStreamManager::HasActiveStreamDuration() const {
+    if (activeStreamId_ == InvalidStreamId) {
+        return false;
+    }
+
+    auto it = streams_.find(activeStreamId_);
+    if (it == streams_.end() || !it->second.mediaSource) {
+        return false;
+    }
+
+    return it->second.mediaSource->HasDuration();
+}
+
 void MultiStreamManager::ShutdownAll() {
     if (streams_.empty()
         && activeStreamId_ == InvalidStreamId

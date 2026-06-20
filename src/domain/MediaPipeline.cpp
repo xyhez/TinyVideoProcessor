@@ -136,9 +136,9 @@ bool MediaPipeline::SeekTo(double seconds)
         return false;
     }
 
-    // 实时源（摄像头）不支持 seek
-    if (mediaSource_ && mediaSource_->GetType() == MediaSourceType::Camera) {
-        qWarning() << "MediaPipeline seek rejected: camera source is not seekable";
+    // 检查媒体源是否支持 seek
+    if (mediaSource_ && !mediaSource_->IsSeekable()) {
+        qWarning() << "MediaPipeline seek rejected: media source is not seekable";
         return false;
     }
 
@@ -185,9 +185,9 @@ bool MediaPipeline::SeekRelative(double seconds)
         return false;
     }
 
-    // 实时源（摄像头）不支持 seek
-    if (mediaSource_ && mediaSource_->GetType() == MediaSourceType::Camera) {
-        qWarning() << "MediaPipeline seek rejected: camera source is not seekable";
+    // 检查媒体源是否支持 seek
+    if (mediaSource_ && !mediaSource_->IsSeekable()) {
+        qWarning() << "MediaPipeline seek rejected: media source is not seekable";
         return false;
     }
 

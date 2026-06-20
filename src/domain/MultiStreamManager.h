@@ -137,6 +137,24 @@ public:
     bool IsAudioMuted() const;
 
     /**
+     * @brief IsActiveStreamSeekable 检查 active stream 是否支持 seek
+     * @return true 支持 seek，false 不支持或无 active stream
+     */
+    bool IsActiveStreamSeekable() const;
+
+    /**
+     * @brief IsActiveStreamRealtime 检查 active stream 是否为实时源
+     * @return true 实时源，false 非实时源或无 active stream
+     */
+    bool IsActiveStreamRealtime() const;
+
+    /**
+     * @brief HasActiveStreamDuration 检查 active stream 是否有确定的时长
+     * @return true 有时长，false 无时长或无 active stream
+     */
+    bool HasActiveStreamDuration() const;
+
+    /**
      * @brief ShutdownAll 清空全部逻辑流状态
      */
     void ShutdownAll();
