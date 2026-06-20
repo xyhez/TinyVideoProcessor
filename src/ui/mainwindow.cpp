@@ -2,6 +2,7 @@
 #include "ui_mainwindow.h"
 #include "domain/FileMediaSource.h"
 #include "domain/CameraMediaSource.h"
+#include "ui/CameraSettingsDialog.h"
 
 #include <QAbstractItemView>
 #include <QComboBox>
@@ -886,6 +887,22 @@ void MainWindow::AddMultiStreamFiles() {
 }
 
 void MainWindow::AddCameraStream() {
+    // 打开摄像头设置对话框
+    CameraSettingsDialog dialog(this);
+    if (dialog.exec() != QDialog::Accepted) {
+        return; // 用户取消
+    }
+
+    // 获取用户选择的选项
+    CameraOpenOptions options = dialog.GetSelectedOptions();
+    if (!options.IsValid()) {
+        qWarning() << "MainWindow::AddCameraStream() - Invalid camera options";
+        return;
+    }
+
+    qDebug() << "MainWindow::AddCameraStream() - 添加摄像头:" << options.Description();
+
+    // 查找可用的视频容器
     const int containerIndex = FirstAvailableVideoContainerIndex();
     QWidget* container = VideoContainerAt(containerIndex);
     if (!container) {
@@ -894,12 +911,7 @@ void MainWindow::AddCameraStream() {
     }
 
     // 创建摄像头媒体源
-    auto cameraSource = std::make_shared<CameraMediaSource>();
-    cameraSource->SetInfo("HD Pro Webcam C920");
-    cameraSource->SetResolution(1280, 720);
-    cameraSource->SetFrameRate(30);
-
-    qDebug() << "MainWindow::AddCameraStream() - 添加 C920 摄像头";
+    auto cameraSource = std::make_shared<CameraMediaSource>(options);
 
     const MediaPlayController::StreamId streamId =
         mediaPlayController_->AddStream(cameraSource, container);
@@ -909,13 +921,18 @@ void MainWindow::AddCameraStream() {
         return;
     }
 
+    // 绑定到视频容器
     BindStreamToVideoContainer(streamId, containerIndex);
-    streamDisplayNames_.insert(streamId, "C920 Camera");
+    streamDisplayNames_.insert(streamId, QString("%1 (%2x%3@%4fps)")
+        .arg(options.deviceName)
+        .arg(options.width)
+        .arg(options.height)
+        .arg(options.frameRate));
     InstallVideoContainerEventFilters();
 
     RefreshStreamView();
 
-    qDebug() << "MainWindow::AddCameraStream() - C920 添加成功, StreamId:" << streamId;
+    qDebug() << "MainWindow::AddCameraStream() - 摄像头添加成功, StreamId:" << streamId;
 }
 
 void MainWindow::RemoveSelectedStream() {

@@ -42,6 +42,8 @@ set(PROJECT_SOURCES
         src/ui/mainwindow.cpp
         src/ui/mainwindow.h
         src/ui/mainwindow.ui
+        src/ui/CameraSettingsDialog.cpp
+        src/ui/CameraSettingsDialog.h
         src/infrastructure/decoder.h
         src/infrastructure/decoder.cpp
         src/infrastructure/demuxer.h
