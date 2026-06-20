@@ -54,6 +54,8 @@ set(PROJECT_SOURCES
         src/infrastructure/multiviewrenderer.cpp
         src/infrastructure/audioplayer.h
         src/infrastructure/audioplayer.cpp
+        src/infrastructure/CameraDeviceEnumerator.h
+        src/infrastructure/CameraDeviceEnumerator.cpp
         src/core/queue.h
         doc/架构指导.md
         doc/Phase0_重构计划.md

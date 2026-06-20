@@ -306,21 +306,35 @@
 - 所有数据结构均为纯数据类型，不依赖 UI 控件
 - 加入 CMakeLists.txt 构建系统
 
-### 2.2.2 CameraDeviceEnumerator 预研与空壳
+### 2.2.2 CameraDeviceEnumerator 预研与空壳 ✅ 已完成
 
-- [ ] 新增设备枚举服务设计。
-- [ ] 明确设备枚举服务属于基础设施层。
-- [ ] 设备枚举服务不创建 `MediaPipeline`。
-- [ ] 设备枚举服务不打开播放流。
-- [ ] 预研 FFmpeg dshow 设备枚举方式。
-- [ ] 预研 Windows DirectShow COM 枚举方式。
-- [ ] 预研 Qt Multimedia 枚举方式。
-- [ ] 决定第一版枚举实现路线。
+- [x] 新增设备枚举服务设计。
+- [x] 明确设备枚举服务属于基础设施层。
+- [x] 设备枚举服务不创建 `MediaPipeline`。
+- [x] 设备枚举服务不打开播放流。
+- [x] 预研 FFmpeg dshow 设备枚举方式。
+- [x] 预研 Windows DirectShow COM 枚举方式。
+- [x] 预研 Qt Multimedia 枚举方式。
+- [x] 决定第一版枚举实现路线。
 
 **验收标准**：
 
-- [ ] 能说明设备枚举为什么不属于 `CameraMediaSource`。
-- [ ] 能说明第一版枚举路线。
+- [x] 能说明设备枚举为什么不属于 `CameraMediaSource`。
+- [x] 能说明第一版枚举路线。
+
+**实现说明**：
+- 创建预研文档：`doc/Phase2_2_2_设备枚举方案预研.md`
+- 对比三种方案：FFmpeg dshow、DirectShow COM、Qt Multimedia
+- **第一版选择 FFmpeg dshow 枚举**，理由：
+  - 与 CameraMediaSource 使用同一套 FFmpeg API，一致性好
+  - 无需额外依赖，已有 libavdevice
+  - 跨平台兼容（Windows/Linux/macOS）
+  - 可以查询设备和格式选项
+- 创建 `src/infrastructure/CameraDeviceEnumerator.h/cpp`
+- 实现 `EnumerateDevices()` 方法（使用 `avdevice_list_input_sources`）
+- `EnumerateDeviceFormats()` 空壳（Phase 2.2.3 实现）
+- 明确职责：枚举服务不创建 MediaPipeline，不打开播放流
+- 加入 CMakeLists.txt 构建系统
 
 ### 2.2.3 设备能力枚举
 
