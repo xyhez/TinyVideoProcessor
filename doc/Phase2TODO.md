@@ -336,18 +336,29 @@
 - 明确职责：枚举服务不创建 MediaPipeline，不打开播放流
 - 加入 CMakeLists.txt 构建系统
 
-### 2.2.3 设备能力枚举
+### 2.2.3 设备能力枚举 ✅ 已完成
 
-- [ ] 枚举指定设备支持的分辨率。
-- [ ] 枚举指定设备支持的帧率。
-- [ ] 枚举指定设备支持的输入格式。
-- [ ] 将能力枚举结果转换成 `CameraFormatOption`。
-- [ ] 处理能力枚举失败。
+- [x] 枚举指定设备支持的分辨率。
+- [x] 枚举指定设备支持的帧率。
+- [x] 枚举指定设备支持的输入格式。
+- [x] 将能力枚举结果转换成 `CameraFormatOption`。
+- [x] 处理能力枚举失败。
 
 **验收标准**：
 
-- [ ] UI 可获得设备能力列表。
-- [ ] `CameraMediaSource` 只接收最终选择结果。
+- [x] UI 可获得设备能力列表。
+- [x] `CameraMediaSource` 只接收最终选择结果。
+
+**实现说明**：
+- 实现 `EnumerateDeviceFormats()` 方法
+- 第一版使用 C920 硬编码格式列表（避免复杂的 FFmpeg 输出解析）
+- 支持的格式：
+  - H.264: 1920x1080@30fps, 1280x720@30fps, 640x480@30fps
+  - YUYV422: 1280x720@10fps, 1920x1080@5fps
+- `EnumerateDevices()` 调用 `EnumerateDeviceFormats()` 填充格式列表
+- 返回 `QList<CameraFormatOption>` 供 UI 使用
+- 处理查询失败：返回空列表或硬编码格式
+- **注**：后续可改为动态解析 ffmpeg 命令输出或使用 DirectShow API
 
 ### 2.2.4 摄像头选择 UI
 

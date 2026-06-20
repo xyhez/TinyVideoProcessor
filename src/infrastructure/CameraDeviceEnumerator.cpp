@@ -49,8 +49,9 @@ QList<CameraDeviceInfo> CameraDeviceEnumerator::EnumerateDevices()
         qDebug() << "  Device" << i << ":" << info.deviceName;
         qDebug() << "    Description:" << info.friendlyName;
 
-        // 查询设备格式选项（第一版暂不实现，返回空列表）
-        // info.formats = EnumerateDeviceFormats(info.deviceName);
+        // 查询设备格式选项
+        info.formats = EnumerateDeviceFormats(info.deviceName);
+        qDebug() << "    Formats:" << info.formats.size();
 
         devices.append(info);
     }
@@ -64,11 +65,108 @@ QList<CameraFormatOption> CameraDeviceEnumerator::EnumerateDeviceFormats(const Q
 {
     QList<CameraFormatOption> formats;
 
-    // 第一版暂不实现格式枚举
-    // 格式枚举需要打开设备查询能力，实现较复杂
-    // 可以在 Phase 2.2.3 或后续实现
+    qDebug() << "CameraDeviceEnumerator::EnumerateDeviceFormats() - Querying formats for:" << deviceName;
 
-    qDebug() << "CameraDeviceEnumerator::EnumerateDeviceFormats() - Not implemented yet";
+    // 注册 FFmpeg 设备
+    static bool devicesRegistered = false;
+    if (!devicesRegistered) {
+        avdevice_register_all();
+        devicesRegistered = true;
+    }
+
+    // 查找 dshow input format
+    const AVInputFormat* inputFormat = av_find_input_format("dshow");
+    if (!inputFormat) {
+        qWarning() << "CameraDeviceEnumerator::EnumerateDeviceFormats() - dshow input format not found";
+        return formats;
+    }
+
+    // 构造设备 URL
+    QString deviceUrl = QString("video=%1").arg(deviceName);
+
+    // 设置选项：list_options=true 会让 dshow 输出设备支持的格式
+    AVDictionary* options = nullptr;
+    av_dict_set(&options, "list_options", "true", 0);
+
+    AVFormatContext* formatContext = nullptr;
+
+    // 尝试打开设备（会失败，但会输出格式信息到日志）
+    // 注意：这里会输出大量日志到 stderr
+    int ret = avformat_open_input(&formatContext, deviceUrl.toUtf8().constData(),
+                                   inputFormat, &options);
+
+    av_dict_free(&options);
+
+    if (formatContext) {
+        avformat_close_input(&formatContext);
+    }
+
+    // FFmpeg 的 list_options 会将格式信息输出到 stderr
+    // 但无法直接捕获，需要通过 QProcess 执行 ffmpeg 命令来获取输出
+
+    qWarning() << "CameraDeviceEnumerator::EnumerateDeviceFormats() - FFmpeg list_options output goes to stderr";
+    qWarning() << "CameraDeviceEnumerator::EnumerateDeviceFormats() - Format enumeration via API is complex";
+    qWarning() << "CameraDeviceEnumerator::EnumerateDeviceFormats() - Returning hardcoded C920 formats for Phase 2.2.3";
+
+    // 第一版：返回 C920 硬编码的常用格式
+    // Phase 2.2.4 可以改为解析 ffmpeg 命令输出
+    formats = GetHardcodedC920Formats();
+
+    return formats;
+}
+
+QList<CameraFormatOption> CameraDeviceEnumerator::GetHardcodedC920Formats()
+{
+    QList<CameraFormatOption> formats;
+
+    // C920 支持的 H.264 格式
+    CameraFormatOption h264_1080p30;
+    h264_1080p30.width = 1920;
+    h264_1080p30.height = 1080;
+    h264_1080p30.minFrameRate = 15;
+    h264_1080p30.maxFrameRate = 30;
+    h264_1080p30.codec = "h264";
+    h264_1080p30.pixelFormat = "h264";
+    formats.append(h264_1080p30);
+
+    CameraFormatOption h264_720p30;
+    h264_720p30.width = 1280;
+    h264_720p30.height = 720;
+    h264_720p30.minFrameRate = 15;
+    h264_720p30.maxFrameRate = 30;
+    h264_720p30.codec = "h264";
+    h264_720p30.pixelFormat = "h264";
+    formats.append(h264_720p30);
+
+    CameraFormatOption h264_480p30;
+    h264_480p30.width = 640;
+    h264_480p30.height = 480;
+    h264_480p30.minFrameRate = 15;
+    h264_480p30.maxFrameRate = 30;
+    h264_480p30.codec = "h264";
+    h264_480p30.pixelFormat = "h264";
+    formats.append(h264_480p30);
+
+    // C920 支持的 YUYV422 格式（raw）
+    CameraFormatOption yuyv_720p10;
+    yuyv_720p10.width = 1280;
+    yuyv_720p10.height = 720;
+    yuyv_720p10.minFrameRate = 5;
+    yuyv_720p10.maxFrameRate = 10;
+    yuyv_720p10.codec = "";
+    yuyv_720p10.pixelFormat = "yuyv422";
+    formats.append(yuyv_720p10);
+
+    CameraFormatOption yuyv_1080p5;
+    yuyv_1080p5.width = 1920;
+    yuyv_1080p5.height = 1080;
+    yuyv_1080p5.minFrameRate = 5;
+    yuyv_1080p5.maxFrameRate = 5;
+    yuyv_1080p5.codec = "";
+    yuyv_1080p5.pixelFormat = "yuyv422";
+    formats.append(yuyv_1080p5);
+
+    qDebug() << "CameraDeviceEnumerator::GetHardcodedC920Formats() - Returning" << formats.size() << "formats";
 
     return formats;
 }

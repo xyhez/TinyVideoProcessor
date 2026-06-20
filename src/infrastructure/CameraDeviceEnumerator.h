@@ -48,4 +48,13 @@ private:
      * @return 格式选项列表
      */
     QList<CameraFormatOption> ParseFormatFromOutput(const QString& output);
+
+    /**
+     * @brief GetHardcodedC920Formats 获取 C920 硬编码的格式列表
+     * @return C920 格式选项列表
+     *
+     * 第一版使用硬编码的 C920 格式列表，避免复杂的 FFmpeg 输出解析。
+     * Phase 2.2.4 或后续可以改为动态查询。
+     */
+    QList<CameraFormatOption> GetHardcodedC920Formats();
 };
