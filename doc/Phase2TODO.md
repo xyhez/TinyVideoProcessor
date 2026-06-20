@@ -184,11 +184,11 @@
 - 摄像头 seek 会输出警告日志但不会崩溃
 - Controller 和 UI 层的防护待后续验证时根据需要添加
 
-### 2.1.6 单路 C920 预览
+### 2.1.6 单路 C920 预览 ⏳ 待测试
 
 **目标**：验证摄像头作为单路视频源的完整生命周期。
 
-- [ ] 通过 `MediaPlayController::Initialize()` 或 `AddStream()` 添加 C920。
+- [x] 通过 `MediaPlayController::Initialize()` 或 `AddStream()` 添加 C920。
 - [ ] 能启动摄像头预览。
 - [ ] 能暂停摄像头预览。
 - [ ] 能继续摄像头预览。
@@ -201,6 +201,15 @@
 - [ ] 单路摄像头预览可用。
 - [ ] 暂停、继续、停止不阻塞。
 - [ ] 关闭程序不阻塞。
+
+**实现说明**：
+- 已在 MainWindow UI 中添加 "Add Camera" 按钮（pushButton_addCamera）
+- 已实现 `MainWindow::AddCameraStream()` 函数
+- 摄像头设备名：`HD Pro Webcam C920`
+- 摄像头参数：1280x720@30fps
+- 流显示名称：`C920 Camera`
+- 添加调试日志输出
+- **需要实际测试验证**
 
 ### 2.1.7 文件 + 摄像头混合多路预览
 

@@ -1,6 +1,7 @@
 ﻿#include "ui/mainwindow.h"
 #include "ui_mainwindow.h"
 #include "domain/FileMediaSource.h"
+#include "domain/CameraMediaSource.h"
 
 #include <QAbstractItemView>
 #include <QComboBox>
@@ -189,6 +190,9 @@ void MainWindow::CreateConnects() {
 
     connect(ui->pushButton_addStream, &QPushButton::clicked,
             this, &MainWindow::AddMultiStreamFiles);
+
+    connect(ui->pushButton_addCamera, &QPushButton::clicked,
+            this, &MainWindow::AddCameraStream);
 
     connect(ui->pushButton_removeStream, &QPushButton::clicked,
             this, &MainWindow::RemoveSelectedStream);
@@ -841,6 +845,7 @@ void MainWindow::UpdateStreamControls() {
     const bool hasAvailableContainer = FirstAvailableVideoContainerIndex() >= 0;
 
     ui->pushButton_addStream->setEnabled(hasAvailableContainer);
+    ui->pushButton_addCamera->setEnabled(hasAvailableContainer);
     ui->pushButton_removeStream->setEnabled(hasSelectedStream);
     ui->pushButton_activeStream->setEnabled(hasSelectedStream);
     ui->pushButton_activeAudio->setEnabled(hasSelectedStream);
@@ -878,6 +883,39 @@ void MainWindow::AddMultiStreamFiles() {
     }
 
     RefreshStreamView();
+}
+
+void MainWindow::AddCameraStream() {
+    const int containerIndex = FirstAvailableVideoContainerIndex();
+    QWidget* container = VideoContainerAt(containerIndex);
+    if (!container) {
+        qWarning() << "Add camera failed: no available video container";
+        return;
+    }
+
+    // 创建摄像头媒体源
+    auto cameraSource = std::make_shared<CameraMediaSource>();
+    cameraSource->SetInfo("HD Pro Webcam C920");
+    cameraSource->SetResolution(1280, 720);
+    cameraSource->SetFrameRate(30);
+
+    qDebug() << "MainWindow::AddCameraStream() - 添加 C920 摄像头";
+
+    const MediaPlayController::StreamId streamId =
+        mediaPlayController_->AddStream(cameraSource, container);
+
+    if (streamId == MediaPlayController::InvalidStreamId) {
+        qWarning() << "Add camera failed: could not add stream";
+        return;
+    }
+
+    BindStreamToVideoContainer(streamId, containerIndex);
+    streamDisplayNames_.insert(streamId, "C920 Camera");
+    InstallVideoContainerEventFilters();
+
+    RefreshStreamView();
+
+    qDebug() << "MainWindow::AddCameraStream() - C920 添加成功, StreamId:" << streamId;
 }
 
 void MainWindow::RemoveSelectedStream() {

@@ -339,22 +339,69 @@ int decoder::StartDecoder() {
                     continue;
                 }
             } else {
-                // 视频软解 或 音频：直接引用
+                // 视频软解 或 音频：需要判断是否需要格式转换
                 outFrame = av_frame_alloc();
                 if (!outFrame) {
                     qDebug() << "分配输出帧失败";
                     continue;
                 }
 
-                if (av_frame_ref(outFrame, frame) < 0) {
-                    qDebug() << "引用帧失败";
-                    av_frame_free(&outFrame);
-                    continue;
-                }
+                // 如果是视频且格式不是 yuv420p，进行格式转换
+                if (decoder_type == "视频" && frame->format != AV_PIX_FMT_YUV420P) {
+                    // 格式转换：任意格式 -> yuv420p
+                    outFrame->format = AV_PIX_FMT_YUV420P;
+                    outFrame->width = frame->width;
+                    outFrame->height = frame->height;
 
-                // 确保 time_base
-                if (outFrame->time_base.den <= 0) {
-                    outFrame->time_base = m_time_base;
+                    // 复制时间戳属性
+                    outFrame->pts = frame->pts;
+                    outFrame->pkt_dts = frame->pkt_dts;
+                    outFrame->time_base = frame->time_base.den > 0 ? frame->time_base : m_time_base;
+                    outFrame->best_effort_timestamp = frame->best_effort_timestamp;
+                    outFrame->duration = frame->duration;
+
+                    // 分配缓冲区
+                    int ret = av_frame_get_buffer(outFrame, 32);
+                    if (ret < 0) {
+                        qDebug() << "分配转换后帧缓冲区失败";
+                        av_frame_free(&outFrame);
+                        continue;
+                    }
+
+                    // 创建或更新 sws 转换上下文
+                    m_swsCtx = sws_getCachedContext(
+                        m_swsCtx,
+                        frame->width, frame->height, (AVPixelFormat)frame->format,
+                        outFrame->width, outFrame->height, AV_PIX_FMT_YUV420P,
+                        SWS_BILINEAR, nullptr, nullptr, nullptr);
+
+                    if (!m_swsCtx) {
+                        qDebug() << "创建格式转换上下文失败";
+                        av_frame_free(&outFrame);
+                        continue;
+                    }
+
+                    // 执行格式转换
+                    sws_scale(m_swsCtx,
+                              frame->data, frame->linesize,
+                              0, frame->height,
+                              outFrame->data, outFrame->linesize);
+
+                    qDebug() << "视频格式转换:"
+                             << av_get_pix_fmt_name((AVPixelFormat)frame->format)
+                             << "->" << av_get_pix_fmt_name(AV_PIX_FMT_YUV420P);
+                } else {
+                    // 音频 或 已经是 yuv420p 的视频：直接引用
+                    if (av_frame_ref(outFrame, frame) < 0) {
+                        qDebug() << "引用帧失败";
+                        av_frame_free(&outFrame);
+                        continue;
+                    }
+
+                    // 确保 time_base
+                    if (outFrame->time_base.den <= 0) {
+                        outFrame->time_base = m_time_base;
+                    }
                 }
             }
 

@@ -42,6 +42,8 @@ bool CameraMediaSource::Open()
     AVDictionary* options = nullptr;
     av_dict_set(&options, "video_size", QString("%1x%2").arg(width_).arg(height_).toUtf8().constData(), 0);
     av_dict_set(&options, "framerate", QString::number(frameRate_).toUtf8().constData(), 0);
+    // 增大实时缓冲区大小，避免帧丢弃（默认约 3MB，增大到 100MB）
+    av_dict_set(&options, "rtbufsize", "100M", 0);
     // 第一版使用 H.264 格式（C920 硬件编码）
     // av_dict_set(&options, "vcodec", "h264", 0);
 

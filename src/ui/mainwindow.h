@@ -387,6 +387,11 @@ private:
     void AddMultiStreamFiles();
 
     /**
+     * @brief AddCameraStream 添加摄像头源（测试用）
+     */
+    void AddCameraStream();
+
+    /**
      * @brief RemoveSelectedStream 移除当前选中的流
      */
     void RemoveSelectedStream();
