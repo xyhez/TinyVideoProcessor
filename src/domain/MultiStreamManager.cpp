@@ -14,6 +14,19 @@ MultiStreamManager::StreamId MultiStreamManager::AddStream(std::shared_ptr<IMedi
         return InvalidStreamId;
     }
 
+    const QString sourceIdentity = mediaSource->SourceIdentity();
+    if (!mediaSource->AllowsDuplicateOpen() && !sourceIdentity.isEmpty()) {
+        for (const auto& stream : streams_) {
+            if (!stream.second.mediaSource) {
+                continue;
+            }
+            if (stream.second.mediaSource->SourceIdentity() == sourceIdentity) {
+                emit StreamErrorOccurred(InvalidStreamId, "该媒体源已在使用，不能重复添加");
+                return InvalidStreamId;
+            }
+        }
+    }
+
     if (!mediaSource->Open()) {
         const QString sourceError = mediaSource->LastError();
         const QString errorMessage = sourceError.isEmpty()

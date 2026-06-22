@@ -1,5 +1,6 @@
 #include "FileMediaSource.h"
 
+#include <QDir>
 
 FileMediaSource::~FileMediaSource() {
     if (ic) {
@@ -52,6 +53,10 @@ Fileinfo& FileMediaSource::GetSourceInfo()  {
 
 void FileMediaSource::SetInfo(QString filepath) {
     FileInfo_.filepath_ = filepath;
+}
+
+QString FileMediaSource::SourceIdentity() const {
+    return QString("file:%1").arg(QDir::cleanPath(FileInfo_.filepath_));
 }
 
 bool FileMediaSource::IsSeekable() const {

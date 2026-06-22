@@ -66,6 +66,12 @@ public:
     void SetInfo(QString filepath) override;
 
     /**
+     * @brief SourceIdentity 获取文件源身份
+     * @return 文件源身份
+     */
+    QString SourceIdentity() const override;
+
+    /**
      * @brief IsSeekable 文件源支持 seek
      * @return true
      */

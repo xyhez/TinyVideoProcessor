@@ -608,10 +608,10 @@
 - active stream 发生运行期错误时，`MediaPlayController` 将播放状态切回 `Stopped`。
 - 上层继续复用 `MediaPipeline -> MultiStreamManager -> MediaPlayController -> UI` 的错误链路。
 
-### 2.4.3 重复添加和释放验证
+### 2.4.3 重复添加和释放验证 ⚠️ 重复添加防护已实现，待释放验证
 
-- [ ] 防止重复添加同一摄像头。
-- [ ] 或明确允许重复添加时的行为。
+- [x] 防止重复添加同一摄像头。
+- [x] 明确第一版不允许重复添加同一摄像头。
 - [ ] remove stream 时释放摄像头。
 - [ ] SwitchSource 时释放旧摄像头。
 - [ ] ShutdownAll 时释放所有摄像头。
@@ -621,6 +621,14 @@
 
 - [ ] 摄像头不会被遗留占用。
 - [ ] 关闭程序不阻塞。
+
+**实现说明**：
+
+- `IMediaSource` 增加 `SourceIdentity()`，用于描述同一底层媒体资源的稳定身份。
+- `IMediaSource` 增加 `AllowsDuplicateOpen()`，由媒体源声明是否允许重复打开同一身份。
+- `CameraMediaSource` 使用设备名生成 `camera:` 身份，并返回不允许重复打开。
+- `FileMediaSource` 使用文件路径生成 `file:` 身份，但保持允许重复打开，避免改变现有文件多路行为。
+- `MultiStreamManager::AddStream()` 在打开媒体源之前检查不可重复资源，重复时直接通过 `StreamErrorOccurred` 提示。
 
 ### 2.4.4 Phase 2.4 报告
 

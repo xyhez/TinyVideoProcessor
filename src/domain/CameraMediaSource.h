@@ -100,6 +100,18 @@ public:
     QString LastError() const override;
 
     /**
+     * @brief SourceIdentity 获取摄像头源身份
+     * @return 摄像头源身份
+     */
+    QString SourceIdentity() const override;
+
+    /**
+     * @brief AllowsDuplicateOpen 摄像头设备不允许重复打开
+     * @return false
+     */
+    bool AllowsDuplicateOpen() const override;
+
+    /**
      * @brief IsSeekable 摄像头不支持 seek
      * @return false
      */

@@ -111,6 +111,26 @@ public:
     }
 
     /**
+     * @brief SourceIdentity 获取媒体源稳定身份
+     * @return 稳定身份；无法提供时返回空字符串
+     *
+     * 用于判断同一底层资源是否已被占用，例如同一个摄像头设备。
+     */
+    virtual QString SourceIdentity() const
+    {
+        return QString();
+    }
+
+    /**
+     * @brief AllowsDuplicateOpen 判断媒体源是否允许重复打开同一身份
+     * @return true 允许重复打开，false 不允许
+     */
+    virtual bool AllowsDuplicateOpen() const
+    {
+        return true;
+    }
+
+    /**
      * @brief IsSeekable 媒体源是否支持 seek
      * @return true 支持 seek，false 不支持
      *

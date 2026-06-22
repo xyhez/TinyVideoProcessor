@@ -210,6 +210,16 @@ QString CameraMediaSource::LastError() const
     return lastError_;
 }
 
+QString CameraMediaSource::SourceIdentity() const
+{
+    return QString("camera:%1").arg(deviceName_.trimmed());
+}
+
+bool CameraMediaSource::AllowsDuplicateOpen() const
+{
+    return false;
+}
+
 bool CameraMediaSource::IsSeekable() const {
     return false; // 摄像头不支持 seek
 }
