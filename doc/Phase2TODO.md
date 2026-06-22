@@ -6,23 +6,24 @@
 
 ## 架构约束
 
-- [ ] `MainWindow` 不直接管理摄像头 FFmpeg 上下文。
-- [ ] `MainWindow` 不直接访问 `MediaPipeline` 或 `MultiStreamManager` 内部资源。
-- [ ] `MediaPlayController` 继续作为 UI 层播放入口。
-- [ ] `MultiStreamManager` 只按 `StreamId` 管理 stream，不关心 stream 来自文件还是摄像头。
-- [ ] `MediaPipeline` 保持单路播放管线职责，不引入摄像头专用分支。
-- [ ] `CameraMediaSource` 只负责按参数打开和关闭摄像头媒体源。
-- [ ] `CameraMediaSource` 不创建 decoder、renderer、audio player。
-- [ ] `CameraMediaSource` 不参与 active stream / active audio stream 策略。
-- [ ] `CameraMediaSource` 不负责设备枚举、参数 UI、截图、录像、设备属性控制。
-- [ ] 摄像头第一版继续使用多个 `VideoRender + QWidget` 的稳定预览路径。
-- [ ] 摄像头第一版不把真实视频帧接入 `MultiViewRenderer`。
+- [x] `MainWindow` 不直接管理摄像头 FFmpeg 上下文。
+- [x] `MainWindow` 不直接访问 `MediaPipeline` 或 `MultiStreamManager` 内部资源。
+- [x] `MediaPlayController` 继续作为 UI 层播放入口。
+- [x] `MultiStreamManager` 只按 `StreamId` 管理 stream，不关心 stream 来自文件还是摄像头。
+- [x] `MediaPipeline` 保持单路播放管线职责，不引入摄像头专用分支。
+- [x] `CameraMediaSource` 只负责按参数打开和关闭摄像头媒体源。
+- [x] `CameraMediaSource` 不创建 decoder、renderer、audio player。
+- [x] `CameraMediaSource` 不参与 active stream / active audio stream 策略。
+- [x] `CameraMediaSource` 不负责设备枚举、参数 UI、截图、录像、设备属性控制。
+- [x] 摄像头第一版继续使用多个 `VideoRender + QWidget` 的稳定预览路径。
+- [x] 摄像头第一版不把真实视频帧接入 `MultiViewRenderer`。
 
 ## 参考文档
 
 - [x] `doc/架构指导.md`
 - [x] `doc/Phase2_摄像头输入预研报告.md`
 - [x] `doc/Phase2_摄像头完整功能预研报告.md`
+- [x] `doc/Phase2_阶段性收尾报告.md`
 
 ## Phase 2.1 C920 video-only MVP
 
@@ -395,16 +396,16 @@
 - 第一版不显示音频选项（video-only）
 - 加入 CMakeLists.txt 构建系统
 
-### 2.2.5 Phase 2.2 报告
+### 2.2.5 Phase 2.2 报告 ✅ 已完成
 
-- [ ] 形成 `doc/Phase2_2_摄像头设备枚举与参数选择报告.md`。
-- [ ] 记录设备枚举方案。
-- [ ] 记录能力枚举方案。
-- [ ] 记录 UI 接入方式。
-- [ ] 记录已知限制。
+- [x] 形成 `doc/Phase2_2_摄像头设备枚举与参数选择报告.md`。
+- [x] 记录设备枚举方案。
+- [x] 记录能力枚举方案。
+- [x] 记录 UI 接入方式。
+- [x] 记录已知限制。
 
 **实现说明**：
-- 创建完整实现报告：`doc/Phase2_2_摄像头设备枚举与参数选择报告.md`
+- 已创建完整实现报告：`doc/Phase2_2_摄像头设备枚举与参数选择报告.md`
 - 记录数据结构设计（CameraTypes.h）
 - 记录设备枚举方案（FFmpeg dshow vs DirectShow COM vs Qt Multimedia）
 - 记录格式枚举方案（第一版硬编码 C920 格式）
@@ -427,7 +428,7 @@
 - ✅ 用户友好的摄像头设置对话框
 - ✅ 不再硬编码设备名和参数
 - ⚠️ 真实设备能力动态枚举待完善
-- ⚠️ Phase 2.2 报告待补
+- ✅ Phase 2.2 报告完成
 
 用户体验提升：
 - 从硬编码 C920 到用户选择任意摄像头
@@ -631,13 +632,37 @@
 - `MultiStreamManager::AddStream()` 在打开媒体源之前检查不可重复资源，重复时直接通过 `StreamErrorOccurred` 提示。
 - 形成 `doc/Phase2_4_3_摄像头释放链路审查报告.md`，确认 remove stream、SwitchSource、ShutdownAll 和关闭程序都会进入 `CameraMediaSource::Close()`。
 
-### 2.4.4 Phase 2.4 报告
+### 2.4.4 Phase 2.4 报告 ✅ 已完成
 
-- [ ] 形成 `doc/Phase2_4_摄像头异常与生命周期报告.md`。
-- [ ] 记录异常处理链路。
-- [ ] 记录资源释放验证结果。
+- [x] 形成 `doc/Phase2_4_摄像头异常与生命周期报告.md`。
+- [x] 记录异常处理链路。
+- [x] 记录资源释放验证结果。
 
-## Phase 2.5 摄像头配置持久化
+**实现说明**：
+
+- 报告记录了 2.4.0 生命周期前置修正、2.4.1 打开失败、2.4.2 运行中异常、2.4.3 重复添加和释放链路。
+- 报告明确区分已实现代码链路和待 C920 实机验证项。
+- 报告记录当前限制：运行期异常阈值为固定连续错误次数、摄像头身份暂基于设备名、真实设备能力枚举仍未完全动态化。
+
+## ✅ Phase 2 阶段性收尾
+
+**结论**：Phase 2 摄像头输入主链路已经阶段性完成，后续扩展项暂缓。
+
+- [x] 形成 `doc/Phase2_阶段性收尾报告.md`。
+- [x] C920 video-only 摄像头源可作为 `IMediaSource` 接入。
+- [x] 摄像头可进入现有 `MediaPipeline`。
+- [x] 摄像头可进入现有多路预览体系。
+- [x] 摄像头无音频策略稳定。
+- [x] 摄像头不可 seek 语义稳定。
+- [x] 打开失败、运行中异常、重复添加和释放链路具备代码闭环。
+- [x] 配置持久化、截图、录像、摄像头音频、设备属性控制、多摄像头/工业相机/网络摄像头预研暂缓。
+
+**下一阶段建议**：
+
+- 回到多路显示和渲染主线。
+- 优先处理 CAD/3D 场景显示效果、`VideoRender` 能力和 `MultiViewRenderer` 后续真实接入策略。
+
+## Phase 2.5 摄像头配置持久化 ⏸️ 暂缓
 
 **目标**：保存用户常用摄像头配置，但不把配置逻辑放入 `CameraMediaSource`。
 
@@ -656,7 +681,9 @@
 - [ ] 配置持久化不依赖 `CameraMediaSource`。
 - [ ] 用户下次添加摄像头时能复用上次选择。
 
-## Phase 2.6 摄像头截图
+**暂缓原因**：配置持久化是体验优化，不阻塞摄像头输入主链路。
+
+## Phase 2.6 摄像头截图 ⏸️ 暂缓
 
 **目标**：支持摄像头 stream 截图，并保持截图能力独立于媒体源。
 
@@ -693,7 +720,9 @@
 
 - [ ] 形成 `doc/Phase2_6_摄像头截图报告.md`。
 
-## Phase 2.7 摄像头录像预研
+**暂缓原因**：截图属于扩展工具能力，不阻塞当前播放和多路预览主线。
+
+## Phase 2.7 摄像头录像预研 ⏸️ 暂缓
 
 **目标**：先决定录像技术路线，不在摄像头播放 MVP 中直接实现录像。
 
@@ -711,7 +740,9 @@
 - [ ] 明确录像不属于 `CameraMediaSource`。
 - [ ] 明确第一版录像路线。
 
-## Phase 2.8 摄像头音频预研
+**暂缓原因**：录像需要独立技术路线和存储策略，当前先不引入编码/封装复杂度。
+
+## Phase 2.8 摄像头音频预研 ⏸️ 暂缓
 
 **目标**：独立判断是否接入 C920 麦克风，不影响 video-only 路线。
 
@@ -729,7 +760,9 @@
 - [ ] 是否接入摄像头麦克风有明确结论。
 - [ ] 不破坏现有“最多一路音频”策略。
 
-## Phase 2.9 设备属性控制预研
+**暂缓原因**：当前 C920 video-only 路线已满足预览主链路，摄像头音频后续按独立需求恢复。
+
+## Phase 2.9 设备属性控制预研 ⏸️ 暂缓
 
 **目标**：评估曝光、白平衡、自动对焦等设备属性控制，保持平台相关能力独立。
 
@@ -748,7 +781,9 @@
 - [ ] 能说明设备属性控制为什么不属于 `CameraMediaSource`。
 - [ ] 能说明平台相关模块边界。
 
-## Phase 2.10 多摄像头、工业相机与网络摄像头预研
+**暂缓原因**：设备属性控制强依赖平台 API 和具体设备需求，当前不提前复杂化 MVP。
+
+## Phase 2.10 多摄像头、工业相机与网络摄像头预研 ⏸️ 暂缓
 
 **目标**：为 C920 之外的摄像头类型做架构判断，不提前污染 MVP。
 
@@ -785,17 +820,20 @@
 - [ ] USB 摄像头、工业相机、网络摄像头边界清晰。
 - [ ] 不为了未来设备提前重构当前 C920 MVP。
 
-## Phase 2 总体验收
+**暂缓原因**：多摄像头、工业相机和网络摄像头属于后续设备类型扩展，需要在真实需求明确后单独预研。
 
-- [ ] C920 video-only MVP 可用。
-- [ ] 摄像头可作为 `IMediaSource` 接入。
-- [ ] 摄像头可进入现有 `MediaPipeline`。
-- [ ] 摄像头可进入现有多路预览。
-- [ ] 摄像头无音频策略稳定。
-- [ ] 摄像头不可 seek 语义稳定。
-- [ ] 设备枚举和参数选择具备清晰扩展路线。
-- [ ] 截图、录像、摄像头音频、设备属性控制没有污染 `CameraMediaSource`。
-- [ ] 工业相机和网络摄像头具备独立预研路线。
+## Phase 2 阶段性验收
+
+- [x] C920 video-only MVP 可用。
+- [x] 摄像头可作为 `IMediaSource` 接入。
+- [x] 摄像头可进入现有 `MediaPipeline`。
+- [x] 摄像头可进入现有多路预览。
+- [x] 摄像头无音频策略稳定。
+- [x] 摄像头不可 seek 语义稳定。
+- [x] 设备枚举和参数选择具备清晰扩展路线。
+- [x] 截图、录像、摄像头音频、设备属性控制没有污染 `CameraMediaSource`。
+- [x] 工业相机和网络摄像头具备独立预研路线。
+- [x] Phase 2.5-2.10 已明确暂缓，不作为当前阶段收口阻塞项。
 
 ## 当前不做范围
 
