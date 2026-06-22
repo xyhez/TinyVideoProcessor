@@ -1,4 +1,4 @@
-# TODO: Phase 3.2 多路管理设计
+# TODO: Phase 3.6 MultiViewRenderer 空壳
 
 ## 阶段目标
 
@@ -630,6 +630,10 @@ MainWindow
 ## Phase 3.6 MultiViewRenderer 空壳
 
 **目标**：先建立统一渲染器的布局、绘制和点击命中边界，不接真实视频帧，不替换当前多个 `VideoRender` 的稳定播放路径。
+
+**OpenGL 学习路线**：
+
+- [x] `doc/Phase3_6_MultiViewRenderer_OpenGL学习路线.md`
 
 ## 3.6.1 MultiViewRenderer 空壳设计
 

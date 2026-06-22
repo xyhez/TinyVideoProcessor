@@ -1,7 +1,7 @@
 #include "MediaPipeline.h"
+#include "core/AppLog.h"
 
 #include <algorithm>
-#include <QDebug>
 #include <QVBoxLayout>
 
 namespace {
@@ -35,7 +35,7 @@ bool MediaPipeline::Initialize(std::shared_ptr<IMediaSource> mediaSource,
                                QWidget* rendererContainer)
 {
     if (!mediaSource) {
-        qCritical() << "MediaPipeline initialize failed: media source is null";
+        APP_LOG_CRITICAL("MediaPipeline initialize failed: media source is null");
         return false;
     }
 
@@ -57,14 +57,14 @@ void MediaPipeline::Shutdown()
 void MediaPipeline::Start()
 {
     if (!demuxer_ || !Vdecoder_ || !videoRender_ || !positionTimer_ || !demuxerTH_ || !VdecoderTH_) {
-        qWarning() << "MediaPipeline start failed: playback pipeline is not initialized";
+        APP_LOG_WARN("MediaPipeline start failed: playback pipeline is not initialized");
         emit ErrorOccurred("Playback pipeline is not initialized");
         return;
     }
 
     const bool hasAudio = Adecoder_ || audioplay_ || AdecoderTH_ || audioplayTH_;
     if (hasAudio && (!Adecoder_ || !audioplay_ || !AdecoderTH_ || !audioplayTH_)) {
-        qWarning() << "MediaPipeline start failed: audio pipeline is incomplete";
+        APP_LOG_WARN("MediaPipeline start failed: audio pipeline is incomplete");
         emit ErrorOccurred("Audio pipeline is incomplete");
         return;
     }
@@ -92,7 +92,7 @@ void MediaPipeline::Start()
 void MediaPipeline::Pause()
 {
     if (!demuxer_ || !Vdecoder_ || !videoRender_ || !positionTimer_) {
-        qWarning() << "MediaPipeline pause failed: playback pipeline is not initialized";
+        APP_LOG_WARN("MediaPipeline pause failed: playback pipeline is not initialized");
         emit ErrorOccurred("Playback pipeline is not initialized");
         return;
     }
@@ -117,7 +117,7 @@ void MediaPipeline::Stop()
     }
 
     if (!SuspendPipelineAndWait()) {
-        qWarning() << "MediaPipeline stop failed: playback pipeline suspend failed";
+        APP_LOG_WARN("MediaPipeline stop failed: playback pipeline suspend failed");
         emit ErrorOccurred("Playback pipeline suspend failed");
         return;
     }
@@ -136,14 +136,14 @@ void MediaPipeline::Stop()
 bool MediaPipeline::SeekTo(double seconds)
 {
     if (!demuxer_ || !Vdecoder_ || !syncManager_) {
-        qWarning() << "MediaPipeline seek failed: playback pipeline is not initialized";
+        APP_LOG_WARN("MediaPipeline seek failed: playback pipeline is not initialized");
         emit ErrorOccurred("Playback pipeline is not initialized");
         return false;
     }
 
     // 检查媒体源是否支持 seek
     if (mediaSource_ && !mediaSource_->IsSeekable()) {
-        qWarning() << "MediaPipeline seek rejected: media source is not seekable";
+        APP_LOG_WARN("MediaPipeline seek rejected: media source is not seekable");
         return false;
     }
 
@@ -158,7 +158,7 @@ bool MediaPipeline::SeekTo(double seconds)
     }
 
     if (!SuspendPipelineAndWait()) {
-        qWarning() << "MediaPipeline seek failed: playback pipeline suspend failed";
+        APP_LOG_WARN("MediaPipeline seek failed: playback pipeline suspend failed");
         emit ErrorOccurred("Playback pipeline suspend failed");
         return false;
     }
@@ -167,7 +167,7 @@ bool MediaPipeline::SeekTo(double seconds)
 
     const int seekResult = demuxer_->SeekTo(targetSeconds);
     if (seekResult != 0) {
-        qWarning() << "MediaPipeline seek failed: demuxer rejected target" << targetSeconds;
+        APP_LOG_WARN("MediaPipeline seek failed: demuxer rejected target", targetSeconds);
         emit ErrorOccurred("Demuxer rejected seek target");
         return false;
     }
@@ -185,14 +185,14 @@ bool MediaPipeline::SeekTo(double seconds)
 bool MediaPipeline::SeekRelative(double seconds)
 {
     if (!demuxer_) {
-        qWarning() << "MediaPipeline seek failed: demuxer is not initialized";
+        APP_LOG_WARN("MediaPipeline seek failed: demuxer is not initialized");
         emit ErrorOccurred("Demuxer is not initialized");
         return false;
     }
 
     // 检查媒体源是否支持 seek
     if (mediaSource_ && !mediaSource_->IsSeekable()) {
-        qWarning() << "MediaPipeline seek rejected: media source is not seekable";
+        APP_LOG_WARN("MediaPipeline seek rejected: media source is not seekable");
         return false;
     }
 

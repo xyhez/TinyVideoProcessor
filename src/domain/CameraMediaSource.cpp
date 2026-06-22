@@ -1,4 +1,5 @@
 #include "CameraMediaSource.h"
+#include "core/AppLog.h"
 
 extern "C" {
 #include <libavdevice/avdevice.h>
@@ -58,7 +59,7 @@ bool CameraMediaSource::Open()
 
     // 构造 dshow 设备 URL: "video=设备名"
     QString deviceUrl = QString("video=%1").arg(deviceName_);
-    qDebug() << "CameraMediaSource::Open() - 打开摄像头:" << deviceUrl;
+    APP_LOG_DEBUG("CameraMediaSource::Open() - open camera:", deviceUrl);
 
     // 设置摄像头参数
     AVDictionary* options = nullptr;
@@ -131,10 +132,10 @@ bool CameraMediaSource::Open()
             // 计算 time_base
             sourceInfo_.V_timeBase = av_q2d(stream->time_base);
 
-            qDebug() << "CameraMediaSource::Open() - 视频流信息:";
-            qDebug() << "  分辨率:" << sourceInfo_.width_ << "x" << sourceInfo_.height_;
-            qDebug() << "  帧率:" << sourceInfo_.FrameRate;
-            qDebug() << "  编码:" << avcodec_get_name(sourceInfo_.videoCodecId_);
+            APP_LOG_DEBUG("CameraMediaSource::Open() - video stream info:");
+            APP_LOG_DEBUG("  resolution:", sourceInfo_.width_, "x", sourceInfo_.height_);
+            APP_LOG_DEBUG("  frame rate:", sourceInfo_.FrameRate);
+            APP_LOG_DEBUG("  codec:", avcodec_get_name(sourceInfo_.videoCodecId_));
 
             break;
         }
@@ -146,14 +147,14 @@ bool CameraMediaSource::Open()
         return false;
     }
 
-    qDebug() << "CameraMediaSource::Open() - 摄像头打开成功";
+    APP_LOG_DEBUG("CameraMediaSource::Open() - camera opened");
     return true;
 }
 
 bool CameraMediaSource::Close()
 {
     if (formatContext_) {
-        qDebug() << "CameraMediaSource::Close() - 关闭摄像头";
+        APP_LOG_DEBUG("CameraMediaSource::Close() - close camera");
         avformat_close_input(&formatContext_);
         formatContext_ = nullptr;
         return true;
@@ -235,5 +236,5 @@ bool CameraMediaSource::IsRealtime() const {
 void CameraMediaSource::SetLastError(const QString& message)
 {
     lastError_ = message;
-    qWarning() << "CameraMediaSource:" << lastError_;
+    APP_LOG_WARN("CameraMediaSource:", lastError_);
 }

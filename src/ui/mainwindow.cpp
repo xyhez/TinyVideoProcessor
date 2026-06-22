@@ -3,10 +3,10 @@
 #include "domain/FileMediaSource.h"
 #include "domain/CameraMediaSource.h"
 #include "ui/CameraSettingsDialog.h"
+#include "core/AppLog.h"
 
 #include <QAbstractItemView>
 #include <QComboBox>
-#include <QDebug>
 #include <QEvent>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -47,7 +47,7 @@ MainWindow::MainWindow(QWidget *parent)
     QString filepath = "../../resource/动物发现自己被绿.mp4";
     playlistManager_->AddFile(filepath);
     if (!SwitchToPlaylistIndex(playlistManager_->CurrentIndex(), false)) {
-        qCritical() << "Controller 初始化失败";
+        APP_LOG_CRITICAL_STREAM() << "Controller 初始化失败";
         return;
     }
 
@@ -133,7 +133,7 @@ void MainWindow::CreateConnects() {
                 const QString errorMessage = message.isEmpty()
                     ? QString("未知错误")
                     : message;
-                qWarning() << "Stream error:" << id << errorMessage;
+                APP_LOG_WARN_STREAM() << "Stream error:" << id << errorMessage;
                 QMessageBox::warning(this, "媒体流错误", QString("%1：%2").arg(streamName, errorMessage));
             });
 
@@ -490,7 +490,7 @@ void MainWindow::SetMultiViewLayout(MultiViewLayout layout) {
     multiViewLayout_ = layout;
     UpdateLayoutComboBox(multiViewLayout_);
     RefreshMultiViewLayout();
-    qInfo() << "Multi view layout changed, max visible streams:" << MaxVisibleStreams();
+    APP_LOG_INFO_STREAM() << "Multi view layout changed, max visible streams:" << MaxVisibleStreams();
 }
 
 MainWindow::MultiViewLayout MainWindow::CurrentMultiViewLayout() const {
@@ -617,7 +617,7 @@ bool MainWindow::ActivateStreamFromVideoContainer(int containerIndex) {
     }
 
     if (!mediaPlayController_->SetActiveStream(streamId)) {
-        qWarning() << "Set active stream from video container failed:" << streamId;
+        APP_LOG_WARN_STREAM() << "Set active stream from video container failed:" << streamId;
         return true;
     }
 
@@ -626,7 +626,7 @@ bool MainWindow::ActivateStreamFromVideoContainer(int containerIndex) {
             ? streamId
             : MediaPlayController::InvalidStreamId;
     if (!mediaPlayController_->SetActiveAudioStream(audioStreamId)) {
-        qWarning() << "Set active audio stream from video container failed:" << streamId;
+        APP_LOG_WARN_STREAM() << "Set active audio stream from video container failed:" << streamId;
     }
 
     RefreshStreamView();
@@ -895,7 +895,7 @@ void MainWindow::AddMultiStreamFiles() {
         const int containerIndex = FirstAvailableVideoContainerIndex();
         QWidget* container = VideoContainerAt(containerIndex);
         if (!container) {
-            qWarning() << "Add stream failed: no available video container";
+            APP_LOG_WARN_STREAM() << "Add stream failed: no available video container";
             break;
         }
 
@@ -903,7 +903,7 @@ void MainWindow::AddMultiStreamFiles() {
         const MediaPlayController::StreamId streamId =
             mediaPlayController_->AddStream(mediaSource, container);
         if (streamId == MediaPlayController::InvalidStreamId) {
-            qWarning() << "Add stream failed:" << filePath;
+            APP_LOG_WARN_STREAM() << "Add stream failed:" << filePath;
             continue;
         }
 
@@ -925,17 +925,17 @@ void MainWindow::AddCameraStream() {
     // 获取用户选择的选项
     CameraOpenOptions options = dialog.GetSelectedOptions();
     if (!options.IsValid()) {
-        qWarning() << "MainWindow::AddCameraStream() - Invalid camera options";
+        APP_LOG_WARN_STREAM() << "MainWindow::AddCameraStream() - Invalid camera options";
         return;
     }
 
-    qDebug() << "MainWindow::AddCameraStream() - 添加摄像头:" << options.Description();
+    APP_LOG_DEBUG_STREAM() << "MainWindow::AddCameraStream() - 添加摄像头:" << options.Description();
 
     // 查找可用的视频容器
     const int containerIndex = FirstAvailableVideoContainerIndex();
     QWidget* container = VideoContainerAt(containerIndex);
     if (!container) {
-        qWarning() << "Add camera failed: no available video container";
+        APP_LOG_WARN_STREAM() << "Add camera failed: no available video container";
         return;
     }
 
@@ -946,7 +946,7 @@ void MainWindow::AddCameraStream() {
         mediaPlayController_->AddStream(cameraSource, container);
 
     if (streamId == MediaPlayController::InvalidStreamId) {
-        qWarning() << "Add camera failed: could not add stream";
+        APP_LOG_WARN_STREAM() << "Add camera failed: could not add stream";
         return;
     }
 
@@ -961,7 +961,7 @@ void MainWindow::AddCameraStream() {
 
     RefreshStreamView();
 
-    qDebug() << "MainWindow::AddCameraStream() - 摄像头添加成功, StreamId:" << streamId;
+    APP_LOG_DEBUG_STREAM() << "MainWindow::AddCameraStream() - 摄像头添加成功, StreamId:" << streamId;
 }
 
 void MainWindow::RemoveSelectedStream() {
@@ -971,7 +971,7 @@ void MainWindow::RemoveSelectedStream() {
     }
 
     if (!mediaPlayController_->RemoveStream(streamId)) {
-        qWarning() << "Remove stream failed:" << streamId;
+        APP_LOG_WARN_STREAM() << "Remove stream failed:" << streamId;
     }
 }
 
@@ -982,7 +982,7 @@ void MainWindow::SetSelectedActiveStream() {
     }
 
     if (!mediaPlayController_->SetActiveStream(streamId)) {
-        qWarning() << "Set active stream failed:" << streamId;
+        APP_LOG_WARN_STREAM() << "Set active stream failed:" << streamId;
         return;
     }
 
@@ -996,7 +996,7 @@ void MainWindow::SetSelectedActiveAudioStream() {
     }
 
     if (!mediaPlayController_->SetActiveAudioStream(streamId)) {
-        qWarning() << "Set active audio stream failed:" << streamId;
+        APP_LOG_WARN_STREAM() << "Set active audio stream failed:" << streamId;
         return;
     }
 
@@ -1028,7 +1028,7 @@ bool MainWindow::SwitchToPlaylistIndex(int index, bool autoStart) {
     const PlaylistItem item = items.at(index);
     std::shared_ptr<IMediaSource> mediaSource = std::make_shared<FileMediaSource>(item.filePath);
     if (!mediaPlayController_->SwitchSource(mediaSource, PrimaryVideoContainer(), autoStart)) {
-        qWarning() << "Switch playlist item failed:" << item.filePath;
+        APP_LOG_WARN_STREAM() << "Switch playlist item failed:" << item.filePath;
         if (previousIndex >= 0 && previousIndex < playlistManager_->Count()) {
             playlistManager_->SetCurrentIndex(previousIndex);
         }
@@ -1079,4 +1079,5 @@ QString MainWindow::formatTime(double totalSeconds) {
     int s = totalSeconds - m * 60;
     return QString("%1:%2").arg(m).arg(s, 2, 10, QChar('0'));
 }
+
 

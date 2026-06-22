@@ -2,7 +2,6 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include <QDebug>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPropertyAnimation>
@@ -437,3 +436,4 @@ private:
 };
 
 #endif // MAINWINDOW_H
+

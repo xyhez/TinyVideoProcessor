@@ -3,7 +3,6 @@
 
 #include <QObject>
 #include <QMutex>
-#include <QDebug>
 #include <QThread>
 #include <QWaitCondition>
 #include <memory>
@@ -189,3 +188,4 @@ private:
 };
 
 #endif // DECODER_H
+

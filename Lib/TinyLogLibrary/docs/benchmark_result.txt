@@ -1,0 +1,11 @@
+Benchmark Results (10000 条 / 业务线程总耗时)
+------------------------------------------------------------
+ConsoleSinkST (sync)                                   8146 us  (  0.81 us/op)
+ConsoleSinkMT (sync, 单线程内调用)               7694 us  (  0.77 us/op)
+FileSinkMT (sync)                                    143231 us  ( 14.32 us/op)
+RotatingFileSinkMT (sync, max=100KB)                 191633 us  ( 19.16 us/op)
+AsyncLogger + FileSinkMT (业务线程入队)        179986 us  ( 18.00 us/op)
+CallbackSink (no IO, 仅函数调用)                   409 us  (  0.04 us/op)
+LOG_INFO_TO (string +)                                 7266 us  (  0.73 us/op)
+LOG_INFO_FMT_TO (std::format)                          2195 us  (  0.22 us/op)
+被过滤的日志 (early return)                        61 us  (  0.01 us/op)

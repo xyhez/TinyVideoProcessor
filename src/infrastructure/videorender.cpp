@@ -1,6 +1,6 @@
 ﻿#include "videorender.h"
+#include "core/AppLog.h"
 #include <QOpenGLPixelTransferOptions>
-#include <QDebug>
 #include <cmath>
 
 extern "C" {
@@ -102,7 +102,7 @@ void VideoRender::StopRendering()
 void VideoRender::SetSpeed(double speed)
 {
     if (!std::isfinite(speed) || !IsSupportedSpeed(speed)) {
-        qWarning() << "VideoRender rejected unsupported speed:" << speed;
+        APP_LOG_WARN_STREAM() << "VideoRender rejected unsupported speed:" << speed;
         return;
     }
 
@@ -333,7 +333,7 @@ void VideoRender::LogFrameFormatIfNeeded(const AVFrame* frame, bool supported)
     const QString prefix = supported
         ? "VideoRender accepted frame format:"
         : "VideoRender unsupported frame format:";
-    qInfo().noquote()
+    APP_LOG_INFO_STREAM().noquote()
         << prefix
         << QString("pix_fmt=%1").arg(PixelFormatName(frame->format))
         << QString("size=%1x%2").arg(frame->width).arg(frame->height)
@@ -404,3 +404,4 @@ void VideoRender::FreeTextures()
     delete m_texU; m_texU = nullptr;
     delete m_texV; m_texV = nullptr;
 }
+

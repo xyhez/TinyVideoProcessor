@@ -1,6 +1,5 @@
 #include "CameraDeviceEnumerator.h"
-
-#include <QDebug>
+#include "core/AppLog.h"
 
 extern "C" {
 #include <libavdevice/avdevice.h>
@@ -21,7 +20,7 @@ QList<CameraDeviceInfo> CameraDeviceEnumerator::EnumerateDevices()
     // 查找 dshow input format
     const AVInputFormat* inputFormat = av_find_input_format("dshow");
     if (!inputFormat) {
-        qWarning() << "CameraDeviceEnumerator::EnumerateDevices() - dshow input format not found";
+        APP_LOG_WARN("CameraDeviceEnumerator::EnumerateDevices() - dshow input format not found");
         return devices;
     }
 
@@ -31,11 +30,11 @@ QList<CameraDeviceInfo> CameraDeviceEnumerator::EnumerateDevices()
     if (ret < 0 || !deviceList) {
         char errbuf[AV_ERROR_MAX_STRING_SIZE] = {0};
         av_strerror(ret, errbuf, AV_ERROR_MAX_STRING_SIZE);
-        qWarning() << "CameraDeviceEnumerator::EnumerateDevices() - Failed to enumerate devices:" << errbuf;
+        APP_LOG_WARN("CameraDeviceEnumerator::EnumerateDevices() - Failed to enumerate devices:", errbuf);
         return devices;
     }
 
-    qDebug() << "CameraDeviceEnumerator::EnumerateDevices() - Found" << deviceList->nb_devices << "devices";
+    APP_LOG_DEBUG("CameraDeviceEnumerator::EnumerateDevices() - Found", deviceList->nb_devices, "devices");
 
     // 遍历设备列表
     for (int i = 0; i < deviceList->nb_devices; i++) {
@@ -49,13 +48,13 @@ QList<CameraDeviceInfo> CameraDeviceEnumerator::EnumerateDevices()
         info.friendlyName = QString::fromUtf8(device->device_description);
         info.description = info.friendlyName;
 
-        qDebug() << "  Device" << i << ":" << info.deviceName;
-        qDebug() << "    PnP Path:" << QString::fromUtf8(device->device_name);
-        qDebug() << "    Description:" << info.friendlyName;
+        APP_LOG_DEBUG("  Device", i, ":", info.deviceName);
+        APP_LOG_DEBUG("    PnP Path:", QString::fromUtf8(device->device_name));
+        APP_LOG_DEBUG("    Description:", info.friendlyName);
 
         // 查询设备格式选项
         info.formats = EnumerateDeviceFormats(info.deviceName);
-        qDebug() << "    Formats:" << info.formats.size();
+        APP_LOG_DEBUG("    Formats:", info.formats.size());
 
         devices.append(info);
     }
@@ -69,7 +68,7 @@ QList<CameraFormatOption> CameraDeviceEnumerator::EnumerateDeviceFormats(const Q
 {
     QList<CameraFormatOption> formats;
 
-    qDebug() << "CameraDeviceEnumerator::EnumerateDeviceFormats() - Querying formats for:" << deviceName;
+    APP_LOG_DEBUG("CameraDeviceEnumerator::EnumerateDeviceFormats() - Querying formats for:", deviceName);
 
     // 注册 FFmpeg 设备
     static bool devicesRegistered = false;
@@ -81,7 +80,7 @@ QList<CameraFormatOption> CameraDeviceEnumerator::EnumerateDeviceFormats(const Q
     // 查找 dshow input format
     const AVInputFormat* inputFormat = av_find_input_format("dshow");
     if (!inputFormat) {
-        qWarning() << "CameraDeviceEnumerator::EnumerateDeviceFormats() - dshow input format not found";
+        APP_LOG_WARN("CameraDeviceEnumerator::EnumerateDeviceFormats() - dshow input format not found");
         return formats;
     }
 
@@ -108,9 +107,9 @@ QList<CameraFormatOption> CameraDeviceEnumerator::EnumerateDeviceFormats(const Q
     // FFmpeg 的 list_options 会将格式信息输出到 stderr
     // 但无法直接捕获，需要通过 QProcess 执行 ffmpeg 命令来获取输出
 
-    qWarning() << "CameraDeviceEnumerator::EnumerateDeviceFormats() - FFmpeg list_options output goes to stderr";
-    qWarning() << "CameraDeviceEnumerator::EnumerateDeviceFormats() - Format enumeration via API is complex";
-    qWarning() << "CameraDeviceEnumerator::EnumerateDeviceFormats() - Returning hardcoded C920 formats for Phase 2.2.3";
+    APP_LOG_WARN("CameraDeviceEnumerator::EnumerateDeviceFormats() - FFmpeg list_options output goes to stderr");
+    APP_LOG_WARN("CameraDeviceEnumerator::EnumerateDeviceFormats() - Format enumeration via API is complex");
+    APP_LOG_WARN("CameraDeviceEnumerator::EnumerateDeviceFormats() - Returning hardcoded C920 formats for Phase 2.2.3");
 
     // 第一版：返回 C920 硬编码的常用格式
     // Phase 2.2.4 可以改为解析 ffmpeg 命令输出
@@ -170,7 +169,7 @@ QList<CameraFormatOption> CameraDeviceEnumerator::GetHardcodedC920Formats()
     yuyv_1080p5.pixelFormat = "yuyv422";
     formats.append(yuyv_1080p5);
 
-    qDebug() << "CameraDeviceEnumerator::GetHardcodedC920Formats() - Returning" << formats.size() << "formats";
+    APP_LOG_DEBUG("CameraDeviceEnumerator::GetHardcodedC920Formats() - Returning", formats.size(), "formats");
 
     return formats;
 }

@@ -1,4 +1,5 @@
 ﻿#include "ui/mainwindow.h"
+#include "tiny_log/Logging.h"
 
 #include <QApplication>
 
@@ -11,7 +12,14 @@
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
+    logging::SetGlobalLevel(logging::Level::Trace);
+    logging::GetDefaultLogger()->SetLevel(logging::Level::Trace);
+    LOG_INFO("TinyVideoProcessor started");
     MainWindow w;
     w.show();
-    return a.exec();
+    const int exitCode = a.exec();
+    LOG_INFO("TinyVideoProcessor exited");
+    logging::FlushAll();
+
+    return exitCode;
 }

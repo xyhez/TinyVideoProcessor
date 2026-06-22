@@ -1,4 +1,5 @@
 #include "FileMediaSource.h"
+#include "core/AppLog.h"
 
 #include <QDir>
 
@@ -10,15 +11,13 @@ FileMediaSource::~FileMediaSource() {
 }
 
 bool FileMediaSource::Open() {
-    ///< 打开文件
-    if(avformat_open_input(&ic,FileInfo_.filepath_.toUtf8().constData(),nullptr,nullptr)) {
-        qDebug()<<"文件打开失败~";
+    if (avformat_open_input(&ic, FileInfo_.filepath_.toUtf8().constData(), nullptr, nullptr)) {
+        APP_LOG_WARN("FileMediaSource open failed:", FileInfo_.filepath_);
         return false;
     }
 
-    ///< 获取流信息
     if (avformat_find_stream_info(ic, nullptr) < 0) {
-        qDebug()<<"无法获取流信息";
+        APP_LOG_WARN("FileMediaSource stream info lookup failed:", FileInfo_.filepath_);
         avformat_close_input(&ic);
         ic = nullptr;
         return false;
@@ -37,7 +36,7 @@ bool FileMediaSource::Close() {
 }
 
 AVFormatContext* FileMediaSource::GetFormatContect() {
-    if(ic) {
+    if (ic) {
         return ic;
     }
     return nullptr;
@@ -60,14 +59,13 @@ QString FileMediaSource::SourceIdentity() const {
 }
 
 bool FileMediaSource::IsSeekable() const {
-    return true; // 文件源支持 seek
+    return true;
 }
 
 bool FileMediaSource::HasDuration() const {
-    return true; // 文件源有确定的时长
+    return true;
 }
 
 bool FileMediaSource::IsRealtime() const {
-    return false; // 文件源不是实时源
+    return false;
 }
-

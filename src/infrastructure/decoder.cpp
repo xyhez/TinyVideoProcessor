@@ -1,4 +1,5 @@
-#include "decoder.h"
+﻿#include "decoder.h"
+#include "core/AppLog.h"
 
 #include <QMutexLocker>
 
@@ -22,7 +23,7 @@ decoder::~decoder() {
         sws_freeContext(m_swsCtx);
         m_swsCtx = nullptr;
     }
-    qDebug() << decoder_type << "解码器资源已清理";
+    APP_LOG_DEBUG_STREAM() << decoder_type << "瑙ｇ爜鍣ㄨ祫婧愬凡娓呯悊";
 }
 
 void decoder::CreateConnect() {
@@ -32,15 +33,15 @@ void decoder::CreateConnect() {
 bool decoder::InitHWDecoder()
 {
     if (!kEnableHardwareDecoder) {
-        qDebug() << "视频硬解已禁用，使用软件解码";
+        APP_LOG_DEBUG_STREAM() << "Video hardware decoding disabled, using software decoder";
         return false;
     }
     if (par->codec_type != AVMEDIA_TYPE_VIDEO) {
-        qDebug() << "音频流强制使用软解";
+        APP_LOG_DEBUG_STREAM() << "Audio stream uses software decoder";
         return false;
     }
 
-    // 只尝试常见视频编码的硬解码
+    // 鍙皾璇曞父瑙佽棰戠紪鐮佺殑纭В鐮?
     if (par->codec_id != AV_CODEC_ID_H264 &&
         par->codec_id != AV_CODEC_ID_HEVC &&
         par->codec_id != AV_CODEC_ID_AV1 &&
@@ -48,14 +49,14 @@ bool decoder::InitHWDecoder()
         par->codec_id != AV_CODEC_ID_VP9 &&
         par->codec_id != AV_CODEC_ID_MPEG2VIDEO &&
         par->codec_id != AV_CODEC_ID_MPEG4) {
-        qDebug() << "视频编码格式不支持硬解码:" << avcodec_get_name(par->codec_id);
+        APP_LOG_DEBUG_STREAM() << "Video codec does not support hardware decoding:" << avcodec_get_name(par->codec_id);
         return false;
     }
 
-    // 按优先级尝试硬件加速器
+    // 鎸変紭鍏堢骇灏濊瘯纭欢鍔犻€熷櫒
     const char *hwDevices[] = {
-        "d3d11va",      // Windows 首选
-        "dxva2",        // Windows 备选
+        "d3d11va",      // Windows 棣栭€?
+        "dxva2",        // Windows 澶囬€?
         "cuda",         // NVIDIA
         nullptr
     };
@@ -66,7 +67,7 @@ bool decoder::InitHWDecoder()
             continue;
         }
 
-        // 检查解码器是否支持该硬件
+        // 妫€鏌ヨВ鐮佸櫒鏄惁鏀寔璇ョ‖浠?
         for (int j = 0;; j++) {
             const AVCodecHWConfig *config = avcodec_get_hw_config(codec, j);
             if (!config) break;
@@ -74,12 +75,12 @@ bool decoder::InitHWDecoder()
             if ((config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX) &&
                 config->device_type == type) {
 
-                // 创建硬件设备上下文
+                // 鍒涘缓纭欢璁惧涓婁笅鏂?
                 int ret = av_hwdevice_ctx_create(&m_hwDeviceCtx, type, nullptr, nullptr, 0);
                 if (ret < 0) {
                     char errBuf[256];
                     av_strerror(ret, errBuf, sizeof(errBuf));
-                    qDebug() << "创建硬件设备上下文失败:" << hwDevices[i] << "-" << errBuf;
+                    APP_LOG_DEBUG_STREAM() << "Create hardware device context failed:" << hwDevices[i] << "-" << errBuf;
                     continue;
                 }
 
@@ -101,7 +102,7 @@ bool decoder::InitHWDecoder()
     m_hwDeviceCtx = nullptr;
     m_hwPixFmt = AV_PIX_FMT_NONE;
     m_swPixFmt = AV_PIX_FMT_NONE;
-    qDebug() << "视频使用软件解码";
+    APP_LOG_DEBUG_STREAM() << "Video uses software decoder";
     return false;
 }
 
@@ -114,7 +115,7 @@ AVFrame *decoder::TransferHWFrame(AVFrame *hwFrame)
 
     AVFrame *nv12Frame = av_frame_alloc();
     if (!nv12Frame) {
-        qDebug() << "分配 NV12 帧失败";
+        APP_LOG_DEBUG_STREAM() << "Allocate NV12 frame failed";
         return nullptr;
     }
 
@@ -122,33 +123,33 @@ AVFrame *decoder::TransferHWFrame(AVFrame *hwFrame)
     if (ret < 0) {
         char errBuf[256];
         av_strerror(ret, errBuf, sizeof(errBuf));
-        qDebug() << "硬件帧转换失败:" << errBuf;
+        APP_LOG_DEBUG_STREAM() << "Hardware frame transfer failed:" << errBuf;
         av_frame_free(&nv12Frame);
         return nullptr;
     }
 
-    // 复制所有属性（包括pts, time_base等）
+    // 澶嶅埗鎵€鏈夊睘鎬э紙鍖呮嫭pts, time_base绛夛級
     av_frame_copy_props(nv12Frame, hwFrame);
 
-    // 确保time_base也被设置（有些硬件解码器可能不设置这个）
+    // 纭繚time_base涔熻璁剧疆锛堟湁浜涚‖浠惰В鐮佸櫒鍙兘涓嶈缃繖涓級
     if (hwFrame->time_base.den > 0) {
         nv12Frame->time_base = hwFrame->time_base;
     } else if (m_time_base.den > 0) {
         nv12Frame->time_base = m_time_base;
     }
 
-    // 验证格式
+    // 楠岃瘉鏍煎紡
     if (nv12Frame->format != AV_PIX_FMT_NV12) {
-        qDebug() << "警告：硬件解码输出不是 NV12，是:"
+        APP_LOG_DEBUG_STREAM() << "Hardware decoder output is not NV12, format:"
                  << av_get_pix_fmt_name((AVPixelFormat)nv12Frame->format);
-        // 如果已经是 YUV420P，直接返回（但要确保属性正确）
+        // 濡傛灉宸茬粡鏄?YUV420P锛岀洿鎺ヨ繑鍥烇紙浣嗚纭繚灞炴€ф纭級
         if (nv12Frame->format == AV_PIX_FMT_YUV420P) {
-            qDebug() << "已经是YUV420P，直接返回，pts=" << nv12Frame->pts;
+            APP_LOG_DEBUG_STREAM() << "Frame is already YUV420P, returning directly, pts=" << nv12Frame->pts;
             return nv12Frame;
         }
     }
 
-    // 第二步：NV12 -> YUV420P 转换
+    // 绗簩姝ワ細NV12 -> YUV420P 杞崲
     AVFrame *yuv420pFrame = av_frame_alloc();
     if (!yuv420pFrame) {
         av_frame_free(&nv12Frame);
@@ -159,7 +160,7 @@ AVFrame *decoder::TransferHWFrame(AVFrame *hwFrame)
     yuv420pFrame->width = nv12Frame->width;
     yuv420pFrame->height = nv12Frame->height;
 
-    // ========== 关键：必须复制所有时间戳相关字段 ==========
+    // ========== 鍏抽敭锛氬繀椤诲鍒舵墍鏈夋椂闂存埑鐩稿叧瀛楁 ==========
     yuv420pFrame->pts = nv12Frame->pts;
     yuv420pFrame->pkt_dts = nv12Frame->pkt_dts;
     yuv420pFrame->time_base = nv12Frame->time_base;
@@ -167,10 +168,10 @@ AVFrame *decoder::TransferHWFrame(AVFrame *hwFrame)
     yuv420pFrame->best_effort_timestamp = nv12Frame->best_effort_timestamp;
     yuv420pFrame->duration = nv12Frame->duration;
 
-    // 分配缓冲区
+    // 鍒嗛厤缂撳啿鍖?
     ret = av_frame_get_buffer(yuv420pFrame, 32);
     if (ret < 0) {
-        qDebug() << "分配 YUV420P 缓冲区失败";
+        APP_LOG_DEBUG_STREAM() << "Allocate YUV420P buffer failed";
         av_frame_free(&nv12Frame);
         av_frame_free(&yuv420pFrame);
         return nullptr;
@@ -184,7 +185,7 @@ AVFrame *decoder::TransferHWFrame(AVFrame *hwFrame)
                                    SWS_BILINEAR, nullptr, nullptr, nullptr);
 
     if (!m_swsCtx) {
-        qDebug() << "创建 sws 上下文失败";
+        APP_LOG_DEBUG_STREAM() << "Create sws context failed";
         av_frame_free(&nv12Frame);
         av_frame_free(&yuv420pFrame);
         return nullptr;
@@ -202,7 +203,7 @@ AVFrame *decoder::TransferHWFrame(AVFrame *hwFrame)
 
 
 
-    // 清理中间帧
+    // 娓呯悊涓棿甯?
     av_frame_free(&nv12Frame);
 
     return yuv420pFrame;
@@ -213,15 +214,15 @@ int decoder::InitDecoder(std::shared_ptr<SyncQueue<AVPacket*>> packetVec
                          , AVCodecParameters *coderPar
                          , AVRational time_base) {
     if (!coderPar) {
-        qWarning() << "decoder init failed: codec parameters are null";
+        APP_LOG_WARN_STREAM() << "decoder init failed: codec parameters are null";
         return -1;
     }
     if (!packetVec) {
-        qWarning() << "decoder init failed: packet queue is null";
+        APP_LOG_WARN_STREAM() << "decoder init failed: packet queue is null";
         return -1;
     }
     if (!framevec) {
-        qWarning() << "decoder init failed: frame queue is null";
+        APP_LOG_WARN_STREAM() << "decoder init failed: frame queue is null";
         return -1;
     }
 
@@ -237,14 +238,14 @@ int decoder::InitDecoder(std::shared_ptr<SyncQueue<AVPacket*>> packetVec
     Ctx = avcodec_alloc_context3(codec);
     avcodec_parameters_to_context(Ctx, par);
 
-    // 先确定解码器类型
+    // 鍏堢‘瀹氳В鐮佸櫒绫诲瀷
     if (par->codec_type == AVMEDIA_TYPE_VIDEO) {
-        decoder_type = "视频";
-        // 视频尝试硬解码
+        decoder_type = "瑙嗛";
+        // 瑙嗛灏濊瘯纭В鐮?
         InitHWDecoder();
     } else {
-        decoder_type = "音频";
-        // 音频强制软解
+        decoder_type = "闊抽";
+        // 闊抽寮哄埗杞В
         m_isHWDecoder = false;
         m_hwDeviceCtx = nullptr;
         m_hwPixFmt = AV_PIX_FMT_NONE;
@@ -254,27 +255,27 @@ int decoder::InitDecoder(std::shared_ptr<SyncQueue<AVPacket*>> packetVec
     if (ret < 0) {
         char errBuf[256];
         av_strerror(ret, errBuf, sizeof(errBuf));
-        qDebug() << "avcodec_open2 错误:" << errBuf;
+        APP_LOG_DEBUG_STREAM() << "avcodec_open2 failed:" << errBuf;
         return -1;
     }
 
-    qDebug() << decoder_type << "解码器初始化完成"
-             << (m_isHWDecoder ? "(硬解)" : "(软解)");
+    APP_LOG_DEBUG_STREAM() << decoder_type << "decoder initialized"
+             << (m_isHWDecoder ? "(hardware)" : "(software)");
     return 0;
 }
 
 int decoder::StartDecoder() {
-    qDebug() << decoder_type << "线程开始解码"
-             << (m_isHWDecoder ? "[硬解]" : "[软解]");
+    APP_LOG_DEBUG_STREAM() << decoder_type << "decoder thread started"
+             << (m_isHWDecoder ? "[hardware]" : "[software]");
 
     frame = av_frame_alloc();
     if (!frame) {
-        qDebug() << "分配帧失败";
+        APP_LOG_DEBUG_STREAM() << "Allocate frame failed";
         return -1;
     }
 
     while (true) {
-        // ========== 取包部分 ==========
+        // ========== 鍙栧寘閮ㄥ垎 ==========
         if (!WaitIfSuspended()) {
             break;
         }
@@ -304,11 +305,11 @@ int decoder::StartDecoder() {
         if (ret < 0) {
             char errBuf[256];
             av_strerror(ret, errBuf, sizeof(errBuf));
-            qDebug() << "发送包失败:" << errBuf;
+            APP_LOG_DEBUG_STREAM() << "Send packet failed:" << errBuf;
             continue;
         }
 
-        // ========== 接收帧部分 ==========
+        // ========== 鎺ユ敹甯ч儴鍒?==========
         while (true) {
             {
                 QMutexLocker locker(&mutex);
@@ -318,57 +319,57 @@ int decoder::StartDecoder() {
             if (ret < 0) {
                 char errBuf[256];
                 av_strerror(ret, errBuf, sizeof(errBuf));
-                qDebug() << "接收解码帧失败:" << errBuf;
+                APP_LOG_DEBUG_STREAM() << "Receive decoded frame failed:" << errBuf;
                 break;
             }
 
-            // 确保 time_base 有效
+            // 纭繚 time_base 鏈夋晥
             if (frame->time_base.den <= 0) {
                 frame->time_base = m_time_base;
             }
 
-            // 处理帧（区分视频硬解/视频软解/音频）
+            // 澶勭悊甯э紙鍖哄垎瑙嗛纭В/瑙嗛杞В/闊抽锛?
             AVFrame *outFrame = nullptr;
 
-            if (decoder_type == "视频" && m_isHWDecoder &&
+            if (decoder_type == "瑙嗛" && m_isHWDecoder &&
                 frame->format == m_hwPixFmt) {
-                // 视频硬解帧：需要转换
+                // 瑙嗛纭В甯э細闇€瑕佽浆鎹?
                 outFrame = TransferHWFrame(frame);
                 if (!outFrame) {
-                    qDebug() << "硬件帧转换失败，跳过此帧";
+                    APP_LOG_DEBUG_STREAM() << "Hardware frame transfer failed, skipping frame";
                     continue;
                 }
             } else {
-                // 视频软解 或 音频：需要判断是否需要格式转换
+                // 瑙嗛杞В 鎴?闊抽锛氶渶瑕佸垽鏂槸鍚﹂渶瑕佹牸寮忚浆鎹?
                 outFrame = av_frame_alloc();
                 if (!outFrame) {
-                    qDebug() << "分配输出帧失败";
+                    APP_LOG_DEBUG_STREAM() << "Allocate output frame failed";
                     continue;
                 }
 
-                // 如果是视频且格式不是 yuv420p，进行格式转换
-                if (decoder_type == "视频" && frame->format != AV_PIX_FMT_YUV420P) {
-                    // 格式转换：任意格式 -> yuv420p
+                // 濡傛灉鏄棰戜笖鏍煎紡涓嶆槸 yuv420p锛岃繘琛屾牸寮忚浆鎹?
+                if (decoder_type == "瑙嗛" && frame->format != AV_PIX_FMT_YUV420P) {
+                    // 鏍煎紡杞崲锛氫换鎰忔牸寮?-> yuv420p
                     outFrame->format = AV_PIX_FMT_YUV420P;
                     outFrame->width = frame->width;
                     outFrame->height = frame->height;
 
-                    // 复制时间戳属性
+                    // 澶嶅埗鏃堕棿鎴冲睘鎬?
                     outFrame->pts = frame->pts;
                     outFrame->pkt_dts = frame->pkt_dts;
                     outFrame->time_base = frame->time_base.den > 0 ? frame->time_base : m_time_base;
                     outFrame->best_effort_timestamp = frame->best_effort_timestamp;
                     outFrame->duration = frame->duration;
 
-                    // 分配缓冲区
+                    // 鍒嗛厤缂撳啿鍖?
                     int ret = av_frame_get_buffer(outFrame, 32);
                     if (ret < 0) {
-                        qDebug() << "分配转换后帧缓冲区失败";
+                        APP_LOG_DEBUG_STREAM() << "Allocate converted frame buffer failed";
                         av_frame_free(&outFrame);
                         continue;
                     }
 
-                    // 创建或更新 sws 转换上下文
+                    // 鍒涘缓鎴栨洿鏂?sws 杞崲涓婁笅鏂?
                     m_swsCtx = sws_getCachedContext(
                         m_swsCtx,
                         frame->width, frame->height, (AVPixelFormat)frame->format,
@@ -376,38 +377,38 @@ int decoder::StartDecoder() {
                         SWS_BILINEAR, nullptr, nullptr, nullptr);
 
                     if (!m_swsCtx) {
-                        qDebug() << "创建格式转换上下文失败";
+                        APP_LOG_DEBUG_STREAM() << "Create format conversion context failed";
                         av_frame_free(&outFrame);
                         continue;
                     }
 
-                    // 执行格式转换
+                    // 鎵ц鏍煎紡杞崲
                     sws_scale(m_swsCtx,
                               frame->data, frame->linesize,
                               0, frame->height,
                               outFrame->data, outFrame->linesize);
 
-                    qDebug() << "视频格式转换:"
+                    APP_LOG_DEBUG_STREAM() << "Video format conversion:"
                              << av_get_pix_fmt_name((AVPixelFormat)frame->format)
                              << "->" << av_get_pix_fmt_name(AV_PIX_FMT_YUV420P);
                 } else {
-                    // 音频 或 已经是 yuv420p 的视频：直接引用
+                    // 闊抽 鎴?宸茬粡鏄?yuv420p 鐨勮棰戯細鐩存帴寮曠敤
                     if (av_frame_ref(outFrame, frame) < 0) {
-                        qDebug() << "引用帧失败";
+                        APP_LOG_DEBUG_STREAM() << "Reference frame failed";
                         av_frame_free(&outFrame);
                         continue;
                     }
 
-                    // 确保 time_base
+                    // 纭繚 time_base
                     if (outFrame->time_base.den <= 0) {
                         outFrame->time_base = m_time_base;
                     }
                 }
             }
 
-            // 验证输出帧
-            if (decoder_type == "视频" && (outFrame->width <= 0 || outFrame->height <= 0)) {
-                qDebug() << "视频帧尺寸无效，丢弃";
+            // 楠岃瘉杈撳嚭甯?
+            if (decoder_type == "瑙嗛" && (outFrame->width <= 0 || outFrame->height <= 0)) {
+                APP_LOG_DEBUG_STREAM() << "Invalid video frame size, dropping";
                 av_frame_free(&outFrame);
                 continue;
             }
@@ -418,24 +419,24 @@ int decoder::StartDecoder() {
                 continue;
             }
 
-            // ========== 入队 ==========
+            // ========== 鍏ラ槦 ==========
             if (!m_FrameVec->Push(outFrame)) {
                 av_frame_free(&outFrame);
                 av_frame_unref(frame);
                 continue;
             }
 
-            av_frame_unref(frame);  // 释放 codec 的引用，复用 frame
+            av_frame_unref(frame);  // 閲婃斁 codec 鐨勫紩鐢紝澶嶇敤 frame
         }
     }
 
-    qDebug() << decoder_type << "解码线程结束";
+    APP_LOG_DEBUG_STREAM() << decoder_type << "decoder thread finished";
     return 0;
 }
 
 int decoder::Flush() {
     if (!Ctx) {
-        qWarning() << decoder_type << "decoder flush failed: context is null";
+        APP_LOG_WARN_STREAM() << decoder_type << "decoder flush failed: context is null";
         return -1;
     }
 
@@ -444,7 +445,7 @@ int decoder::Flush() {
         avcodec_flush_buffers(Ctx);
     }
 
-    qDebug() << decoder_type << "decoder flushed";
+    APP_LOG_DEBUG_STREAM() << decoder_type << "decoder flushed";
     return 0;
 }
 
@@ -512,7 +513,7 @@ int decoder::Start() {
     mutex.lock();
     pause_flag = false;
     suspend_requested_ = false;
-    qDebug() << decoder_type << "解码线程开始运行";
+    APP_LOG_DEBUG_STREAM() << decoder_type << "decoder thread started";
     suspendCondition_.wakeAll();
     mutex.unlock();
 
@@ -530,7 +531,7 @@ int decoder::Stop() {
     mutex.lock();
     stop_flag = true;
     suspend_requested_ = false;
-    qDebug() << decoder_type << "解码线程被停止";
+    APP_LOG_DEBUG_STREAM() << decoder_type << "decoder thread stopped";
     suspendCondition_.wakeAll();
     mutex.unlock();
 
@@ -541,7 +542,7 @@ int decoder::Pause(){
     mutex.lock();
     pause_flag = true;
     suspend_requested_ = true;
-    qDebug() << decoder_type << "解码线程被暂停";
+    APP_LOG_DEBUG_STREAM() << decoder_type << "decoder thread paused";
     suspendCondition_.wakeAll();
     mutex.unlock();
 
@@ -564,3 +565,4 @@ bool decoder::IsSuspendRequested() const {
     QMutexLocker locker(&mutex);
     return suspend_requested_;
 }
+

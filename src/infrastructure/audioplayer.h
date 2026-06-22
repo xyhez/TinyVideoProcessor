@@ -6,7 +6,6 @@
 #include <QAudioDevice>
 #include <QThread>
 #include <QMediaDevices>
-#include <QDebug>
 #include <QIODevice>
 #include <QAudioFormat>
 #include <QMutex>
@@ -232,3 +231,4 @@ signals:
 };
 
 #endif // AUDIOPLAYER_H
+

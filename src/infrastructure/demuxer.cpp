@@ -1,4 +1,5 @@
 #include "demuxer.h"
+#include "core/AppLog.h"
 
 #include <QMutexLocker>
 
@@ -15,12 +16,12 @@ QString AvErrorString(int errorCode)
 }
 }
 
-demuxer::demuxer(std::shared_ptr<IMediaSource> mediaSource
-                 ,std::shared_ptr<SyncQueue<AVPacket*>> APacket
-                 ,std::shared_ptr<SyncQueue<AVPacket*>> VPacket
-                 ,std::shared_ptr<SyncQueue<AVFrame*>>  AFrame
-                 ,std::shared_ptr<SyncQueue<AVFrame*>>  VFrame
-                 ,QObject *parent)
+demuxer::demuxer(std::shared_ptr<IMediaSource> mediaSource,
+                 std::shared_ptr<SyncQueue<AVPacket*>> APacket,
+                 std::shared_ptr<SyncQueue<AVPacket*>> VPacket,
+                 std::shared_ptr<SyncQueue<AVFrame*>> AFrame,
+                 std::shared_ptr<SyncQueue<AVFrame*>> VFrame,
+                 QObject *parent)
     : QObject{parent}
     , m_mediaSource(mediaSource)
     , m_APacket(APacket)
@@ -29,124 +30,118 @@ demuxer::demuxer(std::shared_ptr<IMediaSource> mediaSource
     , m_VFrame(VFrame)
 {
     if (!m_mediaSource) {
-        qCritical() << "媒体源为空";
+        APP_LOG_CRITICAL("Demuxer media source is null");
         return;
     }
 
-    // 从媒体源获取 AVFormatContext
     AVFormatContext* ic = m_mediaSource->GetFormatContect();
-
     if (!ic) {
-        qCritical() << "AVFormatContext 为空，媒体源未正确打开";
+        APP_LOG_CRITICAL("Demuxer format context is null");
         return;
     }
 
-    // 获取媒体源信息的引用
     Fileinfo& info = m_mediaSource->GetSourceInfo();
-
-    // 遍历流，找音视频流
-    for(int i = 0; i < ic->nb_streams; i++) {
-        ///< 找到视频流
-        if(ic->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
-            qDebug() << QString("找到视频流 #%1: %2x%3, 编码=%4, 时长=%5秒")
-                            .arg(i)
-                            .arg(ic->streams[i]->codecpar->width)
-                            .arg(ic->streams[i]->codecpar->height)
-                            .arg(avcodec_get_name(ic->streams[i]->codecpar->codec_id))
-                            .arg(ic->duration/1000000);
-            qDebug() << QString("  帧率: %1 fps").arg(av_q2d(ic->streams[i]->avg_frame_rate));
-            qDebug() << QString("  帧持续时间: %1 ms").arg(1.0/ av_q2d(ic->streams[i]->avg_frame_rate)*1000);
-            qDebug() << "视频时间基(time_base):" << av_q2d(ic->streams[i]->time_base);
+    for (int i = 0; i < static_cast<int>(ic->nb_streams); i++) {
+        AVStream* stream = ic->streams[i];
+        AVCodecParameters* codecParameters = stream->codecpar;
+        if (codecParameters->codec_type == AVMEDIA_TYPE_VIDEO) {
+            APP_LOG_DEBUG(QString("Found video stream #%1: %2x%3, codec=%4, duration=%5s")
+                              .arg(i)
+                              .arg(codecParameters->width)
+                              .arg(codecParameters->height)
+                              .arg(avcodec_get_name(codecParameters->codec_id))
+                              .arg(ic->duration / 1000000));
+            APP_LOG_DEBUG(QString("  frame rate: %1 fps").arg(av_q2d(stream->avg_frame_rate)));
+            APP_LOG_DEBUG(QString("  frame duration: %1 ms")
+                              .arg(1.0 / av_q2d(stream->avg_frame_rate) * 1000));
+            APP_LOG_DEBUG("  video time_base:", av_q2d(stream->time_base));
 
             m_videoStreamIndex = i;
-            m_V_coderPar = ic->streams[i]->codecpar;
-            m_V_time_base = ic->streams[i]->time_base;
+            m_V_coderPar = codecParameters;
+            m_V_time_base = stream->time_base;
 
-            // 填充媒体源信息
             info.hasVideo_ = true;
             info.videoStreamIndex_ = i;
-            info.width_ = ic->streams[i]->codecpar->width;
-            info.height_ = ic->streams[i]->codecpar->height;
-            info.CodecId_ = ic->streams[i]->codecpar->codec_id;
-            info.videoCodecId_ = ic->streams[i]->codecpar->codec_id;
-            const double frameRate = av_q2d(ic->streams[i]->avg_frame_rate);
+            info.width_ = codecParameters->width;
+            info.height_ = codecParameters->height;
+            info.CodecId_ = codecParameters->codec_id;
+            info.videoCodecId_ = codecParameters->codec_id;
+            const double frameRate = av_q2d(stream->avg_frame_rate);
             if (frameRate > 0.0) {
                 info.FrameRate = frameRate;
             }
-            info.V_timeBase = av_q2d(ic->streams[i]->time_base);
+            info.V_timeBase = av_q2d(stream->time_base);
             if (ic->duration > 0) {
-                info.duration_ = ic->duration/1000000; // info拿到的duration单位是s
+                info.duration_ = ic->duration / 1000000;
             }
-
-        }
-        else if(ic->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
-            ///< 找到音频流
-            qDebug() << QString("找到音频流 #%1: %2x%3, 编码=%4, 时长=%5秒")
-                            .arg(i)
-                            .arg(ic->streams[i]->codecpar->sample_rate)
-                            .arg(ic->streams[i]->codecpar->bit_rate)
-                            .arg(avcodec_get_name(ic->streams[i]->codecpar->codec_id))
-                            .arg(ic->duration/1000000);
-            qDebug() << "音频时间基(time_base):" << av_q2d(ic->streams[i]->time_base);
+        } else if (codecParameters->codec_type == AVMEDIA_TYPE_AUDIO) {
+            APP_LOG_DEBUG(QString("Found audio stream #%1: %2x%3, codec=%4, duration=%5s")
+                              .arg(i)
+                              .arg(codecParameters->sample_rate)
+                              .arg(codecParameters->bit_rate)
+                              .arg(avcodec_get_name(codecParameters->codec_id))
+                              .arg(ic->duration / 1000000));
+            APP_LOG_DEBUG("  audio time_base:", av_q2d(stream->time_base));
 
             m_audioStreamIndex = i;
-            m_A_coderPar = ic->streams[i]->codecpar;
-            m_A_time_base = ic->streams[i]->time_base;
+            m_A_coderPar = codecParameters;
+            m_A_time_base = stream->time_base;
 
-            // 填充媒体源信息
             info.hasAudio_ = true;
             info.audioStreamIndex_ = i;
-            info.audioCodecId_ = ic->streams[i]->codecpar->codec_id;
-            info.A_timeBase = av_q2d(ic->streams[i]->time_base);
-
-        }
-        else if(ic->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_SUBTITLE) {
-            ///< 找到字幕流
-            qDebug() << "找到字幕流";
+            info.audioCodecId_ = codecParameters->codec_id;
+            info.A_timeBase = av_q2d(stream->time_base);
+        } else if (codecParameters->codec_type == AVMEDIA_TYPE_SUBTITLE) {
+            APP_LOG_DEBUG("Found subtitle stream");
         }
     }
 }
 
-demuxer::~demuxer(){
-    // 不再需要关闭 AVFormatContext，由 IMediaSource 管理
-    qDebug() << "解复用器资源已清理";
+demuxer::~demuxer()
+{
+    APP_LOG_DEBUG("Demuxer resources released");
 }
 
-AVCodecParameters* demuxer::ReAcoderPar(){
+AVCodecParameters* demuxer::ReAcoderPar()
+{
     return m_A_coderPar;
 }
 
-AVCodecParameters* demuxer::ReVcoderPar(){
+AVCodecParameters* demuxer::ReVcoderPar()
+{
     return m_V_coderPar;
 }
 
 void demuxer::SetAudioQueues(std::shared_ptr<SyncQueue<AVPacket*>> APacket,
-                             std::shared_ptr<SyncQueue<AVFrame*>> AFrame) {
+                             std::shared_ptr<SyncQueue<AVFrame*>> AFrame)
+{
     QMutexLocker locker(&mutex);
     m_APacket = APacket;
     m_AFrame = AFrame;
 }
 
-AVRational demuxer::ReAtimebase() {
+AVRational demuxer::ReAtimebase()
+{
     return m_A_time_base;
 }
 
-AVRational demuxer::ReVtimebase() {
+AVRational demuxer::ReVtimebase()
+{
     return m_V_time_base;
 }
 
-int demuxer::StartDemuxer() {
-    qDebug() << "开始解复用";
+int demuxer::StartDemuxer()
+{
+    APP_LOG_DEBUG("Demuxer started");
 
     if (!m_mediaSource) {
-        qDebug() << "媒体源未初始化";
+        APP_LOG_WARN("Demuxer media source is not initialized");
         return -1;
     }
 
     AVFormatContext* ic = m_mediaSource->GetFormatContect();
-
     if (!ic) {
-        qDebug() << "上下文未初始化";
+        APP_LOG_WARN("Demuxer format context is not initialized");
         return -1;
     }
 
@@ -174,7 +169,7 @@ int demuxer::StartDemuxer() {
         if (ret < 0) {
             av_packet_free(&packet);
             if (ret == AVERROR_EOF) {
-                qDebug() << "Demuxing finished (EOF)";
+                APP_LOG_DEBUG("Demuxing finished (EOF)");
                 reachedEof = true;
                 break;
             }
@@ -186,15 +181,14 @@ int demuxer::StartDemuxer() {
 
             ++consecutiveReadErrors;
             const QString ffmpegError = AvErrorString(ret);
-            qWarning() << "Demuxer read error:" << ffmpegError
-                       << "consecutive errors:" << consecutiveReadErrors;
+            APP_LOG_WARN("Demuxer read error:", ffmpegError,
+                         "consecutive errors:", consecutiveReadErrors);
 
             if (consecutiveReadErrors >= kMaxConsecutiveReadErrors) {
                 if (m_mediaSource && m_mediaSource->IsRealtime()) {
-                    errorMessage = QString("实时媒体源读取失败：%1。设备可能已断开或输入流已中断。")
-                                       .arg(ffmpegError);
+                    errorMessage = QString("Realtime media source read failed: %1").arg(ffmpegError);
                 } else {
-                    errorMessage = QString("读取媒体流失败：%1").arg(ffmpegError);
+                    errorMessage = QString("Media stream read failed: %1").arg(ffmpegError);
                 }
                 failed = true;
                 break;
@@ -206,7 +200,6 @@ int demuxer::StartDemuxer() {
 
         consecutiveReadErrors = 0;
 
-        // 提前过滤非音视频流
         if (IsSuspendRequested()) {
             av_packet_free(&packet);
             continue;
@@ -218,7 +211,6 @@ int demuxer::StartDemuxer() {
             continue;
         }
 
-        // ========== 音频流 ==========
         if (packet->stream_index == m_audioStreamIndex) {
             {
                 QMutexLocker locker(&mutex);
@@ -231,9 +223,7 @@ int demuxer::StartDemuxer() {
             if (!m_APacket->Push(packet)) {
                 continue;
             }
-        }
-        // ========== 视频流 ==========
-        else {
+        } else {
             {
                 QMutexLocker locker(&mutex);
                 if (stop_flag) {
@@ -271,23 +261,26 @@ int demuxer::StartDemuxer() {
     return 0;
 }
 
-int demuxer::Rewind() {
+int demuxer::Rewind()
+{
     return SeekRelative(-kSeekStepSeconds);
 }
 
-int demuxer::Forward() {
+int demuxer::Forward()
+{
     return SeekRelative(kSeekStepSeconds);
 }
 
-int demuxer::SeekTo(double seconds) {
+int demuxer::SeekTo(double seconds)
+{
     if (!m_mediaSource) {
-        qWarning() << "Seek failed: media source is null";
+        APP_LOG_WARN("Seek failed: media source is null");
         return -1;
     }
 
     AVFormatContext* ic = m_mediaSource->GetFormatContect();
     if (!ic) {
-        qWarning() << "Seek failed: format context is null";
+        APP_LOG_WARN("Seek failed: format context is null");
         return -1;
     }
 
@@ -309,22 +302,24 @@ int demuxer::SeekTo(double seconds) {
     if (ret < 0) {
         char errBuf[256];
         av_strerror(ret, errBuf, sizeof(errBuf));
-        qWarning() << "Seek failed:" << errBuf;
+        APP_LOG_WARN("Seek failed:", errBuf);
         return -1;
     }
 
     m_AcurrentPTS = 0;
     m_VcurrentPTS = 0;
 
-    qDebug() << "Demuxer seek to" << seconds << "seconds";
+    APP_LOG_DEBUG("Demuxer seek to", seconds, "seconds");
     return 0;
 }
 
-int demuxer::SeekRelative(double seconds) {
+int demuxer::SeekRelative(double seconds)
+{
     return SeekTo(CurrentPositionSeconds() + seconds);
 }
 
-int demuxer::SuspendAndWait() {
+int demuxer::SuspendAndWait()
+{
     {
         QMutexLocker locker(&mutex);
         if (stop_flag) {
@@ -353,11 +348,13 @@ int demuxer::SuspendAndWait() {
     return stop_flag ? -1 : 0;
 }
 
-double demuxer::Position() const {
+double demuxer::Position() const
+{
     return CurrentPositionSeconds();
 }
 
-double demuxer::CurrentPositionSeconds() const {
+double demuxer::CurrentPositionSeconds() const
+{
     QMutexLocker locker(&mutex);
 
     if (m_VcurrentPTS > 0 && m_V_time_base.den > 0) {
@@ -371,11 +368,12 @@ double demuxer::CurrentPositionSeconds() const {
     return 0.0;
 }
 
-int demuxer::Start() {
+int demuxer::Start()
+{
     mutex.lock();
     pause_flag = false;
     suspend_requested_ = false;
-    qDebug() << "解复用线程开始运行";
+    APP_LOG_DEBUG("Demuxer thread started");
     suspendCondition_.wakeAll();
     mutex.unlock();
 
@@ -389,28 +387,32 @@ int demuxer::Start() {
     return 0;
 }
 
-int demuxer::Stop() {
+int demuxer::Stop()
+{
     mutex.lock();
     stop_flag = true;
     suspend_requested_ = false;
-    qDebug() << "解复用线程被停止";
+    APP_LOG_DEBUG("Demuxer thread stopped");
     suspendCondition_.wakeAll();
     mutex.unlock();
 
     return 0;
 }
 
-int demuxer::Pause(){
+int demuxer::Pause()
+{
     mutex.lock();
     pause_flag = true;
     suspend_requested_ = true;
-    qDebug() << "解复用线程被暂停";
+    APP_LOG_DEBUG("Demuxer thread paused");
     suspendCondition_.wakeAll();
     mutex.unlock();
 
     return 0;
 }
-bool demuxer::WaitIfSuspended() {
+
+bool demuxer::WaitIfSuspended()
+{
     QMutexLocker locker(&mutex);
 
     while (suspend_requested_ && !stop_flag) {
@@ -423,7 +425,8 @@ bool demuxer::WaitIfSuspended() {
     return !stop_flag;
 }
 
-bool demuxer::IsSuspendRequested() const {
+bool demuxer::IsSuspendRequested() const
+{
     QMutexLocker locker(&mutex);
     return suspend_requested_;
 }

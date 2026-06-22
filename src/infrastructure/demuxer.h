@@ -3,7 +3,6 @@
 
 #include <QObject>
 #include <QMutex>
-#include <QDebug>
 #include <QThread>
 #include <QWaitCondition>
 #include <QString>

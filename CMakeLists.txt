@@ -6,7 +6,7 @@ set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets Multimedia OpenGLWidgets)
@@ -35,8 +35,6 @@ set(FFMPEG_LIBS
     ${FFMPEG_LIB_DIR}/avdevice.lib
 )
 
-
-
 set(PROJECT_SOURCES
         src/ui/main.cpp
         src/ui/mainwindow.cpp
@@ -59,6 +57,7 @@ set(PROJECT_SOURCES
         src/infrastructure/CameraDeviceEnumerator.h
         src/infrastructure/CameraDeviceEnumerator.cpp
         src/core/queue.h
+        src/core/AppLog.h
         doc/架构指导.md
         doc/Phase0_重构计划.md
         src/domain/IMediaSource.h
@@ -75,6 +74,10 @@ set(PROJECT_SOURCES
         src/domain/PlaylistManager.h
         src/domain/MultiStreamManager.cpp
         src/domain/MultiStreamManager.h
+        Lib/TinyLogLibrary/src/Logger.cpp
+        Lib/TinyLogLibrary/src/ThreadPool.cpp
+        Lib/TinyLogLibrary/src/AsyncLogger.cpp
+        Lib/TinyLogLibrary/include/tiny_log/src/Registry.cpp
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
@@ -99,6 +102,14 @@ else()
         )
     endif()
 endif()
+
+target_include_directories(modernFFplay PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/Lib/TinyLogLibrary/include
+)
+
+target_compile_definitions(modernFFplay PRIVATE
+    TINY_LOG_PROJECT_ROOT="${CMAKE_SOURCE_DIR}"
+)
 
 target_link_libraries(modernFFplay PRIVATE Qt${QT_VERSION_MAJOR}::Widgets ${FFMPEG_LIBS} Qt${QT_VERSION_MAJOR}::Multimedia Qt${QT_VERSION_MAJOR}::OpenGLWidgets)
 
