@@ -102,6 +102,15 @@ public:
     virtual Fileinfo& GetSourceInfo() = 0;
 
     /**
+     * @brief LastError 获取最近一次媒体源操作失败原因
+     * @return 错误信息；无错误时返回空字符串
+     */
+    virtual QString LastError() const
+    {
+        return QString();
+    }
+
+    /**
      * @brief IsSeekable 媒体源是否支持 seek
      * @return true 支持 seek，false 不支持
      *

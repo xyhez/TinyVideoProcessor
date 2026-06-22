@@ -15,8 +15,12 @@ MultiStreamManager::StreamId MultiStreamManager::AddStream(std::shared_ptr<IMedi
     }
 
     if (!mediaSource->Open()) {
+        const QString sourceError = mediaSource->LastError();
+        const QString errorMessage = sourceError.isEmpty()
+            ? QString("Open media source failed")
+            : sourceError;
         mediaSource->Close();
-        emit StreamErrorOccurred(InvalidStreamId, "Open media source failed");
+        emit StreamErrorOccurred(InvalidStreamId, errorMessage);
         return InvalidStreamId;
     }
 

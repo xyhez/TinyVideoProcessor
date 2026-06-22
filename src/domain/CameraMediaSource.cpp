@@ -32,6 +32,16 @@ CameraMediaSource::~CameraMediaSource()
 
 bool CameraMediaSource::Open()
 {
+    lastError_.clear();
+    if (formatContext_) {
+        Close();
+    }
+
+    if (deviceName_.trimmed().isEmpty()) {
+        SetLastError("摄像头设备名为空");
+        return false;
+    }
+
     // 注册 FFmpeg 设备（libavdevice）
     static bool devicesRegistered = false;
     if (!devicesRegistered) {
@@ -42,7 +52,7 @@ bool CameraMediaSource::Open()
     // 查找 dshow input format
     const AVInputFormat* inputFormat = av_find_input_format("dshow");
     if (!inputFormat) {
-        qDebug() << "CameraMediaSource::Open() - 无法找到 dshow input format";
+        SetLastError("无法找到 FFmpeg dshow input format");
         return false;
     }
 
@@ -80,16 +90,18 @@ bool CameraMediaSource::Open()
     if (ret != 0) {
         char errbuf[AV_ERROR_MAX_STRING_SIZE] = {0};
         av_strerror(ret, errbuf, AV_ERROR_MAX_STRING_SIZE);
-        qDebug() << "CameraMediaSource::Open() - 打开摄像头失败:" << errbuf;
-        formatContext_ = nullptr;
+        SetLastError(QString("打开摄像头失败：%1。设备可能不存在、被占用，或所选参数不受支持。")
+                         .arg(QString::fromLocal8Bit(errbuf)));
+        if (formatContext_) {
+            avformat_close_input(&formatContext_);
+        }
         return false;
     }
 
     // 获取流信息
     if (avformat_find_stream_info(formatContext_, nullptr) < 0) {
-        qDebug() << "CameraMediaSource::Open() - 无法获取摄像头流信息";
+        SetLastError("无法获取摄像头流信息");
         avformat_close_input(&formatContext_);
-        formatContext_ = nullptr;
         return false;
     }
 
@@ -129,9 +141,8 @@ bool CameraMediaSource::Open()
     }
 
     if (!sourceInfo_.hasVideo_) {
-        qDebug() << "CameraMediaSource::Open() - 摄像头未找到视频流";
+        SetLastError("摄像头未找到可用视频流");
         avformat_close_input(&formatContext_);
-        formatContext_ = nullptr;
         return false;
     }
 
@@ -194,6 +205,11 @@ void CameraMediaSource::SetOpenOptions(const CameraOpenOptions& options)
     sourceInfo_.filepath_ = options.deviceName;
 }
 
+QString CameraMediaSource::LastError() const
+{
+    return lastError_;
+}
+
 bool CameraMediaSource::IsSeekable() const {
     return false; // 摄像头不支持 seek
 }
@@ -204,4 +220,10 @@ bool CameraMediaSource::HasDuration() const {
 
 bool CameraMediaSource::IsRealtime() const {
     return true; // 摄像头是实时源
+}
+
+void CameraMediaSource::SetLastError(const QString& message)
+{
+    lastError_ = message;
+    qWarning() << "CameraMediaSource:" << lastError_;
 }

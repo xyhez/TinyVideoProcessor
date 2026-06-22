@@ -94,6 +94,12 @@ public:
     void SetOpenOptions(const CameraOpenOptions& options);
 
     /**
+     * @brief LastError 获取最近一次摄像头打开或读取信息失败原因
+     * @return 错误信息
+     */
+    QString LastError() const override;
+
+    /**
      * @brief IsSeekable 摄像头不支持 seek
      * @return false
      */
@@ -112,8 +118,15 @@ public:
     bool IsRealtime() const override;
 
 private:
+    /**
+     * @brief SetLastError 保存最近一次失败原因并输出日志
+     * @param message 错误信息
+     */
+    void SetLastError(const QString& message);
+
     AVFormatContext* formatContext_ = nullptr;
     Fileinfo sourceInfo_;
+    QString lastError_;
     QString deviceName_;
     int width_ = 1280;
     int height_ = 720;

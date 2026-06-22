@@ -553,20 +553,28 @@
 - [x] 文件源 Stop 语义不退化。
 - [x] 队列停止/关闭时不泄漏入队失败的解码帧。
 
-### 2.4.1 打开失败处理
+### 2.4.1 打开失败处理 ✅ 已实现，待实机验证
 
-- [ ] 处理设备不存在。
-- [ ] 处理设备被占用。
-- [ ] 处理参数不支持。
-- [ ] 处理 dshow input format 不存在。
-- [ ] `CameraMediaSource::Open()` 返回明确失败。
-- [ ] 错误通过 `MediaPipeline -> MultiStreamManager -> MediaPlayController -> UI` 转发。
+- [x] 处理设备不存在。
+- [x] 处理设备被占用。
+- [x] 处理参数不支持。
+- [x] 处理 dshow input format 不存在。
+- [x] `CameraMediaSource::Open()` 返回明确失败。
+- [x] 打开失败通过 `CameraMediaSource -> MultiStreamManager -> MediaPlayController -> UI` 转发。
 
 **验收标准**：
 
 - [ ] 添加失败不崩溃。
 - [ ] UI 能看到可理解错误。
 - [ ] 失败后资源释放完整。
+
+**实现说明**：
+
+- `IMediaSource` 增加 `LastError()`，用于向上层暴露最近一次媒体源失败原因。
+- `CameraMediaSource` 在设备名为空、dshow 不存在、打开失败、流信息读取失败、无视频流时记录明确错误。
+- `CameraMediaSource` 打开失败后统一释放 `AVFormatContext` 和打开参数字典。
+- `MultiStreamManager::AddStream()` 打开失败时透传媒体源错误；运行期 Pipeline 错误继续走既有 `MediaPipeline -> MultiStreamManager -> MediaPlayController -> UI` 链路。
+- `MainWindow` 通过 `MediaPlayController::StreamErrorOccurred` 显示错误提示。
 
 ### 2.4.2 运行中异常处理
 

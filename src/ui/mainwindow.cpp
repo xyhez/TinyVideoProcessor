@@ -11,6 +11,7 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QListWidgetItem>
+#include <QMessageBox>
 #include <QSignalBlocker>
 #include <QStringList>
 #include <QTimer>
@@ -122,6 +123,18 @@ void MainWindow::CreateConnects() {
     connect(mediaPlayController_.get(), &MediaPlayController::ActiveAudioStreamChanged,
             this, [this](MediaPlayController::StreamId) {
                 RefreshStreamView();
+            });
+
+    connect(mediaPlayController_.get(), &MediaPlayController::StreamErrorOccurred,
+            this, [this](MediaPlayController::StreamId id, const QString& message) {
+                const QString streamName = id == MediaPlayController::InvalidStreamId
+                    ? QString("媒体源")
+                    : QString("Stream %1").arg(id);
+                const QString errorMessage = message.isEmpty()
+                    ? QString("未知错误")
+                    : message;
+                qWarning() << "Stream error:" << id << errorMessage;
+                QMessageBox::warning(this, "媒体流错误", QString("%1：%2").arg(streamName, errorMessage));
             });
 
     connect(playlistManager_.get(), &PlaylistManager::PlaylistChanged, this, [this]() {
