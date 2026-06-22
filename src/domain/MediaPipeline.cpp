@@ -125,6 +125,11 @@ void MediaPipeline::Stop()
     emit PositionChanged(0.0);
     positionTimer_->stop();
 
+    if (mediaSource_ && !mediaSource_->IsSeekable()) {
+        ResetRealtimePipelineStop();
+        return;
+    }
+
     ResetPipelineToStart();
 }
 
@@ -451,6 +456,21 @@ void MediaPipeline::ResetPipelineToStart()
 
     ClearQueues();
     demuxer_->SeekTo(0.0);
+    FlushDecoders();
+    ClearQueues();
+    syncManager_->SeekTo(0.0);
+}
+
+void MediaPipeline::ResetRealtimePipelineStop()
+{
+    if (videoRender_) {
+        videoRender_->StopRendering();
+    }
+    if (audioplay_) {
+        audioplay_->Pause();
+    }
+
+    ClearQueues();
     FlushDecoders();
     ClearQueues();
     syncManager_->SeekTo(0.0);

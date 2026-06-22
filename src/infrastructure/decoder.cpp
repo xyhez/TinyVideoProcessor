@@ -420,6 +420,7 @@ int decoder::StartDecoder() {
 
             // ========== 入队 ==========
             if (!m_FrameVec->Push(outFrame)) {
+                av_frame_free(&outFrame);
                 av_frame_unref(frame);
                 continue;
             }

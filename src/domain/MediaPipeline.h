@@ -194,6 +194,11 @@ private:
     void ResetPipelineToStart();
 
     /**
+     * @brief ResetRealtimePipelineStop 停止实时源管线但不执行 seek 回零
+     */
+    void ResetRealtimePipelineStop();
+
+    /**
      * @brief ClearQueues 清空音视频包队列和帧队列
      */
     void ClearQueues();
