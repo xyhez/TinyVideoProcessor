@@ -6,6 +6,7 @@
 #include <QDebug>
 #include <QThread>
 #include <QWaitCondition>
+#include <QString>
 #include <memory>
 
 #include "core/queue.h"
@@ -159,6 +160,12 @@ signals:
      * @brief DemuxFinished 解复用自然读到文件尾
      */
     void DemuxFinished();
+
+    /**
+     * @brief DemuxErrorOccurred 解复用运行期错误信号
+     * @param message 错误信息
+     */
+    void DemuxErrorOccurred(QString message);
 
 
 private:

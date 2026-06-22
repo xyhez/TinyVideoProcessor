@@ -576,19 +576,37 @@
 - `MultiStreamManager::AddStream()` 打开失败时透传媒体源错误；运行期 Pipeline 错误继续走既有 `MediaPipeline -> MultiStreamManager -> MediaPlayController -> UI` 链路。
 - `MainWindow` 通过 `MediaPlayController::StreamErrorOccurred` 显示错误提示。
 
-### 2.4.2 运行中异常处理
+### 2.4.2 运行中异常处理 ✅ 已实现，待实机验证
 
-- [ ] 处理读帧失败。
-- [ ] 处理摄像头运行中断流。
-- [ ] 处理运行中拔出设备。
-- [ ] 处理 demuxer 错误转发。
-- [ ] 异常 stream 可被移除。
-- [ ] 异常 stream 不影响其他文件或摄像头 stream。
+- [x] 处理读帧失败。
+- [x] 处理摄像头运行中断流。
+- [x] 处理运行中拔出设备。
+- [x] 处理 demuxer 错误转发。
+- [x] 异常 stream 可被移除。
+- [x] 异常 stream 不影响其他文件或摄像头 stream。
 
 **验收标准**：
 
 - [ ] 单路摄像头异常不拖垮整个程序。
 - [ ] 多路中摄像头异常不影响其他路。
+
+**审查结论**：
+
+- [x] 形成 `doc/Phase2_4_2_运行中异常链路审查报告.md`。
+- [x] 确认当前非 EOF 读包错误只会重试，不会上报 UI。
+- [x] 确认运行期错误应走 `demuxer -> MediaPipeline -> MultiStreamManager -> MediaPlayController -> UI`。
+- [x] 确认异常策略不应放入 `CameraMediaSource`。
+- [x] 建议下一步实现 demuxer 运行期错误信号和连续错误阈值。
+
+**实现说明**：
+
+- `demuxer` 新增 `DemuxErrorOccurred(QString message)` 运行期错误信号。
+- `demuxer::StartDemuxer()` 区分 EOF、EAGAIN 和连续读包错误。
+- 非 EOF、非 EAGAIN 的连续读包错误达到阈值后判定为运行期异常。
+- 实时源错误提示会说明设备可能已断开或输入流已中断。
+- `MediaPipeline` 接收 demuxer 错误后停止本路 demuxer/decoder、队列、计时器、音频和视频渲染等待，并转发 `ErrorOccurred`。
+- active stream 发生运行期错误时，`MediaPlayController` 将播放状态切回 `Stopped`。
+- 上层继续复用 `MediaPipeline -> MultiStreamManager -> MediaPlayController -> UI` 的错误链路。
 
 ### 2.4.3 重复添加和释放验证
 

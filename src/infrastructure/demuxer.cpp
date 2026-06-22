@@ -4,6 +4,15 @@
 
 namespace {
 constexpr double kSeekStepSeconds = 10.0;
+constexpr int kReadErrorRetryDelayMs = 20;
+constexpr int kMaxConsecutiveReadErrors = 100;
+
+QString AvErrorString(int errorCode)
+{
+    char errBuf[AV_ERROR_MAX_STRING_SIZE] = {0};
+    av_strerror(errorCode, errBuf, sizeof(errBuf));
+    return QString::fromLocal8Bit(errBuf);
+}
 }
 
 demuxer::demuxer(std::shared_ptr<IMediaSource> mediaSource
@@ -142,6 +151,9 @@ int demuxer::StartDemuxer() {
     }
 
     bool reachedEof = false;
+    bool failed = false;
+    QString errorMessage;
+    int consecutiveReadErrors = 0;
     while (true) {
         if (!WaitIfSuspended()) {
             break;
@@ -166,10 +178,33 @@ int demuxer::StartDemuxer() {
                 reachedEof = true;
                 break;
             }
-            qDebug() << "读取错误，重试...";
-            QThread::msleep(20);
+
+            if (ret == AVERROR(EAGAIN)) {
+                QThread::msleep(kReadErrorRetryDelayMs);
+                continue;
+            }
+
+            ++consecutiveReadErrors;
+            const QString ffmpegError = AvErrorString(ret);
+            qWarning() << "Demuxer read error:" << ffmpegError
+                       << "consecutive errors:" << consecutiveReadErrors;
+
+            if (consecutiveReadErrors >= kMaxConsecutiveReadErrors) {
+                if (m_mediaSource && m_mediaSource->IsRealtime()) {
+                    errorMessage = QString("实时媒体源读取失败：%1。设备可能已断开或输入流已中断。")
+                                       .arg(ffmpegError);
+                } else {
+                    errorMessage = QString("读取媒体流失败：%1").arg(ffmpegError);
+                }
+                failed = true;
+                break;
+            }
+
+            QThread::msleep(kReadErrorRetryDelayMs);
             continue;
         }
+
+        consecutiveReadErrors = 0;
 
         // 提前过滤非音视频流
         if (IsSuspendRequested()) {
@@ -221,6 +256,16 @@ int demuxer::StartDemuxer() {
             m_VPacket->RequestStop();
         }
         emit DemuxFinished();
+    }
+
+    if (failed) {
+        if (m_APacket) {
+            m_APacket->RequestStop();
+        }
+        if (m_VPacket) {
+            m_VPacket->RequestStop();
+        }
+        emit DemuxErrorOccurred(errorMessage);
     }
 
     return 0;

@@ -182,6 +182,12 @@ private:
     void HandleDemuxFinished();
 
     /**
+     * @brief HandleDemuxError 处理解复用运行期错误
+     * @param message 错误信息
+     */
+    void HandleDemuxError(const QString& message);
+
+    /**
      * @brief SuspendPipelineAndWait 挂起 demuxer/decoder 管线并等待安全点
      * @return true 挂起成功
      * @return false 挂起失败

@@ -331,6 +331,9 @@ void MediaPipeline::CreateConnects()
     connect(demuxer_.get(), &demuxer::DemuxFinished,
             this, &MediaPipeline::HandleDemuxFinished);
 
+    connect(demuxer_.get(), &demuxer::DemuxErrorOccurred,
+            this, &MediaPipeline::HandleDemuxError);
+
     connect(positionTimer_.get(), &QTimer::timeout, this, [this]() {
         emit PositionChanged(Position());
     });
@@ -420,6 +423,43 @@ void MediaPipeline::HandleDemuxFinished()
 
     emit PositionChanged(Duration());
     emit PlaybackFinished();
+}
+
+void MediaPipeline::HandleDemuxError(const QString& message)
+{
+    if (demuxer_) {
+        demuxer_->Stop();
+    }
+    if (Adecoder_) {
+        Adecoder_->Stop();
+    }
+    if (Vdecoder_) {
+        Vdecoder_->Stop();
+    }
+
+    if (APacket_) {
+        APacket_->RequestStop();
+    }
+    if (VPacket_) {
+        VPacket_->RequestStop();
+    }
+    if (AFrame_) {
+        AFrame_->RequestStop();
+    }
+    if (VFrame_) {
+        VFrame_->RequestStop();
+    }
+    if (positionTimer_) {
+        positionTimer_->stop();
+    }
+    if (audioplay_) {
+        audioplay_->Pause();
+    }
+    if (videoRender_) {
+        videoRender_->Pause();
+    }
+
+    emit ErrorOccurred(message.isEmpty() ? QString("Demuxer runtime error") : message);
 }
 
 bool MediaPipeline::SuspendPipelineAndWait()

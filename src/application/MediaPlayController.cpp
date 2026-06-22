@@ -278,6 +278,10 @@ void MediaPlayController::ConnectManagerSignals()
 
     connect(multiStreamManager_.get(), &MultiStreamManager::StreamErrorOccurred,
             this, [this](MultiStreamManager::StreamId id, const QString& message) {
+                if (id != MultiStreamManager::InvalidStreamId
+                    && id == multiStreamManager_->ActiveStream()) {
+                    SetState(PlaybackState::Stopped);
+                }
                 emit StreamErrorOccurred(id, message);
             });
 
