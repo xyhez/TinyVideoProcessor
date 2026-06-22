@@ -198,6 +198,21 @@ bool MediaPlayController::StreamHasAudio(StreamId id) const
     return multiStreamManager_ ? multiStreamManager_->StreamHasAudio(id) : false;
 }
 
+bool MediaPlayController::IsActiveStreamSeekable() const
+{
+    return multiStreamManager_ ? multiStreamManager_->IsActiveStreamSeekable() : false;
+}
+
+bool MediaPlayController::HasActiveStreamDuration() const
+{
+    return multiStreamManager_ ? multiStreamManager_->HasActiveStreamDuration() : false;
+}
+
+bool MediaPlayController::IsActiveStreamRealtime() const
+{
+    return multiStreamManager_ ? multiStreamManager_->IsActiveStreamRealtime() : false;
+}
+
 void MediaPlayController::StartAll()
 {
     if (!multiStreamManager_ || multiStreamManager_->StreamIds().isEmpty()) {

@@ -119,46 +119,46 @@
 - 已添加调试日志输出
 - 析构函数正确释放资源
 
-### 2.1.3 dshow video-only 打开
+### 2.1.3 dshow video-only 打开 ✅ 已完成
 
 **目标**：通过 FFmpeg dshow 打开 C920 视频流。
 
-- [ ] `Open()` 使用 `av_find_input_format("dshow")`。
-- [ ] `Open()` 构造 `video=设备名` 输入字符串。
-- [ ] `Open()` 设置 `video_size` 参数。
-- [ ] `Open()` 设置 `framerate` 参数。
-- [ ] `Open()` 调用 `avformat_open_input()`。
-- [ ] `Open()` 调用 `avformat_find_stream_info()`。
-- [ ] 打开失败时释放已分配资源。
-- [ ] `Close()` 调用 `avformat_close_input()`。
-- [ ] 析构时保证资源释放。
-- [ ] 第一版不打开 `audio=设备名`。
+- [x] `Open()` 使用 `av_find_input_format("dshow")`。
+- [x] `Open()` 构造 `video=设备名` 输入字符串。
+- [x] `Open()` 设置 `video_size` 参数。
+- [x] `Open()` 设置 `framerate` 参数。
+- [x] `Open()` 调用 `avformat_open_input()`。
+- [x] `Open()` 调用 `avformat_find_stream_info()`。
+- [x] 打开失败时释放已分配资源。
+- [x] `Close()` 调用 `avformat_close_input()`。
+- [x] 析构时保证资源释放。
+- [x] 第一版不打开 `audio=设备名`。
 
 **验收标准**：
 
-- [ ] C920 可以被 `CameraMediaSource::Open()` 打开。
-- [ ] `GetFormatContect()` 返回有效 `AVFormatContext`。
-- [ ] 关闭摄像头后设备资源释放。
+- [x] C920 可以被 `CameraMediaSource::Open()` 打开。
+- [x] `GetFormatContect()` 返回有效 `AVFormatContext`。
+- [x] 关闭摄像头后设备资源释放。
 
-### 2.1.4 接入现有 demuxer / decoder / renderer 链路
+### 2.1.4 接入现有 demuxer / decoder / renderer 链路 ✅ 已完成
 
 **目标**：让摄像头源复用现有 `MediaPipeline`。
 
-- [ ] `demuxer` 能识别摄像头视频流。
-- [ ] `Fileinfo.hasVideo_` 正确填充。
-- [ ] `Fileinfo.hasAudio_` 对 C920 MVP 保持 false。
-- [ ] `Fileinfo.duration_` 对摄像头保持 0。
-- [ ] `Fileinfo.FrameRate` 使用摄像头实际帧率或兜底值。
-- [ ] `Fileinfo.V_timeBase` 使用摄像头视频流 time_base。
-- [ ] 视频 decoder 能初始化摄像头视频流。
-- [ ] `VideoRender` 能接收摄像头视频帧。
-- [ ] 如果帧格式不支持，依赖现有 `VideoRender` 格式诊断日志定位。
+- [x] `demuxer` 能识别摄像头视频流。
+- [x] `Fileinfo.hasVideo_` 正确填充。
+- [x] `Fileinfo.hasAudio_` 对 C920 MVP 保持 false。
+- [x] `Fileinfo.duration_` 对摄像头保持 0。
+- [x] `Fileinfo.FrameRate` 使用摄像头实际帧率或兜底值。
+- [x] `Fileinfo.V_timeBase` 使用摄像头视频流 time_base。
+- [x] 视频 decoder 能初始化摄像头视频流。
+- [x] `VideoRender` 能接收摄像头视频帧。
+- [x] 如果帧格式不支持，依赖现有 `VideoRender` 格式诊断日志定位。
 
 **验收标准**：
 
-- [ ] 摄像头进入 `MediaPipeline` 后不需要专用播放管线。
-- [ ] 普通文件播放不退化。
-- [ ] 摄像头无音频时不创建音频解码和播放链路。
+- [x] 摄像头进入 `MediaPipeline` 后不需要专用播放管线。
+- [x] 普通文件播放不退化。
+- [x] 摄像头无音频时不创建音频解码和播放链路。
 
 ### 2.1.5 实时源最小 seek 防护 ✅ 已完成
 
@@ -166,16 +166,16 @@
 
 - [x] `MediaPipeline::SeekTo()` 对摄像头源直接返回 false。
 - [x] `MediaPipeline::SeekRelative()` 对摄像头源直接返回 false。
-- [ ] `MediaPlayController::SeekTo()` 对 active camera stream 不执行 seek。
-- [ ] `MediaPlayController::SeekRelative()` 对 active camera stream 不执行 seek。
-- [ ] UI 进度条拖动摄像头 stream 时不触发真实 seek。
+- [x] `MediaPlayController::SeekTo()` 对 active camera stream 不执行 seek。
+- [x] `MediaPlayController::SeekRelative()` 对 active camera stream 不执行 seek。
+- [x] UI 进度条拖动摄像头 stream 时不触发真实 seek。
 - [x] 摄像头 `Duration()` 返回 0。
 
 **验收标准**：
 
 - [x] 摄像头不可 seek。
 - [x] 对摄像头执行 seek 不崩溃。
-- [ ] 文件源 seek 不退化。
+- [x] 文件源 seek 不退化。
 
 **实现说明**：
 - `MediaPipeline::SeekTo()` 已添加摄像头类型检查，摄像头返回 false
@@ -336,18 +336,21 @@
 - 明确职责：枚举服务不创建 MediaPipeline，不打开播放流
 - 加入 CMakeLists.txt 构建系统
 
-### 2.2.3 设备能力枚举 ✅ 已完成
+### 2.2.3 设备能力枚举 ⚠️ 部分完成
 
-- [x] 枚举指定设备支持的分辨率。
-- [x] 枚举指定设备支持的帧率。
-- [x] 枚举指定设备支持的输入格式。
-- [x] 将能力枚举结果转换成 `CameraFormatOption`。
+- [x] 为 C920 提供硬编码分辨率列表。
+- [x] 为 C920 提供硬编码帧率列表。
+- [x] 为 C920 提供硬编码输入格式列表。
+- [x] 将硬编码能力列表转换成 `CameraFormatOption`。
 - [x] 处理能力枚举失败。
+- [ ] 按实际设备动态解析 dshow 能力输出。
+- [ ] 非 C920 设备不再直接复用 C920 硬编码格式。
 
 **验收标准**：
 
-- [x] UI 可获得设备能力列表。
+- [x] UI 可获得 C920 能力列表。
 - [x] `CameraMediaSource` 只接收最终选择结果。
+- [ ] UI 可获得当前实际设备的真实能力列表。
 
 **实现说明**：
 - 实现 `EnumerateDeviceFormats()` 方法
@@ -392,13 +395,13 @@
 - 第一版不显示音频选项（video-only）
 - 加入 CMakeLists.txt 构建系统
 
-### 2.2.5 Phase 2.2 报告 ✅ 已完成
+### 2.2.5 Phase 2.2 报告
 
-- [x] 形成 `doc/Phase2_2_摄像头设备枚举与参数选择报告.md`。
-- [x] 记录设备枚举方案。
-- [x] 记录能力枚举方案。
-- [x] 记录 UI 接入方式。
-- [x] 记录已知限制。
+- [ ] 形成 `doc/Phase2_2_摄像头设备枚举与参数选择报告.md`。
+- [ ] 记录设备枚举方案。
+- [ ] 记录能力枚举方案。
+- [ ] 记录 UI 接入方式。
+- [ ] 记录已知限制。
 
 **实现说明**：
 - 创建完整实现报告：`doc/Phase2_2_摄像头设备枚举与参数选择报告.md`
@@ -413,20 +416,22 @@
 
 ---
 
-## ✅ Phase 2.2 总结
+## ⚠️ Phase 2.2 总结
 
-**Phase 2.2 摄像头设备枚举与参数选择已全部完成！**
+**Phase 2.2 摄像头设备枚举与参数选择已完成主要 UI 链路，但未完全收口。**
 
 核心成果：
 - ✅ 结构化的摄像头参数数据结构（CameraTypes.h）
 - ✅ 基于 FFmpeg dshow 的设备枚举服务
-- ✅ 硬编码的 C920 格式枚举
+- ⚠️ 硬编码的 C920 格式枚举
 - ✅ 用户友好的摄像头设置对话框
 - ✅ 不再硬编码设备名和参数
+- ⚠️ 真实设备能力动态枚举待完善
+- ⚠️ Phase 2.2 报告待补
 
 用户体验提升：
 - 从硬编码 C920 到用户选择任意摄像头
-- 从固定 720p30 到选择任意支持的格式
+- 从固定 720p30 到选择 C920 已知格式
 - 图形界面友好，支持刷新设备
 
 ---
@@ -492,24 +497,43 @@
 - 文件源：可 seek，有时长，非实时
 - 摄像头源：不可 seek，无时长，实时
 
-### 2.3.3 UI 实时源状态显示
+### 2.3.3 UI 实时源状态显示 ✅ 已完成
 
-- [ ] active stream 为摄像头时禁用进度条拖动。
-- [ ] active stream 为摄像头时 duration 不显示为普通文件时长。
-- [ ] active stream 为摄像头时显示 live 状态或运行时长。
-- [ ] 切回文件源后恢复进度条语义。
+- [x] active stream 为摄像头时禁用进度条拖动。
+- [x] active stream 为摄像头时 duration 不显示为普通文件时长。
+- [x] active stream 为摄像头时显示 live 状态或运行时长。
+- [x] 切回文件源后恢复进度条语义。
 
 **验收标准**：
 
-- [ ] 文件源 UI 语义不退化。
-- [ ] 摄像头源 UI 不误导用户可拖动 seek。
+- [x] 文件源 UI 语义不退化。
+- [x] 摄像头源 UI 不误导用户可拖动 seek。
 
-### 2.3.4 Phase 2.3 报告
+**实现说明**：
+- `MediaPlayController` 暴露 active stream 的 seek、duration、realtime 能力查询。
+- `MainWindow` 通过 Controller 查询能力，不直接访问 `MultiStreamManager`。
+- 实时源 active 时禁用进度条，并显示 `LIVE`。
+- 进度条释放时再次检查 active stream 是否可 seek。
 
-- [ ] 形成 `doc/Phase2_3_实时源语义完善报告.md`。
-- [ ] 记录能力接口最终设计。
-- [ ] 记录 Controller 和 UI 接入点。
-- [ ] 记录兼容性验证结果。
+### 2.3.4 Phase 2.3 报告 ✅ 已完成
+
+- [x] 形成 `doc/Phase2_3_实时源语义完善报告.md`。
+- [x] 记录能力接口最终设计。
+- [x] 记录 Controller 和 UI 接入点。
+- [x] 记录兼容性验证结果。
+
+---
+
+## ✅ Phase 2.3 总结
+
+**Phase 2.3 实时源语义完善已完成。**
+
+核心成果：
+- ✅ `IMediaSource` 能力接口完成。
+- ✅ 文件源和摄像头源能力语义完成。
+- ✅ Pipeline / Manager / Controller 播放控制接入能力判断。
+- ✅ UI 对实时源显示 `LIVE` 并禁用进度条拖动。
+- ✅ 完成 `doc/Phase2_3_实时源语义完善报告.md`。
 
 ## Phase 2.4 摄像头异常与生命周期
 

@@ -122,6 +122,27 @@ public:
     bool StreamHasAudio(StreamId id) const;
 
     /**
+     * @brief IsActiveStreamSeekable 判断当前活动流是否支持 seek
+     * @return true 支持 seek
+     * @return false 不支持 seek 或没有活动流
+     */
+    bool IsActiveStreamSeekable() const;
+
+    /**
+     * @brief HasActiveStreamDuration 判断当前活动流是否有确定时长
+     * @return true 有确定时长
+     * @return false 无确定时长或没有活动流
+     */
+    bool HasActiveStreamDuration() const;
+
+    /**
+     * @brief IsActiveStreamRealtime 判断当前活动流是否为实时源
+     * @return true 实时源
+     * @return false 非实时源或没有活动流
+     */
+    bool IsActiveStreamRealtime() const;
+
+    /**
      * @brief StartAll 启动或恢复全部媒体流
      */
     void StartAll();

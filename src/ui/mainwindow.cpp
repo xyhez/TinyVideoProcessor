@@ -67,9 +67,21 @@ void MainWindow::CreateConnects() {
     });
 
     connect(mediaPlayController_.get(),&MediaPlayController::DurationChanged,this,[this](double duration){
+        if (mediaPlayController_->ActiveStream() != MediaPlayController::InvalidStreamId
+            && mediaPlayController_->IsActiveStreamRealtime()) {
+            ui->slider_progress->setRange(0, 0);
+            ui->slider_progress->setEnabled(false);
+            ui->label_duration->setText("LIVE");
+            return;
+        }
+
         ui->slider_progress->setRange(0,static_cast<int>(duration));
-        ui->slider_progress->setEnabled(static_cast<int>(duration) > 0);
-        ui->label_duration->setText(formatTime(duration));
+        ui->slider_progress->setEnabled(mediaPlayController_->IsActiveStreamSeekable()
+                                        && mediaPlayController_->HasActiveStreamDuration()
+                                        && static_cast<int>(duration) > 0);
+        ui->label_duration->setText(mediaPlayController_->HasActiveStreamDuration()
+                                    ? formatTime(duration)
+                                    : formatTime(0.0));
     });
 
     connect(mediaPlayController_.get(), &MediaPlayController::PlaybackSpeedChanged,
@@ -225,8 +237,12 @@ void MainWindow::CreateConnects() {
     });
 
     connect(ui->slider_progress,&QSlider::sliderReleased,this,[this](){
-        double target = static_cast<double>(ui->slider_progress->value());
         isSliderDragging_ = false;
+        if (!mediaPlayController_->IsActiveStreamSeekable()) {
+            return;
+        }
+
+        double target = static_cast<double>(ui->slider_progress->value());
         mediaPlayController_->SeekTo(target);
     });
 }

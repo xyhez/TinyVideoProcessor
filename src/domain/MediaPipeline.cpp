@@ -196,7 +196,11 @@ bool MediaPipeline::SeekRelative(double seconds)
 
 double MediaPipeline::Duration() const
 {
-    return mediaSource_ ? static_cast<double>(mediaSource_->GetSourceInfo().duration_) : 0.0;
+    if (!mediaSource_ || !mediaSource_->HasDuration()) {
+        return 0.0;
+    }
+
+    return static_cast<double>(mediaSource_->GetSourceInfo().duration_);
 }
 
 double MediaPipeline::Position() const
