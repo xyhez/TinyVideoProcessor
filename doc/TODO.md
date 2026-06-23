@@ -649,37 +649,37 @@ MainWindow
 
 **验收标准**：
 
-- [ ] 类可以独立加入构建。
-- [ ] 不影响当前播放路径。
-- [ ] 当前多个 `VideoRender` 方案仍可作为回退路径。
+- [x] 类可以独立加入构建。
+- [x] 不影响当前播放路径。
+- [x] 当前多个 `VideoRender` 方案仍可作为回退路径。
 
 ## 3.6.2 Viewport 布局计算
 
 **目标**：让 `MultiViewRenderer` 能根据布局和 stream 列表计算每路画面区域。
 
-- [ ] 定义渲染器内部布局枚举或复用现有布局语义。
-- [ ] 支持 `Single` 布局 viewport。
-- [ ] 支持 `Grid2x2` 布局 viewport。
-- [ ] 支持最多 4 个逻辑 view slot。
-- [ ] 空 slot 保持空白。
-- [ ] 不引入 3x3 / 4x4 / 1+N。
+- [x] 定义渲染器内部布局枚举或复用现有布局语义。
+- [x] 支持 `Single` 布局 viewport。
+- [x] 支持 `Grid2x2` 布局 viewport。
+- [x] 支持最多 4 个逻辑 view slot。
+- [x] 空 slot 保持空白。
+- [x] 不引入 3x3 / 4x4 / 1+N。
 
 **验收标准**：
 
-- [ ] `Single` 能计算一个全区域 viewport。
-- [ ] `Grid2x2` 能计算四个 viewport。
-- [ ] 空 slot 不影响布局计算。
+- [x] `Single` 能计算一个全区域 viewport。
+- [x] `Grid2x2` 能计算四个 viewport。
+- [x] 空 slot 不影响布局计算。
 
 ## 3.6.3 空画面绘制
 
 **目标**：先验证统一 OpenGL widget 可以绘制多画面区域，不接纹理。
 
-- [ ] 初始化 OpenGL 状态。
-- [ ] 绘制空背景。
-- [ ] 绘制 `Single` 空画面区域。
-- [ ] 绘制 `Grid2x2` 四个空画面区域。
-- [ ] 绘制 slot 边界。
-- [ ] 不上传视频纹理。
+- [x] 初始化 OpenGL 状态。
+- [x] 绘制空背景。
+- [x] 绘制 `Single` 空画面区域。
+- [x] 绘制 `Grid2x2` 四个空画面区域。
+- [x] 绘制 slot 边界。
+- [x] 不上传视频纹理。
 
 **验收标准**：
 

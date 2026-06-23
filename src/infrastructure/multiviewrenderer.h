@@ -4,6 +4,8 @@
 #include <QMap>
 #include <QOpenGLFunctions>
 #include <QOpenGLWidget>
+#include <QRect>
+#include <QVector>
 
 /**
  * @brief MultiViewRenderer 统一多画面渲染器空壳
@@ -24,6 +26,23 @@ public:
     enum class Layout {
         Single,
         Grid2x2
+    };
+
+    /**
+     * @brief Viewport 单个逻辑 slot 的显示区域
+     */
+    struct Viewport {
+        int slotIndex = -1;
+        StreamId streamId = InvalidStreamId;
+        QRect qtRect;
+        QRect glViewportRect;
+
+        /**
+         * @brief IsBound 判断当前 viewport 是否绑定有效流
+         * @return true 已绑定有效流
+         * @return false 空 slot
+         */
+        bool IsBound() const;
     };
 
     /**
@@ -68,6 +87,25 @@ public:
      */
     StreamId ActiveStream() const;
 
+    /**
+     * @brief MaxVisibleSlots 获取当前布局下可见 slot 数量
+     * @return 可见 slot 数量
+     */
+    int MaxVisibleSlots() const;
+
+    /**
+     * @brief Viewports 计算当前布局下所有可见 viewport
+     * @return viewport 列表，坐标同时包含 Qt 坐标和 OpenGL viewport 坐标
+     */
+    QVector<Viewport> Viewports() const;
+
+    /**
+     * @brief ViewportForSlot 计算指定 slot 的 viewport
+     * @param slotIndex slot 索引
+     * @return slot 可见时返回有效 viewport，不可见或索引无效时返回空 viewport
+     */
+    Viewport ViewportForSlot(int slotIndex) const;
+
 signals:
     /**
      * @brief StreamClicked 点击已绑定 view slot 时发出的信号
@@ -87,6 +125,49 @@ protected:
     void paintGL() override;
 
 private:
+    /**
+     * @brief IsLogicalSlotIndex 判断是否为合法逻辑 slot
+     * @param slotIndex slot 索引
+     * @return true 合法
+     */
+    bool IsLogicalSlotIndex(int slotIndex) const;
+
+    /**
+     * @brief QtRectForSlot 计算 slot 在 Qt 坐标系下的显示区域
+     * @param slotIndex slot 索引
+     * @return Qt 坐标系显示区域
+     */
+    QRect QtRectForSlot(int slotIndex) const;
+
+    /**
+     * @brief ToOpenGLViewportRect 将 Qt 坐标区域转换为 OpenGL viewport 坐标
+     * @param qtRect Qt 坐标系区域
+     * @return OpenGL viewport 坐标区域
+     */
+    QRect ToOpenGLViewportRect(const QRect& qtRect) const;
+
+    /**
+     * @brief DrawViewport 绘制单个空 viewport 区域
+     * @param viewport 待绘制 viewport
+     */
+    void DrawViewport(const Viewport& viewport);
+
+    /**
+     * @brief FillOpenGLRect 使用当前 OpenGL 上下文填充矩形区域
+     * @param rect OpenGL viewport 坐标系矩形
+     * @param red 红色通道
+     * @param green 绿色通道
+     * @param blue 蓝色通道
+     * @param alpha 透明度通道
+     */
+    void FillOpenGLRect(const QRect& rect, float red, float green, float blue, float alpha);
+
+    /**
+     * @brief DrawViewportBorder 绘制 viewport 边界
+     * @param rect OpenGL viewport 坐标系矩形
+     */
+    void DrawViewportBorder(const QRect& rect);
+
     Layout layout_ = Layout::Single;
     QMap<int, StreamId> viewSlots_;
     StreamId activeStreamId_ = InvalidStreamId;
