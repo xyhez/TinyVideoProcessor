@@ -351,62 +351,80 @@ void MediaPipeline::CreateConnects()
 
 void MediaPipeline::ReleaseResources()
 {
+    APP_LOG_DEBUG("MediaPipeline release resources begin");
+
     if (positionTimer_) {
+        APP_LOG_DEBUG("MediaPipeline release: stop position timer");
         positionTimer_->stop();
     }
 
+    APP_LOG_DEBUG("MediaPipeline release: request queues stop");
     if (APacket_) { APacket_->RequestStop(); }
     if (VPacket_) { VPacket_->RequestStop(); }
     if (AFrame_)  { AFrame_->RequestStop();  }
     if (VFrame_)  { VFrame_->RequestStop();  }
 
     if (demuxer_) {
+        APP_LOG_DEBUG("MediaPipeline release: stop demuxer");
         demuxer_->Stop();
     }
     if (Adecoder_) {
+        APP_LOG_DEBUG("MediaPipeline release: stop audio decoder");
         Adecoder_->Stop();
     }
     if (Vdecoder_) {
+        APP_LOG_DEBUG("MediaPipeline release: stop video decoder");
         Vdecoder_->Stop();
     }
     if (audioplay_) {
+        APP_LOG_DEBUG("MediaPipeline release: stop audio player");
         audioplay_->Stop();
     }
     if (videoRender_) {
+        APP_LOG_DEBUG("MediaPipeline release: stop video render");
         videoRender_->StopRendering();
     }
 
-    auto stopThread = [](std::unique_ptr<QThread>& thread) {
+    auto stopThread = [](const char* name, std::unique_ptr<QThread>& thread) {
         if (thread) {
+            APP_LOG_DEBUG("MediaPipeline release: quit thread", name,
+                          "running =", thread->isRunning());
             thread->quit();
+            APP_LOG_DEBUG("MediaPipeline release: wait thread begin", name);
             thread->wait();
+            APP_LOG_DEBUG("MediaPipeline release: wait thread finished", name);
             thread.reset();
         }
     };
-    stopThread(demuxerTH_);
-    stopThread(AdecoderTH_);
-    stopThread(VdecoderTH_);
-    stopThread(audioplayTH_);
+    stopThread("demuxer", demuxerTH_);
+    stopThread("audio decoder", AdecoderTH_);
+    stopThread("video decoder", VdecoderTH_);
+    stopThread("audio player", audioplayTH_);
 
+    APP_LOG_DEBUG("MediaPipeline release: reset infrastructure objects");
     demuxer_.reset();
     Adecoder_.reset();
     Vdecoder_.reset();
     audioplay_.reset();
     if (videoRender_) {
+        APP_LOG_DEBUG("MediaPipeline release: delete video render");
         delete videoRender_;
         videoRender_ = nullptr;
     }
 
+    APP_LOG_DEBUG("MediaPipeline release: reset queues and sync manager");
     APacket_.reset();
     VPacket_.reset();
     AFrame_.reset();
     VFrame_.reset();
     syncManager_.reset();
     if (mediaSource_) {
+        APP_LOG_DEBUG("MediaPipeline release: close media source");
         mediaSource_->Close();
     }
     mediaSource_.reset();
     positionTimer_.reset();
+    APP_LOG_DEBUG("MediaPipeline release resources finished");
 }
 
 void MediaPipeline::HandleDemuxFinished()
@@ -464,24 +482,35 @@ void MediaPipeline::HandleDemuxError(const QString& message)
 
 bool MediaPipeline::SuspendPipelineAndWait()
 {
+    APP_LOG_DEBUG("MediaPipeline suspend begin");
+
     if (videoRender_) {
+        APP_LOG_DEBUG("MediaPipeline suspend: pause video render");
         videoRender_->Pause();
     }
     if (audioplay_) {
+        APP_LOG_DEBUG("MediaPipeline suspend: pause audio player");
         audioplay_->Pause();
     }
 
     bool suspended = true;
     if (demuxer_ && demuxerTH_ && demuxerTH_->isRunning()) {
+        APP_LOG_DEBUG("MediaPipeline suspend: demuxer wait begin");
         suspended = demuxer_->SuspendAndWait() == 0 && suspended;
+        APP_LOG_DEBUG("MediaPipeline suspend: demuxer wait finished", "result =", suspended);
     }
     if (Adecoder_ && AdecoderTH_ && AdecoderTH_->isRunning()) {
+        APP_LOG_DEBUG("MediaPipeline suspend: audio decoder wait begin");
         suspended = Adecoder_->SuspendAndWait() == 0 && suspended;
+        APP_LOG_DEBUG("MediaPipeline suspend: audio decoder wait finished", "result =", suspended);
     }
     if (Vdecoder_ && VdecoderTH_ && VdecoderTH_->isRunning()) {
+        APP_LOG_DEBUG("MediaPipeline suspend: video decoder wait begin");
         suspended = Vdecoder_->SuspendAndWait() == 0 && suspended;
+        APP_LOG_DEBUG("MediaPipeline suspend: video decoder wait finished", "result =", suspended);
     }
 
+    APP_LOG_DEBUG("MediaPipeline suspend finished", "result =", suspended);
     return suspended;
 }
 

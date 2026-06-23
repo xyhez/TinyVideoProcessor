@@ -274,7 +274,8 @@ int decoder::StartDecoder() {
         return -1;
     }
 
-    while (true) {
+    bool exitRequested = false;
+    while (!exitRequested) {
         // ========== 鍙栧寘閮ㄥ垎 ==========
         if (!WaitIfSuspended()) {
             break;
@@ -311,6 +312,11 @@ int decoder::StartDecoder() {
 
         // ========== 鎺ユ敹甯ч儴鍒?==========
         while (true) {
+            if (!WaitIfSuspended()) {
+                exitRequested = true;
+                break;
+            }
+
             {
                 QMutexLocker locker(&mutex);
                 ret = avcodec_receive_frame(Ctx, frame);
@@ -421,8 +427,14 @@ int decoder::StartDecoder() {
 
             // ========== 鍏ラ槦 ==========
             if (!m_FrameVec->Push(outFrame)) {
-                av_frame_free(&outFrame);
                 av_frame_unref(frame);
+                if (m_FrameVec->IsStopRequested()) {
+                    exitRequested = true;
+                    break;
+                }
+                if (IsSuspendRequested()) {
+                    break;
+                }
                 continue;
             }
 
@@ -528,12 +540,20 @@ int decoder::Start() {
 }
 
 int decoder::Stop() {
-    mutex.lock();
-    stop_flag = true;
-    suspend_requested_ = false;
-    APP_LOG_DEBUG_STREAM() << decoder_type << "decoder thread stopped";
-    suspendCondition_.wakeAll();
-    mutex.unlock();
+    {
+        QMutexLocker locker(&mutex);
+        stop_flag = true;
+        suspend_requested_ = false;
+        APP_LOG_DEBUG_STREAM() << decoder_type << "decoder thread stopped";
+        suspendCondition_.wakeAll();
+    }
+
+    if (m_PacketVec) {
+        m_PacketVec->RequestStop();
+    }
+    if (m_FrameVec) {
+        m_FrameVec->RequestStop();
+    }
 
     return 0;
 }
