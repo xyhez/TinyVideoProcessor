@@ -7,6 +7,8 @@
 #include <QRect>
 #include <QVector>
 
+class QMouseEvent;
+
 /**
  * @brief MultiViewRenderer 统一多画面渲染器空壳
  *
@@ -123,6 +125,12 @@ protected:
      * @brief paintGL 绘制空壳背景
      */
     void paintGL() override;
+
+    /**
+     * @brief mousePressEvent 处理 viewport 点击命中
+     * @param event 鼠标按下事件
+     */
+    void mousePressEvent(QMouseEvent* event) override;
 
 private:
     /**

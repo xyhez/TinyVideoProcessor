@@ -1,6 +1,7 @@
 #include "multiviewrenderer.h"
 
 #include <algorithm>
+#include <QMouseEvent>
 
 namespace {
 constexpr int kMaxLogicalSlots = 4;
@@ -137,6 +138,26 @@ void MultiViewRenderer::paintGL() {
         DrawViewport(viewport);
     }
     glDisable(GL_SCISSOR_TEST);
+}
+
+void MultiViewRenderer::mousePressEvent(QMouseEvent* event) {
+    if (!event || event->button() != Qt::LeftButton) {
+        QOpenGLWidget::mousePressEvent(event);
+        return;
+    }
+
+    const QPoint clickPosition = event->pos();
+    for (const Viewport& viewport : Viewports()) {
+        if (!viewport.IsBound() || !viewport.qtRect.contains(clickPosition)) {
+            continue;
+        }
+
+        emit StreamClicked(viewport.streamId);
+        event->accept();
+        return;
+    }
+
+    QOpenGLWidget::mousePressEvent(event);
 }
 
 bool MultiViewRenderer::IsLogicalSlotIndex(int slotIndex) const {

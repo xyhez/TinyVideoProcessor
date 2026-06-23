@@ -706,11 +706,11 @@ MainWindow
 
 **目标**：将鼠标点击坐标映射到 viewport，并对外发出 stream 点击信号。
 
-- [ ] 实现坐标命中 viewport。
-- [ ] 命中已绑定 slot 时发出 `StreamClicked(StreamId)` 信号。
-- [ ] 点击空 slot 不发出有效 stream 信号。
-- [ ] `MultiViewRenderer` 不直接调用 `SetActiveStream()`。
-- [ ] active stream 切换仍由 `MainWindow -> MediaPlayController` 完成。
+- [x] 实现坐标命中 viewport。
+- [x] 命中已绑定 slot 时发出 `StreamClicked(StreamId)` 信号。
+- [x] 点击空 slot 不发出有效 stream 信号。
+- [x] `MultiViewRenderer` 不直接调用 `SetActiveStream()`。
+- [x] active stream 切换仍由 `MainWindow -> MediaPlayController` 完成。
 
 **验收标准**：
 
