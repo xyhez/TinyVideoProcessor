@@ -14,6 +14,9 @@
 #include "application/MediaPlayController.h"
 #include "domain/PlaylistManager.h"
 
+class MultiViewRenderer;
+class QDockWidget;
+
 QT_BEGIN_NAMESPACE
 namespace Ui {
 class MainWindow;
@@ -125,6 +128,8 @@ private:
     std::unique_ptr<MediaPlayController> mediaPlayController_ = nullptr;
     std::unique_ptr<PlaylistManager> playlistManager_ = nullptr;
     std::unique_ptr<QTimer> cursorHideTimer_ = nullptr;
+    QDockWidget* multiViewRendererDock_ = nullptr;
+    MultiViewRenderer* multiViewRenderer_ = nullptr;
 
     /**
      * @brief UpdatePlaybackControls 根据播放状态更新按钮可用状态
@@ -181,6 +186,22 @@ private:
      * @brief InitializeMultiViewLayout 初始化多路显示布局状态
      */
     void InitializeMultiViewLayout();
+
+    /**
+     * @brief InitializeMultiViewRenderer 初始化统一多画面渲染器空壳入口
+     */
+    void InitializeMultiViewRenderer();
+
+    /**
+     * @brief RefreshMultiViewRenderer 同步统一渲染器空壳的布局、slot 和 active stream
+     */
+    void RefreshMultiViewRenderer();
+
+    /**
+     * @brief MultiViewRendererViewSlots 获取统一渲染器 slot 与 stream 的绑定关系
+     * @return slot 索引到 StreamId 的映射
+     */
+    QMap<int, MediaPlayController::StreamId> MultiViewRendererViewSlots() const;
 
     /**
      * @brief SetMultiViewLayout 切换多路显示布局状态
@@ -281,6 +302,13 @@ private:
      * @return true 切换成功
      */
     bool ActivateStreamFromVideoContainer(int containerIndex);
+
+    /**
+     * @brief ActivateStreamFromView 根据视图点击结果切换活动流
+     * @param streamId 被点击的流 ID
+     * @return true 点击已处理
+     */
+    bool ActivateStreamFromView(MediaPlayController::StreamId streamId);
 
     /**
      * @brief RefreshMultiViewLayout 根据当前布局刷新视频容器显示状态

@@ -2,11 +2,13 @@
 #include "ui_mainwindow.h"
 #include "domain/FileMediaSource.h"
 #include "domain/CameraMediaSource.h"
+#include "infrastructure/multiviewrenderer.h"
 #include "ui/CameraSettingsDialog.h"
 #include "core/AppLog.h"
 
 #include <QAbstractItemView>
 #include <QComboBox>
+#include <QDockWidget>
 #include <QEvent>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -40,6 +42,7 @@ MainWindow::MainWindow(QWidget *parent)
     InitializeVolumeControls();
     InitializePlaybackSpeedComboBox();
     InitializeCursorHideTimer();
+    InitializeMultiViewRenderer();
     InitializeMultiViewLayout();
 
     CreateConnects();
@@ -482,6 +485,52 @@ void MainWindow::InitializeMultiViewLayout() {
     RefreshMultiViewLayout();
 }
 
+void MainWindow::InitializeMultiViewRenderer() {
+    if (multiViewRendererDock_) {
+        return;
+    }
+
+    multiViewRenderer_ = new MultiViewRenderer(this);
+    multiViewRenderer_->setMinimumSize(320, 240);
+
+    multiViewRendererDock_ = new QDockWidget("统一渲染视图", this);
+    multiViewRendererDock_->setObjectName("dockWidget_multiViewRenderer");
+    multiViewRendererDock_->setAllowedAreas(Qt::LeftDockWidgetArea
+                                            | Qt::RightDockWidgetArea
+                                            | Qt::BottomDockWidgetArea);
+    multiViewRendererDock_->setFeatures(QDockWidget::DockWidgetMovable
+                                         | QDockWidget::DockWidgetFloatable);
+    multiViewRendererDock_->setWidget(multiViewRenderer_);
+    addDockWidget(Qt::RightDockWidgetArea, multiViewRendererDock_);
+
+    connect(multiViewRenderer_, &MultiViewRenderer::StreamClicked,
+            this, &MainWindow::ActivateStreamFromView);
+}
+
+void MainWindow::RefreshMultiViewRenderer() {
+    if (!multiViewRenderer_) {
+        return;
+    }
+
+    const MultiViewRenderer::Layout rendererLayout =
+        CurrentMultiViewLayout() == MultiViewLayout::Grid2x2
+            ? MultiViewRenderer::Layout::Grid2x2
+            : MultiViewRenderer::Layout::Single;
+
+    multiViewRenderer_->SetLayout(rendererLayout);
+    multiViewRenderer_->SetViewSlots(MultiViewRendererViewSlots());
+    multiViewRenderer_->SetActiveStream(mediaPlayController_->ActiveStream());
+}
+
+QMap<int, MediaPlayController::StreamId> MainWindow::MultiViewRendererViewSlots() const {
+    QMap<int, MediaPlayController::StreamId> viewSlots;
+    for (auto it = streamContainerIndexes_.cbegin(); it != streamContainerIndexes_.cend(); ++it) {
+        viewSlots.insert(it.value(), it.key());
+    }
+
+    return viewSlots;
+}
+
 void MainWindow::SetMultiViewLayout(MultiViewLayout layout) {
     if (multiViewLayout_ == layout) {
         return;
@@ -616,8 +665,16 @@ bool MainWindow::ActivateStreamFromVideoContainer(int containerIndex) {
         return false;
     }
 
+    return ActivateStreamFromView(streamId);
+}
+
+bool MainWindow::ActivateStreamFromView(MediaPlayController::StreamId streamId) {
+    if (streamId == MediaPlayController::InvalidStreamId) {
+        return false;
+    }
+
     if (!mediaPlayController_->SetActiveStream(streamId)) {
-        APP_LOG_WARN_STREAM() << "Set active stream from video container failed:" << streamId;
+        APP_LOG_WARN_STREAM() << "Set active stream from view failed:" << streamId;
         return true;
     }
 
@@ -626,7 +683,7 @@ bool MainWindow::ActivateStreamFromVideoContainer(int containerIndex) {
             ? streamId
             : MediaPlayController::InvalidStreamId;
     if (!mediaPlayController_->SetActiveAudioStream(audioStreamId)) {
-        APP_LOG_WARN_STREAM() << "Set active audio stream from video container failed:" << streamId;
+        APP_LOG_WARN_STREAM() << "Set active audio stream from view failed:" << streamId;
     }
 
     RefreshStreamView();
@@ -652,6 +709,7 @@ void MainWindow::RefreshMultiViewLayout() {
     }
 
     UpdateVideoContainerStyles();
+    RefreshMultiViewRenderer();
 }
 
 void MainWindow::UpdateVideoContainerStyles() {

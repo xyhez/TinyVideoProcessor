@@ -718,15 +718,18 @@ MainWindow
 - [ ] 点击空区域不误触发。
 - [ ] 渲染器不承担播放状态切换职责。
 
-## 3.6.6 MainWindow 实验性接入入口
+## 3.6.6 MainWindow 正式接入 MultiViewRenderer 空壳
 
-**目标**：以并存方式验证 `MultiViewRenderer` 空壳，不替换当前真实播放显示链路。
+**目标**：在 MainWindow 中正式显示 `MultiViewRenderer` 空壳，并同步当前多路布局、slot 绑定、active stream 和点击命中，不替换当前真实播放显示链路。
 
-- [ ] 在 UI 中预留实验性渲染器挂载入口。
-- [ ] `MultiViewRenderer` 与当前多个 `VideoRender` 路径并存。
-- [ ] 默认仍使用当前多个 `VideoRender` 播放路径。
-- [ ] 实验入口只用于验证空布局、active 高亮和点击命中。
-- [ ] 不把真实视频帧接入 `MultiViewRenderer`。
+- [x] 在 UI 中挂载 `MultiViewRenderer` 空壳视图。
+- [x] `MultiViewRenderer` 与当前多个 `VideoRender` 路径并存。
+- [x] 默认仍使用当前多个 `VideoRender` 播放路径。
+- [x] 同步 `Single` / `Grid2x2` 布局状态。
+- [x] 同步 slot 与 `StreamId` 的绑定关系。
+- [x] 同步 active stream 高亮状态。
+- [x] 点击 `MultiViewRenderer` 已绑定 slot 后，通过 `MainWindow -> MediaPlayController` 切换 active stream。
+- [x] 不把真实视频帧接入 `MultiViewRenderer`。
 
 **验收标准**：
 
