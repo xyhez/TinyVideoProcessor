@@ -7,6 +7,7 @@ constexpr int kMaxLogicalSlots = 4;
 constexpr int kGrid2x2Columns = 2;
 constexpr int kGrid2x2Rows = 2;
 constexpr int kSlotBorderWidth = 2;
+constexpr int kActiveSlotBorderWidth = 4;
 
 constexpr float kBackgroundRed = 0.035f;
 constexpr float kBackgroundGreen = 0.04f;
@@ -20,6 +21,9 @@ constexpr float kEmptySlotBlue = 0.065f;
 constexpr float kBorderRed = 0.23f;
 constexpr float kBorderGreen = 0.25f;
 constexpr float kBorderBlue = 0.28f;
+constexpr float kActiveBorderRed = 0.16f;
+constexpr float kActiveBorderGreen = 0.48f;
+constexpr float kActiveBorderBlue = 0.92f;
 }
 
 MultiViewRenderer::MultiViewRenderer(QWidget* parent)
@@ -187,7 +191,8 @@ void MultiViewRenderer::DrawViewport(const Viewport& viewport) {
         FillOpenGLRect(viewport.glViewportRect, kEmptySlotRed, kEmptySlotGreen, kEmptySlotBlue, 1.0f);
     }
 
-    DrawViewportBorder(viewport.glViewportRect);
+    const bool active = viewport.IsBound() && viewport.streamId == activeStreamId_;
+    DrawViewportBorder(viewport.glViewportRect, active);
 }
 
 void MultiViewRenderer::FillOpenGLRect(const QRect& rect,
@@ -204,27 +209,31 @@ void MultiViewRenderer::FillOpenGLRect(const QRect& rect,
     glClear(GL_COLOR_BUFFER_BIT);
 }
 
-void MultiViewRenderer::DrawViewportBorder(const QRect& rect) {
+void MultiViewRenderer::DrawViewportBorder(const QRect& rect, bool active) {
     if (rect.isEmpty()) {
         return;
     }
 
-    const int borderWidth = std::max(1, std::min({kSlotBorderWidth, rect.width(), rect.height()}));
+    const int targetBorderWidth = active ? kActiveSlotBorderWidth : kSlotBorderWidth;
+    const int borderWidth = std::max(1, std::min({targetBorderWidth, rect.width(), rect.height()}));
+    const float borderRed = active ? kActiveBorderRed : kBorderRed;
+    const float borderGreen = active ? kActiveBorderGreen : kBorderGreen;
+    const float borderBlue = active ? kActiveBorderBlue : kBorderBlue;
     const int x = rect.x();
     const int y = rect.y();
     const int width = rect.width();
     const int height = rect.height();
 
-    FillOpenGLRect(QRect(x, y, borderWidth, height), kBorderRed, kBorderGreen, kBorderBlue, 1.0f);
+    FillOpenGLRect(QRect(x, y, borderWidth, height), borderRed, borderGreen, borderBlue, 1.0f);
     FillOpenGLRect(QRect(x + width - borderWidth, y, borderWidth, height),
-                   kBorderRed,
-                   kBorderGreen,
-                   kBorderBlue,
+                   borderRed,
+                   borderGreen,
+                   borderBlue,
                    1.0f);
-    FillOpenGLRect(QRect(x, y, width, borderWidth), kBorderRed, kBorderGreen, kBorderBlue, 1.0f);
+    FillOpenGLRect(QRect(x, y, width, borderWidth), borderRed, borderGreen, borderBlue, 1.0f);
     FillOpenGLRect(QRect(x, y + height - borderWidth, width, borderWidth),
-                   kBorderRed,
-                   kBorderGreen,
-                   kBorderBlue,
+                   borderRed,
+                   borderGreen,
+                   borderBlue,
                    1.0f);
 }

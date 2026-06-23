@@ -691,10 +691,10 @@ MainWindow
 
 **目标**：让统一渲染器能根据 active stream 绘制选中态。
 
-- [ ] 支持设置 slot 与 `StreamId` 的绑定关系。
-- [ ] 支持设置 active stream。
-- [ ] active stream 对应 viewport 绘制高亮边框。
-- [ ] 无 active stream 时不绘制高亮。
+- [x] 支持设置 slot 与 `StreamId` 的绑定关系。
+- [x] 支持设置 active stream。
+- [x] active stream 对应 viewport 绘制高亮边框。
+- [x] 无 active stream 时不绘制高亮。
 
 **验收标准**：
 

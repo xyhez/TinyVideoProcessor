@@ -165,8 +165,9 @@ private:
     /**
      * @brief DrawViewportBorder 绘制 viewport 边界
      * @param rect OpenGL viewport 坐标系矩形
+     * @param active 是否绘制 active stream 高亮边界
      */
-    void DrawViewportBorder(const QRect& rect);
+    void DrawViewportBorder(const QRect& rect, bool active);
 
     Layout layout_ = Layout::Single;
     QMap<int, StreamId> viewSlots_;
