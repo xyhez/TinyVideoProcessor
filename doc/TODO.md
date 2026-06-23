@@ -1,4 +1,4 @@
-# TODO: Phase 3.6 MultiViewRenderer 空壳
+# TODO: Phase 3 多路播放与统一渲染推进
 
 ## 阶段目标
 
@@ -683,9 +683,9 @@ MainWindow
 
 **验收标准**：
 
-- [ ] 渲染器空壳显示正常。
-- [ ] `Single` / `Grid2x2` 空布局显示正常。
-- [ ] 切换布局不崩溃。
+- [x] 渲染器空壳显示正常。
+- [x] `Single` / `Grid2x2` 空布局显示正常。
+- [x] 切换布局不崩溃。
 
 ## 3.6.4 Active Stream 视觉标记
 
@@ -698,9 +698,9 @@ MainWindow
 
 **验收标准**：
 
-- [ ] active stream 高亮正确。
-- [ ] 切换 active stream 后高亮跟随变化。
-- [ ] 空 slot 不显示 active 高亮。
+- [x] active stream 高亮正确。
+- [x] 切换 active stream 后高亮跟随变化。
+- [x] 空 slot 不显示 active 高亮。
 
 ## 3.6.5 点击命中与信号
 
@@ -714,9 +714,9 @@ MainWindow
 
 **验收标准**：
 
-- [ ] 点击不同 viewport 能识别对应 stream。
-- [ ] 点击空区域不误触发。
-- [ ] 渲染器不承担播放状态切换职责。
+- [x] 点击不同 viewport 能识别对应 stream。
+- [x] 点击空区域不误触发。
+- [x] 渲染器不承担播放状态切换职责。
 
 ## 3.6.6 MainWindow 正式接入 MultiViewRenderer 空壳
 
@@ -733,27 +733,441 @@ MainWindow
 
 **验收标准**：
 
-- [ ] 当前播放功能不退化。
-- [ ] 可以打开或显示 `MultiViewRenderer` 空壳。
-- [ ] 空壳布局、active 高亮、点击信号可验证。
-- [ ] 关闭程序不阻塞。
+- [x] 当前播放功能不退化。
+- [x] 可以打开或显示 `MultiViewRenderer` 空壳。
+- [x] 空壳布局、active 高亮、点击信号可验证。
+- [x] 关闭程序不阻塞。
 
 ## 3.6.7 Phase 3.6 验收报告
 
 **目标**：收口统一渲染器空壳阶段，决定是否进入真实视频帧接入。
 
-- [ ] 形成 `doc/Phase3_6_MultiViewRenderer空壳实现报告.md`。
-- [ ] 记录空壳类职责边界。
-- [ ] 记录 viewport 布局计算方式。
-- [ ] 记录 active stream 高亮策略。
-- [ ] 记录点击命中策略。
-- [ ] 记录与当前多 `VideoRender` 路径的并存方式。
-- [ ] 记录下一阶段接真实帧前的风险点。
+- [x] 形成 `doc/Phase3_6_MultiViewRenderer空壳实现报告.md`。
+- [x] 记录空壳类职责边界。
+- [x] 记录 viewport 布局计算方式。
+- [x] 记录 active stream 高亮策略。
+- [x] 记录点击命中策略。
+- [x] 记录与当前多 `VideoRender` 路径的并存方式。
+- [x] 记录下一阶段接真实帧前的风险点。
 
 **验收标准**：
 
-- [ ] `MultiViewRenderer` 不管理播放管线。
-- [ ] 当前播放路径不退化。
-- [ ] 空布局绘制通过。
-- [ ] 点击命中通过。
-- [ ] 具备进入真实帧接入预研的条件。
+- [x] `MultiViewRenderer` 不管理播放管线。
+- [x] 当前播放路径不退化。
+- [x] 空布局绘制通过。
+- [x] 点击命中通过。
+- [x] 具备进入真实帧接入预研的条件。
+
+## Phase 3.7 视频帧输出边界设计
+
+**目标**：在不直接接真实视频帧的前提下，先拆清 `VideoRender`、`MediaPipeline` 和后续 `MultiViewRenderer` 之间的视频帧输出边界，确保真实帧接入不会破坏当前单路播放管线、多路管理和 active audio 策略。
+
+**阶段原则**：
+
+- 保持当前多个 `VideoRender` 播放路径作为稳定基线。
+- 不让 `MultiViewRenderer` 直接消费 `VFrame_`。
+- 不让 `MultiViewRenderer` 管理 demuxer / decoder / syncmanager / audio player。
+- 不把 `StreamId` 塞进 `MediaPipeline`。
+- 同步调度仍靠近单路 `MediaPipeline`。
+- `MultiViewRenderer` 后续只消费可显示帧并负责统一绘制。
+
+**参考文档**：
+
+- `doc/架构指导.md`
+- `doc/Phase3_4_MultiViewRenderer预研报告.md`
+- `doc/Phase3_6_MultiViewRenderer空壳实现报告.md`
+- `doc/Phase3_7_视频帧输出边界预研报告.md`
+
+## 3.7.1 视频帧输出边界预研
+
+**目标**：先明确为什么不能直接把 `VFrame_` / `AVFrame*` 交给 `MultiViewRenderer`，并确定真实帧接入前必须拆出的边界。
+
+**修改文件**：
+
+- `doc/Phase3_7_视频帧输出边界预研报告.md`
+
+**任务清单**：
+
+- [x] 梳理当前 `MediaPipeline -> VideoRender -> QWidget container` 链路。
+- [x] 拆解 `VideoRender` 的帧消费、同步调度、帧持有、OpenGL 绘制职责。
+- [x] 分析直接暴露 `VFrame_` 的风险。
+- [x] 分析 `MediaPipeline` 发出可显示帧信号的风险。
+- [x] 分析 `IVideoFrameSink` / 可显示帧消费者方向。
+- [x] 明确 `AVFrame*` 所有权必须先设计。
+- [x] 明确 seek / stop / remove stream / shutdown 清理要求。
+- [x] 明确不直接接真实视频帧。
+
+**验收标准**：
+
+- [x] 能说明为什么 `MultiViewRenderer` 不应该直接读取 `VFrame_`。
+- [x] 能说明当前 `VideoRender` 至少包含四类职责。
+- [x] 能说明同步调度为什么不应进入 `MultiViewRenderer`。
+- [x] 能说明后续推荐迁移路线。
+
+**测试流程**：
+
+- [x] 本任务为文档预研，不运行程序。
+- [x] 执行 `git diff --check -- doc\Phase3_7_视频帧输出边界预研报告.md`。
+
+**Commit message**：
+
+```text
+docs: 预研视频帧输出边界
+
+- 新增 Phase 3.7 视频帧输出边界预研报告
+- 梳理 MediaPipeline 与 VideoRender 的强绑定关系
+- 拆解 VideoRender 的帧消费、同步调度、帧持有和 OpenGL 绘制职责
+- 对比直接暴露 VFrame、信号推帧和 IVideoFrameSink 方案
+- 明确真实帧接入前的 AVFrame 所有权和清理协议
+```
+
+## 3.7.2 VideoRender 职责标注与边界确认
+
+**目标**：在代码注释和文档层面确认 `VideoRender` 当前职责边界，为后续拆分做准备。本步骤不改变行为，不移动逻辑。
+
+**预计修改文件**：
+
+- `src/infrastructure/videorender.h`
+- `src/infrastructure/videorender.cpp`
+- `doc/TODO.md`
+
+**任务清单**：
+
+- [ ] 标注 `RenderFrame()` 中的取帧、同步判断、丢帧、显示、调度阶段。
+- [ ] 标注 `m_displayFrame` 的所有权语义。
+- [ ] 标注 `UploadTexture()` / `DrawFrame()` 属于 OpenGL 绘制职责。
+- [ ] 标注 `ScheduleNextFrame()` 属于帧调度职责。
+- [ ] 不新增类。
+- [ ] 不改变函数调用顺序。
+- [ ] 不改变 `VideoRender` 对外接口。
+
+**验收标准**：
+
+- [ ] `VideoRender` 当前职责可以从代码注释中直接读清。
+- [ ] 代码行为不变。
+- [ ] 当前播放路径不受影响。
+- [ ] 不涉及 `MediaPipeline` 签名变化。
+
+**测试流程**：
+
+- [ ] 静态检查：`git diff --check -- src\infrastructure\videorender.h src\infrastructure\videorender.cpp doc\TODO.md`
+- [ ] 人工运行建议：普通 MP4 播放、暂停、停止、seek、关闭程序。
+
+**Commit message**：
+
+```text
+docs: 标注 VideoRender 职责边界
+
+- 标注 VideoRender 中帧调度、同步判断、帧持有和 OpenGL 绘制职责
+- 明确 m_displayFrame 的当前所有权语义
+- 保持 VideoRender 对外接口和播放行为不变
+- 为后续拆分视频帧输出边界做准备
+```
+
+## 3.7.3 帧调度边界设计
+
+**目标**：设计 `VideoFrameScheduler` 或等价内部调度边界，明确“从 `VFrame_` 取帧并判断是否可显示”的职责应从纯绘制职责中拆出来。
+
+**预计修改文件**：
+
+- `doc/Phase3_7_视频帧调度边界设计.md`
+- `doc/TODO.md`
+
+**任务清单**：
+
+- [ ] 梳理当前 `RenderFrame()` 的调度状态机。
+- [ ] 定义帧调度器输入：`VFrame_`、`syncmanager`、frameRate、videoTimeBase、playbackSpeed。
+- [ ] 定义帧调度器输出：可显示帧、丢帧、等待时长、停止状态。
+- [ ] 明确 AUDIO sync 和 VIDEO sync 的职责归属。
+- [ ] 明确调度器不做 OpenGL 上传。
+- [ ] 明确调度器不持有 QWidget。
+- [ ] 明确调度器与 sink 的调用关系。
+
+**验收标准**：
+
+- [ ] 能说明 `RenderFrame()` 后续如何拆成调度和绘制两部分。
+- [ ] 能说明同步时钟仍靠近单路 pipeline。
+- [ ] 能说明调度器为什么不进入 `MultiViewRenderer`。
+
+**测试流程**：
+
+- [ ] 本任务为设计文档，不运行程序。
+- [ ] 静态检查：`git diff --check -- doc\Phase3_7_视频帧调度边界设计.md doc\TODO.md`
+
+**Commit message**：
+
+```text
+docs: 设计视频帧调度边界
+
+- 新增 Phase 3.7 视频帧调度边界设计文档
+- 梳理 RenderFrame 的取帧、同步判断、丢帧和调度状态机
+- 明确帧调度器输入输出和职责边界
+- 明确 OpenGL 绘制不进入帧调度器
+- 明确 MultiViewRenderer 不承担同步调度
+```
+
+## 3.7.4 IVideoFrameSink 接口草案
+
+**目标**：设计可显示帧消费者接口草案，明确 `VideoRender` 和后续 `MultiViewRenderer` 如何以同一语义接收可显示帧。本步骤先写文档，不新增接口文件。
+
+**预计修改文件**：
+
+- `doc/Phase3_7_IVideoFrameSink接口草案.md`
+- `doc/TODO.md`
+
+**任务清单**：
+
+- [ ] 定义 `PresentFrame()` 语义。
+- [ ] 定义 `ClearFrame()` 语义。
+- [ ] 定义 `DetachStream()` 是否属于 sink 接口。
+- [ ] 明确 `PresentFrame()` 是否转移 `AVFrame*` 所有权。
+- [ ] 明确调用线程要求。
+- [ ] 明确 sink 清理当前显示帧的责任。
+- [ ] 明确第一版不使用 shared ownership。
+- [ ] 明确接口归属层级。
+
+**验收标准**：
+
+- [ ] 能说明 sink 接收的是可显示帧，不是原始解码队列。
+- [ ] 能说明 `AVFrame*` 所有权在接口调用后的归属。
+- [ ] 能说明 `VideoRender` 如何作为默认 sink 保持现有路径。
+- [ ] 能说明 `MultiViewRenderer` 后续如何作为另一个 sink 接入。
+
+**测试流程**：
+
+- [ ] 本任务为接口设计文档，不运行程序。
+- [ ] 静态检查：`git diff --check -- doc\Phase3_7_IVideoFrameSink接口草案.md doc\TODO.md`
+
+**Commit message**：
+
+```text
+docs: 设计 IVideoFrameSink 接口草案
+
+- 新增 IVideoFrameSink 接口草案文档
+- 明确 PresentFrame、ClearFrame 和 DetachStream 的语义
+- 明确可显示帧消费者只接收调度后的帧
+- 明确 AVFrame 所有权转移和清理责任
+- 明确 VideoRender 与 MultiViewRenderer 后续共用 sink 语义
+```
+
+## 3.7.5 帧所有权与清理协议设计
+
+**目标**：把 `AVFrame*` 的释放责任和 seek / stop / remove stream / shutdown 清理顺序设计清楚，防止真实帧接入后出现旧帧回显、重复释放或泄漏。
+
+**预计修改文件**：
+
+- `doc/Phase3_7_帧所有权与清理协议.md`
+- `doc/TODO.md`
+
+**任务清单**：
+
+- [ ] 明确谁从 `VFrame_` 取出 `AVFrame*`，谁负责最终释放。
+- [ ] 明确调度器把帧交给 sink 后是否转移所有权。
+- [ ] 明确 sink 替换 current frame 时释放旧帧。
+- [ ] 明确 `ClearFrame()` 释放当前显示帧。
+- [ ] 明确 seek 时停止调度、清队列、flush decoder、清 current frame、刷新时钟的顺序。
+- [ ] 明确 stop 时停止调度、清 current frame、重置时钟的顺序。
+- [ ] 明确 remove stream 时 detach sink 和释放纹理/帧的顺序。
+- [ ] 明确 shutdown 时不能有排队 UI 更新访问已释放对象。
+
+**验收标准**：
+
+- [ ] 能说明每个 `AVFrame*` 只有一个释放责任方。
+- [ ] 能说明 seek 后不会显示旧帧。
+- [ ] 能说明 remove stream 后不会访问已释放帧。
+- [ ] 能说明 shutdown 的释放顺序。
+
+**测试流程**：
+
+- [ ] 本任务为协议设计文档，不运行程序。
+- [ ] 静态检查：`git diff --check -- doc\Phase3_7_帧所有权与清理协议.md doc\TODO.md`
+
+**Commit message**：
+
+```text
+docs: 设计视频帧所有权与清理协议
+
+- 新增视频帧所有权与清理协议文档
+- 明确 AVFrame 从队列取出后的释放责任
+- 明确 sink current frame 的替换和清理规则
+- 明确 seek、stop、remove stream 和 shutdown 的清理顺序
+- 为真实帧接入防止旧帧回显和重复释放建立约束
+```
+
+## 3.7.6 当前 VideoRender 路径适配方案
+
+**目标**：设计如何在不破坏当前播放路径的前提下，让现有 `VideoRender` 先适配新的帧调度和 sink 边界。本步骤先做方案，不直接改代码。
+
+**预计修改文件**：
+
+- `doc/Phase3_7_VideoRender适配方案.md`
+- `doc/TODO.md`
+
+**任务清单**：
+
+- [ ] 设计 `VideoRender` 如何保留当前 QWidget / OpenGL 绘制职责。
+- [ ] 设计帧调度职责从 `VideoRender` 内部逐步拆出的顺序。
+- [ ] 设计第一版是否先使用内部私有类或私有方法过渡。
+- [ ] 设计 `VideoRender` 如何作为默认 sink。
+- [ ] 设计如何保持 `MediaPipeline::Initialize(mediaSource, rendererContainer)` 暂时不变。
+- [ ] 设计如何验证单路、多路文件和摄像头路径不退化。
+
+**验收标准**：
+
+- [ ] 能说明第一步代码实现应改哪些文件。
+- [ ] 能说明哪些接口暂时不能动。
+- [ ] 能说明如何保留当前 `VideoRender` 稳定回退路径。
+
+**测试流程**：
+
+- [ ] 本任务为方案文档，不运行程序。
+- [ ] 静态检查：`git diff --check -- doc\Phase3_7_VideoRender适配方案.md doc\TODO.md`
+
+**Commit message**：
+
+```text
+docs: 设计 VideoRender 适配帧输出边界方案
+
+- 新增 VideoRender 适配方案文档
+- 明确当前 VideoRender 路径作为默认 sink 保留
+- 规划帧调度职责从 VideoRender 中小步拆出的顺序
+- 明确 MediaPipeline 初始化签名暂不修改
+- 明确单路、多路文件和摄像头路径的回归验证范围
+```
+
+## 3.7.7 VideoRender 内部帧调度边界最小拆分
+
+**目标**：在不新增 `MultiViewRenderer` 真实帧接入的前提下，先对 `VideoRender` 内部做最小结构拆分，让帧调度和 OpenGL 绘制边界更清晰。
+
+**预计修改文件**：
+
+- `src/infrastructure/videorender.h`
+- `src/infrastructure/videorender.cpp`
+- `doc/TODO.md`
+
+**任务清单**：
+
+- [ ] 将 `RenderFrame()` 内部逻辑拆成小函数。
+- [ ] 保留 `RenderFrame()` 作为自调度入口。
+- [ ] 拆出取帧与同步判断逻辑。
+- [ ] 拆出显示帧替换逻辑。
+- [ ] 保持 `UploadTexture()` / `DrawFrame()` 行为不变。
+- [ ] 不新增 `IVideoFrameSink`。
+- [ ] 不修改 `MediaPipeline`。
+- [ ] 不修改 `MultiViewRenderer`。
+
+**验收标准**：
+
+- [ ] 播放行为不变。
+- [ ] 音视频同步不退化。
+- [ ] seek 不退化。
+- [ ] stop / shutdown 不退化。
+- [ ] 代码中能清晰区分调度和绘制职责。
+
+**测试流程**：
+
+- [ ] 静态检查：`git diff --check -- src\infrastructure\videorender.h src\infrastructure\videorender.cpp doc\TODO.md`
+- [ ] 人工运行建议：普通 MP4 播放、seek、pause、stop、关闭程序。
+- [ ] 人工运行建议：无音频视频播放和关闭程序。
+- [ ] 人工运行建议：多路 2x2 播放、切 active stream、关闭程序。
+
+**Commit message**：
+
+```text
+refactor: 拆清 VideoRender 内部帧调度边界
+
+- 将 VideoRender 的 RenderFrame 内部逻辑拆成更清晰的小函数
+- 保留 RenderFrame 作为自调度入口
+- 拆分取帧、同步判断、显示帧替换和调度安排逻辑
+- 保持 OpenGL 上传和绘制行为不变
+- 不修改 MediaPipeline 和 MultiViewRenderer
+```
+
+## 3.7.8 IVideoFrameSink 最小接口落地
+
+**目标**：在帧调度边界清晰后，新增最小可显示帧消费者接口，并让当前 `VideoRender` 路径仍然作为默认实现工作。
+
+**预计修改文件**：
+
+- `src/infrastructure/ivideoframesink.h`
+- `src/infrastructure/videorender.h`
+- `src/infrastructure/videorender.cpp`
+- `CMakeLists.txt`
+- `doc/TODO.md`
+
+**任务清单**：
+
+- [ ] 新增 `IVideoFrameSink` 接口。
+- [ ] 明确 `PresentFrame()` 所有权转移语义。
+- [ ] 明确 `ClearFrame()` 清理当前显示帧。
+- [ ] 让 `VideoRender` 实现或适配 `IVideoFrameSink`。
+- [ ] 保持当前 `VideoRender::InitVideoRender()` 入口可用。
+- [ ] 不接 `MultiViewRenderer` 真实帧。
+- [ ] 不修改 `MediaPipeline` 的多路管理边界。
+
+**验收标准**：
+
+- [ ] 当前播放路径仍通过 `VideoRender` 显示。
+- [ ] `VideoRender` 可以作为默认 frame sink。
+- [ ] 所有权语义在接口注释中明确。
+- [ ] 未引入 `StreamId` 到 `MediaPipeline`。
+
+**测试流程**：
+
+- [ ] 静态检查：`git diff --check -- src\infrastructure\ivideoframesink.h src\infrastructure\videorender.h src\infrastructure\videorender.cpp CMakeLists.txt doc\TODO.md`
+- [ ] 人工运行建议：普通 MP4、无音频视频、多路文件、摄像头源。
+
+**Commit message**：
+
+```text
+feat: 增加 IVideoFrameSink 最小接口
+
+- 新增 IVideoFrameSink 可显示帧消费者接口
+- 明确 PresentFrame 的 AVFrame 所有权转移语义
+- 明确 ClearFrame 的当前显示帧清理语义
+- 让 VideoRender 保持默认视频帧消费路径
+- 保持当前播放路径和 MultiViewRenderer 空壳路径不变
+```
+
+## 3.7.9 MultiViewRenderer 单路真实帧接入计划
+
+**目标**：在 `VideoRender` 路径适配完成后，再规划 `MultiViewRenderer` 接一路真实视频帧的实现方案。此任务仍然是计划，不直接实现。
+
+**预计修改文件**：
+
+- `doc/Phase3_7_MultiViewRenderer单路真实帧接入计划.md`
+- `doc/TODO.md`
+
+**任务清单**：
+
+- [ ] 明确 `MultiViewRenderer` 接一路帧的入口。
+- [ ] 明确 slot 0 的 current frame / texture 状态。
+- [ ] 明确 `PresentFrame(streamId, frame)` 是否需要带 `StreamId`。
+- [ ] 明确 `StreamId` 不进入 `MediaPipeline` 的适配方式。
+- [ ] 明确 OpenGL 上传必须在 `MultiViewRenderer` 上下文线程执行。
+- [ ] 明确 seek / stop / remove stream 时的 `ClearFrame` / `DetachStream` 调用。
+- [ ] 明确先接一路，不接多路。
+
+**验收标准**：
+
+- [ ] 能说明单路真实帧从 pipeline 到 `MultiViewRenderer` 的完整路径。
+- [ ] 能说明 `StreamId` 如何在 Manager / Controller / 渲染适配层保持边界。
+- [ ] 能说明一路接入的回退方案。
+- [ ] 能说明真实实现前还需要改哪些文件。
+
+**测试流程**：
+
+- [ ] 本任务为计划文档，不运行程序。
+- [ ] 静态检查：`git diff --check -- doc\Phase3_7_MultiViewRenderer单路真实帧接入计划.md doc\TODO.md`
+
+**Commit message**：
+
+```text
+docs: 规划 MultiViewRenderer 单路真实帧接入
+
+- 新增 MultiViewRenderer 单路真实帧接入计划
+- 明确一路视频帧进入统一渲染器的最小路径
+- 明确 StreamId 不进入 MediaPipeline 的适配方式
+- 明确 OpenGL 上下文线程和帧清理要求
+- 明确先接一路真实帧再扩展多路的验收路线
+```
