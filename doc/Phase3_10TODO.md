@@ -13,6 +13,7 @@
   - `VideoRender` 内部取帧、同步判断、丢帧和自调度循环已迁移到 `VideoFrameScheduler`。
   - `MediaPipeline` 已显式组合 `VideoFrameScheduler` 和当前 `IVideoFrameSink`。
   - `VideoRender` 已收口为默认视频帧 sink 和 OpenGL widget。
+  - UI 全面转向 `MultiViewRenderer` 的条件复核报告已完成。
 - 未完成：
   - `MultiViewRenderer` 尚未成为 UI 唯一视频显示区域。
 - 已知风险：
@@ -353,22 +354,22 @@ refactor: 收口 VideoRender 为默认视频帧 sink
 
 **任务清单**：
 
-- [ ] 检查默认路径是否仍需要旧 `VideoRender` widget 容器。
-- [ ] 检查播放列表、文件多路、摄像头多路是否都能通过统一 sink 进入 `MultiViewRenderer`。
-- [ ] 检查无音频流、seek、stop all、pause all、shutdown 是否不依赖旧容器。
-- [ ] 检查 `MainWindow` 中旧视频容器是否只剩布局兼容用途。
-- [ ] 给出是否进入 UI 替换任务的判断。
+- [x] 检查默认路径是否仍需要旧 `VideoRender` widget 容器。
+- [x] 检查播放列表、文件多路、摄像头多路是否都能通过统一 sink 进入 `MultiViewRenderer`。
+- [x] 检查无音频流、seek、stop all、pause all、shutdown 是否不依赖旧容器。
+- [x] 检查 `MainWindow` 中旧视频容器是否只剩布局兼容用途。
+- [x] 给出是否进入 UI 替换任务的判断。
 
 **验收标准**：
 
-- [ ] 能说明旧 UI 容器是否可以删除。
-- [ ] 能说明删除旧容器会影响哪些文件。
-- [ ] 能说明全面转向 `MultiViewRenderer` 的剩余风险。
+- [x] 能说明旧 UI 容器是否可以删除。
+- [x] 能说明删除旧容器会影响哪些文件。
+- [x] 能说明全面转向 `MultiViewRenderer` 的剩余风险。
 
 **测试流程**：
 
-- [ ] 本任务为复核报告，不运行程序。
-- [ ] 静态检查：`git diff --check -- doc\Phase3_10_UI全面转向MultiViewRenderer复核报告.md doc\Phase3_10TODO.md`
+- [x] 本任务为复核报告，不运行程序。
+- [x] 静态检查：`git diff --check -- doc\Phase3_10_UI全面转向MultiViewRenderer复核报告.md doc\Phase3_10TODO.md`
 
 **Commit message**：
 
