@@ -10,6 +10,7 @@
 #include <memory>
 #include <atomic>
 
+#include "infrastructure/ivideoframesink.h"
 #include "infrastructure/syncmanager.h"
 #include "core/queue.h"
 
@@ -28,7 +29,7 @@ extern "C" {
  *          空闲时以帧间隔回退轮询，队列有帧则按需唤醒。
  *          参考 ffplay video_refresh() 的自调度模式。
  */
-class VideoRender : public QOpenGLWidget, protected QOpenGLFunctions
+class VideoRender : public QOpenGLWidget, public IVideoFrameSink, protected QOpenGLFunctions
 {
     Q_OBJECT
 
@@ -76,6 +77,21 @@ public:
      * @param speed 支持的播放速度档位
      */
     void SetSpeed(double speed);
+
+    /**
+     * @brief PresentFrame 接管可显示帧并请求重绘
+     * @details IVideoFrameSink 接口实现。调用后 frame 所有权转移给 VideoRender
+     *          的当前显示帧。
+     * @param frame 可显示帧
+     */
+    void PresentFrame(AVFrame* frame) override;
+
+    /**
+     * @brief ClearFrame 清理当前显示帧
+     * @details IVideoFrameSink 接口实现。只释放当前显示帧并刷新画面，
+     *          不清空队列、不刷新 decoder、不重置同步时钟。
+     */
+    void ClearFrame() override;
 
 private slots:
     /**
@@ -161,18 +177,17 @@ private:
     bool PopDisplayableFrame(AVFrame*& frame);
 
     /**
-     * @brief PresentFrame 接管可显示帧并请求重绘
-     * @details 调用后 frame 所有权转移给 VideoRender 的当前显示帧。
-     * @param frame 可显示帧
-     */
-    void PresentFrame(AVFrame* frame);
-
-    /**
      * @brief RefreshVideoClockIfNeeded 在 VIDEO sync 模式下刷新视频主时钟
      * @param frame 当前已显示帧
      * @param syncType 当前同步类型
      */
     void RefreshVideoClockIfNeeded(const AVFrame* frame, SYNCTYPE syncType);
+
+    /**
+     * @brief ClearCurrentFrame 释放当前显示帧并重置显示状态
+     * @param requestUpdate 是否请求重绘
+     */
+    void ClearCurrentFrame(bool requestUpdate);
 
     /**
      * @brief UploadTexture 上传 AVFrame 的 YUV 数据到纹理

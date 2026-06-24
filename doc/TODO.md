@@ -1097,24 +1097,24 @@ refactor: 拆清 VideoRender 内部帧调度边界
 
 **任务清单**：
 
-- [ ] 新增 `IVideoFrameSink` 接口。
-- [ ] 明确 `PresentFrame()` 所有权转移语义。
-- [ ] 明确 `ClearFrame()` 清理当前显示帧。
-- [ ] 让 `VideoRender` 实现或适配 `IVideoFrameSink`。
-- [ ] 保持当前 `VideoRender::InitVideoRender()` 入口可用。
-- [ ] 不接 `MultiViewRenderer` 真实帧。
-- [ ] 不修改 `MediaPipeline` 的多路管理边界。
+- [x] 新增 `IVideoFrameSink` 接口。
+- [x] 明确 `PresentFrame()` 所有权转移语义。
+- [x] 明确 `ClearFrame()` 清理当前显示帧。
+- [x] 让 `VideoRender` 实现或适配 `IVideoFrameSink`。
+- [x] 保持当前 `VideoRender::InitVideoRender()` 入口可用。
+- [x] 不接 `MultiViewRenderer` 真实帧。
+- [x] 不修改 `MediaPipeline` 的多路管理边界。
 
 **验收标准**：
 
-- [ ] 当前播放路径仍通过 `VideoRender` 显示。
-- [ ] `VideoRender` 可以作为默认 frame sink。
-- [ ] 所有权语义在接口注释中明确。
-- [ ] 未引入 `StreamId` 到 `MediaPipeline`。
+- [x] 当前播放路径仍通过 `VideoRender` 显示。
+- [x] `VideoRender` 可以作为默认 frame sink。
+- [x] 所有权语义在接口注释中明确。
+- [x] 未引入 `StreamId` 到 `MediaPipeline`。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\ivideoframesink.h src\infrastructure\videorender.h src\infrastructure\videorender.cpp CMakeLists.txt doc\TODO.md`
+- [x] 静态检查：`git diff --check -- src\infrastructure\ivideoframesink.h src\infrastructure\videorender.h src\infrastructure\videorender.cpp CMakeLists.txt doc\TODO.md`
 - [ ] 人工运行建议：普通 MP4、无音频视频、多路文件、摄像头源。
 
 **Commit message**：

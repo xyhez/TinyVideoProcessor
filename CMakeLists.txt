@@ -48,6 +48,7 @@ set(PROJECT_SOURCES
         src/infrastructure/demuxer.cpp
         src/infrastructure/syncmanager.h
         src/infrastructure/syncmanager.cpp
+        src/infrastructure/ivideoframesink.h
         src/infrastructure/videorender.h
         src/infrastructure/videorender.cpp
         src/infrastructure/multiviewrenderer.h

@@ -63,9 +63,7 @@ VideoRender::~VideoRender()
     StopRendering();
     makeCurrent();
     FreeTextures();
-    m_frameMutex.lock();
-    av_frame_free(&m_displayFrame);
-    m_frameMutex.unlock();
+    ClearCurrentFrame(false);
     doneCurrent();
 }
 
@@ -232,6 +230,11 @@ void VideoRender::PresentFrame(AVFrame* frame)
     update();
 }
 
+void VideoRender::ClearFrame()
+{
+    ClearCurrentFrame(true);
+}
+
 void VideoRender::RefreshVideoClockIfNeeded(const AVFrame* frame, SYNCTYPE syncType)
 {
     if (syncType == SYNCTYPE::VIDEO &&
@@ -240,6 +243,21 @@ void VideoRender::RefreshVideoClockIfNeeded(const AVFrame* frame, SYNCTYPE syncT
         m_videoTimeBase > 0.0) {
         const double videoPts = frame->pts * m_videoTimeBase * 1000.0;
         m_syncManager->RefreshClock(videoPts);
+    }
+}
+
+void VideoRender::ClearCurrentFrame(bool requestUpdate)
+{
+    m_frameMutex.lock();
+    av_frame_free(&m_displayFrame);
+    m_videoW = 0;
+    m_videoH = 0;
+    m_sar = {1, 1};
+    m_hasFrame = false;
+    m_frameMutex.unlock();
+
+    if (requestUpdate) {
+        update();
     }
 }
 
