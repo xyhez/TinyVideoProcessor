@@ -9,18 +9,19 @@
   - `MediaPipeline` 已显式组合 `VideoFrameScheduler` 和 `IVideoFrameSink`。
   - `VideoRender` 已收口为默认单路显示 sink。
   - 文件、多路文件和摄像头路径已经可以通过 `SingleStreamFrameSinkAdapter` 把帧送入 `MultiViewRenderer`。
+  - Phase 3.11 已完成主窗口 UI 全面转向 `MultiViewRenderer`。
+  - 旧 `video_widget*` 容器、事件过滤、点击激活和 stylesheet 高亮路径已清理。
+  - `MultiViewRenderer` 已成为主窗口常规视频显示区域，并修正高 DPI framebuffer 坐标问题。
 - 未完成：
-  - 主窗口 `.ui` 中的四个旧视频容器仍存在。
-  - `MainWindow` 仍使用旧容器承担 slot 容量判断、stream 绑定、布局显示隐藏、点击激活和 active 高亮职责。
-  - `MultiViewRenderer` 还不是主窗口唯一视频显示区域。
+  - Phase 3.11 无未完成项。
 - 已知风险：
-  - 直接删除旧 `video_widget*` 会破坏 slot 分配、active stream 点击切换、布局刷新和默认回退路径参数。
+  - 后续如果继续扩展 `MultiViewRenderer`，需要避免把布局能力、格式转换和性能优化混在同一步提交中。
   - 如果在本阶段修改 `VideoFrameScheduler` 或 `MediaPipeline` 调度语义，会扩大回归范围。
   - `MultiViewRenderer` 当前仍主要覆盖 YUV420P 绘制，不在本阶段处理 4K MKV 色彩、格式转换和性能优化。
 - 本轮范围：
-  - 迁移 UI 层旧视频容器的职责。
-  - 让 `MultiViewRenderer` 成为主窗口常规播放路径的唯一显示区域。
-  - 保留 `VideoRender` 作为默认 sink 回退能力，不从基础设施层删除。
+  - 已完成 UI 层旧视频容器职责迁移。
+  - 已完成 `MultiViewRenderer` 主窗口常规显示区域迁移。
+  - 已保留 `VideoRender` 作为默认 sink 回退能力，不从基础设施层删除。
 
 ## 阶段目标
 
@@ -378,24 +379,24 @@ refactor: 删除主窗口旧视频容器路径
 
 **任务清单**：
 
-- [ ] 记录主窗口最终视频显示链路。
-- [ ] 记录旧 UI 容器删除结果。
-- [ ] 记录逻辑 slot 和 `MultiViewRenderer` slot 的关系。
-- [ ] 记录 active stream / active audio stream 点击切换结果。
-- [ ] 记录 `VideoRender` fallback 保留原因。
-- [ ] 记录剩余限制：格式覆盖、性能优化、全屏目标、摄像头硬件验证。
+- [x] 记录主窗口最终视频显示链路。
+- [x] 记录旧 UI 容器删除结果。
+- [x] 记录逻辑 slot 和 `MultiViewRenderer` slot 的关系。
+- [x] 记录 active stream / active audio stream 点击切换结果。
+- [x] 记录 `VideoRender` fallback 保留原因。
+- [x] 记录剩余限制：格式覆盖、性能优化、全屏目标、摄像头硬件验证。
 
 **验收标准**：
 
-- [ ] 能说明 Phase 3.11 是否完成。
-- [ ] 能说明 `MultiViewRenderer` 是否成为主窗口唯一常规显示区域。
-- [ ] 能说明旧容器职责是否全部迁移。
-- [ ] 能说明下一阶段应该处理什么。
+- [x] 能说明 Phase 3.11 是否完成。
+- [x] 能说明 `MultiViewRenderer` 是否成为主窗口唯一常规显示区域。
+- [x] 能说明旧容器职责是否全部迁移。
+- [x] 能说明下一阶段应该处理什么。
 
 **测试流程**：
 
-- [ ] 本任务为验收报告，不运行程序。
-- [ ] 静态检查：`git diff --check -- doc\Phase3_11_UI全面转向MultiViewRenderer验收报告.md doc\Phase3_11TODO.md`
+- [x] 本任务为验收报告，不运行程序。
+- [x] 静态检查：`git diff --check -- doc\Phase3_11_UI全面转向MultiViewRenderer验收报告.md doc\Phase3_11TODO.md`
 
 **Commit message**：
 
