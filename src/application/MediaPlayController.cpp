@@ -61,6 +61,14 @@ bool MediaPlayController::Initialize(std::shared_ptr<IMediaSource> mediaSource, 
 bool MediaPlayController::SwitchSource(std::shared_ptr<IMediaSource> mediaSource,
                                        QWidget* rendererContainer,
                                        bool autoStart) {
+    return SwitchSourceWithFrameSinkFactory(mediaSource, rendererContainer, autoStart, {});
+}
+
+bool MediaPlayController::SwitchSourceWithFrameSinkFactory(
+    std::shared_ptr<IMediaSource> mediaSource,
+    QWidget* rendererContainer,
+    bool autoStart,
+    FrameSinkFactory frameSinkFactory) {
     if (!mediaSource) {
         APP_LOG_WARN("SwitchSource failed: media source is null");
         return false;
@@ -70,7 +78,8 @@ bool MediaPlayController::SwitchSource(std::shared_ptr<IMediaSource> mediaSource
     multiStreamManager_->ShutdownAll();
     SetState(PlaybackState::Stopped);
 
-    const StreamId streamId = AddStream(mediaSource, rendererContainer);
+    const StreamId streamId =
+        AddStreamWithFrameSinkFactory(mediaSource, rendererContainer, std::move(frameSinkFactory));
     if (streamId == InvalidStreamId) {
         APP_LOG_WARN("SwitchSource failed: initialize new media source failed");
         SetState(PlaybackState::Stopped);

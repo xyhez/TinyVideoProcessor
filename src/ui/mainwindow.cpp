@@ -1109,7 +1109,17 @@ bool MainWindow::SwitchToPlaylistIndex(int index, bool autoStart) {
     const int previousIndex = playlistManager_->CurrentIndex();
     const PlaylistItem item = items.at(index);
     std::shared_ptr<IMediaSource> mediaSource = std::make_shared<FileMediaSource>(item.filePath);
-    if (!mediaPlayController_->SwitchSource(mediaSource, PrimaryVideoContainer(), autoStart)) {
+    const bool switched = multiViewRenderer_
+        ? mediaPlayController_->SwitchSourceWithFrameSinkFactory(
+              mediaSource,
+              PrimaryVideoContainer(),
+              autoStart,
+              [this](MediaPlayController::StreamId id) {
+                  return std::unique_ptr<IVideoFrameSink>(
+                      new SingleStreamFrameSinkAdapter(multiViewRenderer_, id));
+              })
+        : mediaPlayController_->SwitchSource(mediaSource, PrimaryVideoContainer(), autoStart);
+    if (!switched) {
         APP_LOG_WARN_STREAM() << "Switch playlist item failed:" << item.filePath;
         if (previousIndex >= 0 && previousIndex < playlistManager_->Count()) {
             playlistManager_->SetCurrentIndex(previousIndex);

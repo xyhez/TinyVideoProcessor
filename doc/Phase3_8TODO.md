@@ -7,11 +7,14 @@
   - `VideoRender` 已拆清内部帧调度边界。
   - `IVideoFrameSink` 已落地，`VideoRender` 已作为默认实现。
   - `MultiViewRenderer` 已具备 layout、slot、viewport、点击命中能力。
+  - `MultiViewRenderer` 已具备 slot 0 真实帧接收、YUV420P 纹理上传和绘制能力。
+  - `SingleStreamFrameSinkAdapter` 已能把单路可显示帧转发到 `MultiViewRenderer`。
+  - 播放列表 slot 0 路径已能进入统一渲染实验区域。
 - 未完成：
-  - `MultiViewRenderer` 尚未持有真实视频帧。
-  - `MultiViewRenderer` 尚未上传或绘制 YUV 纹理。
-  - 尚未实现 `SingleStreamFrameSinkAdapter`。
-  - 尚未提供实验路径把单路 pipeline 接到 `MultiViewRenderer`。
+  - 多路真实帧尚未全部进入 `MultiViewRenderer`。
+  - 第二路及后续流仍保留默认 `VideoRender` / 独立 `QOpenGLWidget` 路径。
+  - 尚未支持非 YUV420P 格式转换。
+  - 尚未拆出独立 `VideoFrameScheduler`。
 - 已知风险：
   - OpenGL 纹理必须在 `MultiViewRenderer` 上下文线程创建、释放和上传。
   - `AVFrame*` 跨线程投递时必须保证所有权不泄漏、不重复释放。
@@ -357,25 +360,25 @@ feat: 接入 MultiViewRenderer 单路真实帧实验路径
 
 **任务清单**：
 
-- [ ] 记录默认 `VideoRender` 路径是否可回退。
-- [ ] 记录实验路径普通 MP4 验证结果。
-- [ ] 记录实验路径无音频视频验证结果。
-- [ ] 记录 seek / stop / remove stream / shutdown 验证结果。
-- [ ] 记录 OpenGL 线程和 `AVFrame*` 所有权风险是否解决。
-- [ ] 记录当前不支持格式和限制。
-- [ ] 判断是否进入多路真实帧扩展。
+- [x] 记录默认 `VideoRender` 路径是否可回退。
+- [x] 记录实验路径普通 MP4 验证结果。
+- [x] 记录实验路径无音频视频验证结果。
+- [x] 记录 seek / stop / remove stream / shutdown 验证结果。
+- [x] 记录 OpenGL 线程和 `AVFrame*` 所有权风险是否解决。
+- [x] 记录当前不支持格式和限制。
+- [x] 判断是否进入多路真实帧扩展。
 
 **验收标准**：
 
-- [ ] 能说明单路真实帧接入是否成功。
-- [ ] 能说明是否保留稳定回退路径。
-- [ ] 能说明后续扩展多路前还要解决的问题。
-- [ ] 能说明是否可以进入下一阶段。
+- [x] 能说明单路真实帧接入是否成功。
+- [x] 能说明是否保留稳定回退路径。
+- [x] 能说明后续扩展多路前还要解决的问题。
+- [x] 能说明是否可以进入下一阶段。
 
 **测试流程**：
 
-- [ ] 本任务为报告文档，不运行程序。
-- [ ] 静态检查：`git diff --check -- doc\Phase3_8_MultiViewRenderer单路真实帧接入验收报告.md doc\Phase3_8TODO.md`
+- [x] 本任务为报告文档，不运行程序。
+- [x] 静态检查：`git diff --check -- doc\Phase3_8_MultiViewRenderer单路真实帧接入验收报告.md doc\Phase3_8TODO.md`
 
 **Commit message**：
 

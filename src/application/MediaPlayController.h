@@ -69,6 +69,20 @@ public:
                       bool autoStart);
 
     /**
+     * @brief SwitchSourceWithFrameSinkFactory 使用外部视频帧 sink 切换当前媒体源
+     * @param mediaSource 新媒体源抽象
+     * @param rendererContainer 默认渲染容器，保留回退路径
+     * @param autoStart 切换成功后是否立即播放
+     * @param frameSinkFactory 根据 StreamId 创建外部 sink 的工厂
+     * @return true 切换成功
+     * @return false 切换失败
+     */
+    bool SwitchSourceWithFrameSinkFactory(std::shared_ptr<IMediaSource> mediaSource,
+                                          QWidget* rendererContainer,
+                                          bool autoStart,
+                                          FrameSinkFactory frameSinkFactory);
+
+    /**
      * @brief AddStream 添加一路媒体源
      * @param mediaSource 媒体源抽象
      * @param rendererContainer 视频渲染容器
