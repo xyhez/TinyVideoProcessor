@@ -14,8 +14,9 @@
   - `MediaPipeline` 已显式组合 `VideoFrameScheduler` 和当前 `IVideoFrameSink`。
   - `VideoRender` 已收口为默认视频帧 sink 和 OpenGL widget。
   - UI 全面转向 `MultiViewRenderer` 的条件复核报告已完成。
+  - Phase 3.10 `VideoFrameScheduler` 抽取验收报告已完成。
 - 未完成：
-  - `MultiViewRenderer` 尚未成为 UI 唯一视频显示区域。
+  - 下一阶段：旧 UI 视频容器尚未被 `MultiViewRenderer` 全面替换。
 - 已知风险：
   - 直接删除 `VideoRender` 会同时破坏取帧、同步判断、丢帧追赶和 VIDEO sync 时钟刷新。
   - 调度器抽取如果一次性改动 `MediaPipeline`、`VideoRender`、`MultiViewRenderer` 和 UI，回归定位会困难。
@@ -393,23 +394,23 @@ docs: 复核 UI 全面转向 MultiViewRenderer 条件
 
 **任务清单**：
 
-- [ ] 记录 scheduler 抽取结果。
-- [ ] 记录 `VideoRender` 是否已降级为默认 sink。
-- [ ] 记录 `MultiViewRenderer` 多路路径是否仍正常。
-- [ ] 记录 stop / seek / shutdown 生命周期验证结果。
-- [ ] 记录是否可以进入 UI 全面替换任务。
-- [ ] 记录剩余限制。
+- [x] 记录 scheduler 抽取结果。
+- [x] 记录 `VideoRender` 是否已降级为默认 sink。
+- [x] 记录 `MultiViewRenderer` 多路路径是否仍正常。
+- [x] 记录 stop / seek / shutdown 生命周期验证结果。
+- [x] 记录是否可以进入 UI 全面替换任务。
+- [x] 记录剩余限制。
 
 **验收标准**：
 
-- [ ] 能说明 Phase 3.10 是否完成。
-- [ ] 能说明当前调度、sink、绘制边界。
-- [ ] 能说明下一阶段是否全面替换旧 UI。
+- [x] 能说明 Phase 3.10 是否完成。
+- [x] 能说明当前调度、sink、绘制边界。
+- [x] 能说明下一阶段是否全面替换旧 UI。
 
 **测试流程**：
 
-- [ ] 本任务为验收报告，不运行程序。
-- [ ] 静态检查：`git diff --check -- doc\Phase3_10_VideoFrameScheduler抽取验收报告.md doc\Phase3_10TODO.md`
+- [x] 本任务为验收报告，不运行程序。
+- [x] 静态检查：`git diff --check -- doc\Phase3_10_VideoFrameScheduler抽取验收报告.md doc\Phase3_10TODO.md`
 
 **Commit message**：
 
