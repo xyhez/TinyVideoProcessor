@@ -1225,3 +1225,20 @@ docs: 规划 MultiViewRenderer 单路真实帧接入
 - 不让 `MultiViewRenderer` 访问 `VFrame_` 或 `SyncManager`。
 - 让 `IVideoFrameSink` 继续作为调度器和显示 sink 之间的边界。
 - 先抽出调度器，再判断是否删除旧 `VideoRender` widget 容器。
+
+## Phase 3.11 UI 全面转向 MultiViewRenderer
+
+**目标**：在 `VideoFrameScheduler` 已从 `VideoRender` 中抽出后，把主窗口旧 `video_widget*` 容器承担的 slot 分配、布局刷新、点击激活和 active 高亮职责迁移出来，让 `MultiViewRenderer` 成为主窗口常规视频显示区域。
+
+**独立 TODO**：
+
+- `doc/Phase3_11TODO.md`
+
+**阶段原则**：
+
+- 不把 `StreamId` 放进 `MediaPipeline`。
+- 不把 `StreamId` 放进 `VideoFrameScheduler`。
+- 不让 `MultiViewRenderer` 访问 `VFrame_` 或 `SyncManager`。
+- 不让 `MultiViewRenderer` 做同步判断、取帧判断或队列消费。
+- 保留 `VideoRender` 作为默认 sink 回退能力，不从基础设施层删除。
+- 先迁移旧容器承担的 UI 逻辑职责，再删除 `.ui` 中的旧视频容器。
