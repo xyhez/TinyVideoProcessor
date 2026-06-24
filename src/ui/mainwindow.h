@@ -8,14 +8,12 @@
 #include <QLabel>
 #include <QTimer>
 #include <QMap>
-#include <array>
 #include <memory>
 
 #include "application/MediaPlayController.h"
 #include "domain/PlaylistManager.h"
 
 class MultiViewRenderer;
-class QDockWidget;
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -130,7 +128,6 @@ private:
     std::unique_ptr<MediaPlayController> mediaPlayController_ = nullptr;
     std::unique_ptr<PlaylistManager> playlistManager_ = nullptr;
     std::unique_ptr<QTimer> cursorHideTimer_ = nullptr;
-    QDockWidget* multiViewRendererDock_ = nullptr;
     MultiViewRenderer* multiViewRenderer_ = nullptr;
 
     /**
@@ -175,14 +172,9 @@ private:
     void InitializeCursorHideTimer();
 
     /**
-     * @brief InitializeVideoContainers 初始化多路视频容器状态
+     * @brief InitializeVideoArea 初始化主视频显示区域事件状态
      */
-    void InitializeVideoContainers();
-
-    /**
-     * @brief InstallVideoContainerEventFilters 为视频容器及其子控件安装事件过滤器
-     */
-    void InstallVideoContainerEventFilters();
+    void InitializeVideoArea();
 
     /**
      * @brief InitializeMultiViewLayout 初始化多路显示布局状态
@@ -190,12 +182,12 @@ private:
     void InitializeMultiViewLayout();
 
     /**
-     * @brief InitializeMultiViewRenderer 初始化统一多画面渲染器空壳入口
+     * @brief InitializeMultiViewRenderer 初始化主视频区域统一多画面渲染器
      */
     void InitializeMultiViewRenderer();
 
     /**
-     * @brief RefreshMultiViewRenderer 同步统一渲染器空壳的布局、slot 和 active stream
+     * @brief RefreshMultiViewRenderer 同步统一渲染器的布局、slot 和 active stream
      */
     void RefreshMultiViewRenderer();
 
@@ -243,23 +235,10 @@ private:
     int MaxVideoSlots() const;
 
     /**
-     * @brief VideoContainers 获取当前 UI 中的多路视频容器
-     * @return 视频容器指针数组
+     * @brief FallbackRendererContainer 获取默认 VideoRender fallback 容器
+     * @return fallback 容器
      */
-    std::array<QWidget*, kVideoSlotCount> VideoContainers() const;
-
-    /**
-     * @brief PrimaryVideoContainer 获取兼容当前单路播放的主视频容器
-     * @return 主视频容器
-     */
-    QWidget* PrimaryVideoContainer() const;
-
-    /**
-     * @brief VideoContainerAt 获取指定索引的视频容器
-     * @param index 容器索引
-     * @return 视频容器，索引无效时返回 nullptr
-     */
-    QWidget* VideoContainerAt(int index) const;
+    QWidget* FallbackRendererContainer() const;
 
     /**
      * @brief FirstAvailableVideoSlotIndex 获取第一个空闲逻辑视频 slot
@@ -289,41 +268,12 @@ private:
     int SlotIndexForStream(MediaPlayController::StreamId streamId) const;
 
     /**
-     * @brief StreamIdForVideoSlotIndex 获取逻辑视频 slot 绑定的流 ID
-     * @param slotIndex slot 索引
-     * @return 流 ID，未绑定时返回 InvalidStreamId
-     */
-    MediaPlayController::StreamId StreamIdForVideoSlotIndex(int slotIndex) const;
-
-    /**
      * @brief IsValidVideoSlotIndex 判断逻辑视频 slot 索引是否有效
      * @param slotIndex slot 索引
      * @return true 有效
      * @return false 无效
      */
     bool IsValidVideoSlotIndex(int slotIndex) const;
-
-    /**
-     * @brief VideoContainerIndexForWidget 获取控件所属的视频容器索引
-     * @param widget 事件来源控件
-     * @return 容器索引，未命中时返回 -1
-     */
-    int VideoContainerIndexForWidget(QWidget* widget) const;
-
-    /**
-     * @brief HandleVideoContainerClick 处理视频容器点击事件
-     * @param watched 事件来源
-     * @param event 事件对象
-     * @return true 点击已处理
-     */
-    bool HandleVideoContainerClick(QObject* watched, QEvent* event);
-
-    /**
-     * @brief ActivateStreamFromVideoContainer 根据视频容器切换活动流
-     * @param containerIndex 容器索引，过渡期等同于逻辑 slot 索引
-     * @return true 切换成功
-     */
-    bool ActivateStreamFromVideoContainer(int containerIndex);
 
     /**
      * @brief ActivateStreamFromView 根据视图点击结果切换活动流
@@ -333,14 +283,9 @@ private:
     bool ActivateStreamFromView(MediaPlayController::StreamId streamId);
 
     /**
-     * @brief RefreshMultiViewLayout 根据当前布局刷新视频容器显示状态
+     * @brief RefreshMultiViewLayout 根据当前布局刷新统一渲染器显示状态
      */
     void RefreshMultiViewLayout();
-
-    /**
-     * @brief UpdateVideoContainerStyles 根据 active stream 刷新视频容器视觉标记
-     */
-    void UpdateVideoContainerStyles();
 
     /**
      * @brief UpdateLayoutComboBox 根据当前布局同步布局下拉框

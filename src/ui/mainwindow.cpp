@@ -9,7 +9,6 @@
 
 #include <QAbstractItemView>
 #include <QComboBox>
-#include <QDockWidget>
 #include <QEvent>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -38,7 +37,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->widget_func->installEventFilter(this);
     ui->listWidget_files->installEventFilter(this);
     ui->listWidget_streams->installEventFilter(this);
-    InitializeVideoContainers();
+    InitializeVideoArea();
     InitializePlayModeComboBox();
     InitializeVolumeControls();
     InitializePlaybackSpeedComboBox();
@@ -336,10 +335,6 @@ void MainWindow::mouseMoveEvent(QMouseEvent *event) {
 }
 
 bool MainWindow::eventFilter(QObject *watched, QEvent *event) {
-    if (HandleVideoContainerClick(watched, event)) {
-        return true;
-    }
-
     if (event->type() == QEvent::MouseMove) {
         HandleFullScreenMouseActivity();
     }
@@ -460,25 +455,9 @@ void MainWindow::InitializeCursorHideTimer() {
             this, &MainWindow::HideCursorIfFullScreen);
 }
 
-void MainWindow::InitializeVideoContainers() {
+void MainWindow::InitializeVideoArea() {
     ui->widget_videoArea->setMouseTracking(true);
     ui->widget_videoArea->installEventFilter(this);
-    InstallVideoContainerEventFilters();
-}
-
-void MainWindow::InstallVideoContainerEventFilters() {
-    for (QWidget* container : VideoContainers()) {
-        if (!container) {
-            continue;
-        }
-
-        container->setMouseTracking(true);
-        container->installEventFilter(this);
-        const QList<QWidget*> childWidgets = container->findChildren<QWidget*>();
-        for (QWidget* child : childWidgets) {
-            child->installEventFilter(this);
-        }
-    }
 }
 
 void MainWindow::InitializeMultiViewLayout() {
@@ -490,22 +469,14 @@ void MainWindow::InitializeMultiViewLayout() {
 }
 
 void MainWindow::InitializeMultiViewRenderer() {
-    if (multiViewRendererDock_) {
+    if (multiViewRenderer_) {
         return;
     }
 
-    multiViewRenderer_ = new MultiViewRenderer(this);
+    multiViewRenderer_ = new MultiViewRenderer(ui->widget_videoArea);
+    multiViewRenderer_->setObjectName("multiViewRenderer");
     multiViewRenderer_->setMinimumSize(320, 240);
-
-    multiViewRendererDock_ = new QDockWidget("统一渲染视图", this);
-    multiViewRendererDock_->setObjectName("dockWidget_multiViewRenderer");
-    multiViewRendererDock_->setAllowedAreas(Qt::LeftDockWidgetArea
-                                            | Qt::RightDockWidgetArea
-                                            | Qt::BottomDockWidgetArea);
-    multiViewRendererDock_->setFeatures(QDockWidget::DockWidgetMovable
-                                         | QDockWidget::DockWidgetFloatable);
-    multiViewRendererDock_->setWidget(multiViewRenderer_);
-    addDockWidget(Qt::RightDockWidgetArea, multiViewRendererDock_);
+    ui->gridLayout_videoArea->addWidget(multiViewRenderer_, 0, 0, 2, 2);
 
     connect(multiViewRenderer_, &MultiViewRenderer::StreamClicked,
             this, &MainWindow::ActivateStreamFromView);
@@ -584,21 +555,8 @@ int MainWindow::MaxVideoSlots() const {
     return kVideoSlotCount;
 }
 
-std::array<QWidget*, MainWindow::kVideoSlotCount> MainWindow::VideoContainers() const {
-    return {ui->video_widget, ui->video_widget_1, ui->video_widget_2, ui->video_widget_3};
-}
-
-QWidget* MainWindow::PrimaryVideoContainer() const {
-    return ui->video_widget;
-}
-
-QWidget* MainWindow::VideoContainerAt(int index) const {
-    const std::array<QWidget*, kVideoSlotCount> containers = VideoContainers();
-    if (index < 0 || index >= static_cast<int>(containers.size())) {
-        return nullptr;
-    }
-
-    return containers.at(index);
+QWidget* MainWindow::FallbackRendererContainer() const {
+    return ui->widget_videoArea;
 }
 
 int MainWindow::FirstAvailableVideoSlotIndex() const {
@@ -636,66 +594,8 @@ int MainWindow::SlotIndexForStream(MediaPlayController::StreamId streamId) const
     return streamSlotIndexes_.value(streamId, -1);
 }
 
-MediaPlayController::StreamId MainWindow::StreamIdForVideoSlotIndex(int slotIndex) const {
-    for (auto it = streamSlotIndexes_.cbegin(); it != streamSlotIndexes_.cend(); ++it) {
-        if (it.value() == slotIndex) {
-            return it.key();
-        }
-    }
-
-    return MediaPlayController::InvalidStreamId;
-}
-
 bool MainWindow::IsValidVideoSlotIndex(int slotIndex) const {
     return slotIndex >= 0 && slotIndex < MaxVideoSlots();
-}
-
-int MainWindow::VideoContainerIndexForWidget(QWidget* widget) const {
-    if (!widget) {
-        return -1;
-    }
-
-    const std::array<QWidget*, kVideoSlotCount> containers = VideoContainers();
-    for (int index = 0; index < static_cast<int>(containers.size()); ++index) {
-        QWidget* container = containers.at(index);
-        if (!container) {
-            continue;
-        }
-
-        if (widget == container || container->isAncestorOf(widget)) {
-            return index;
-        }
-    }
-
-    return -1;
-}
-
-bool MainWindow::HandleVideoContainerClick(QObject* watched, QEvent* event) {
-    if (!event || event->type() != QEvent::MouseButtonPress) {
-        return false;
-    }
-
-    auto* mouseEvent = static_cast<QMouseEvent*>(event);
-    if (mouseEvent->button() != Qt::LeftButton) {
-        return false;
-    }
-
-    QWidget* sourceWidget = qobject_cast<QWidget*>(watched);
-    const int containerIndex = VideoContainerIndexForWidget(sourceWidget);
-    if (containerIndex < 0) {
-        return false;
-    }
-
-    return ActivateStreamFromVideoContainer(containerIndex);
-}
-
-bool MainWindow::ActivateStreamFromVideoContainer(int containerIndex) {
-    const MediaPlayController::StreamId streamId = StreamIdForVideoSlotIndex(containerIndex);
-    if (streamId == MediaPlayController::InvalidStreamId) {
-        return false;
-    }
-
-    return ActivateStreamFromView(streamId);
 }
 
 bool MainWindow::ActivateStreamFromView(MediaPlayController::StreamId streamId) {
@@ -721,41 +621,7 @@ bool MainWindow::ActivateStreamFromView(MediaPlayController::StreamId streamId) 
 }
 
 void MainWindow::RefreshMultiViewLayout() {
-    const std::array<QWidget*, kVideoSlotCount> containers = VideoContainers();
-    int singleVisibleIndex = SlotIndexForStream(mediaPlayController_->ActiveStream());
-    if (singleVisibleIndex < 0) {
-        singleVisibleIndex = 0;
-    }
-
-    for (int index = 0; index < static_cast<int>(containers.size()); ++index) {
-        QWidget* container = containers.at(index);
-        if (!container) {
-            continue;
-        }
-
-        const bool visible = CurrentMultiViewLayout() == MultiViewLayout::Grid2x2
-            || index == singleVisibleIndex;
-        container->setVisible(visible);
-    }
-
-    UpdateVideoContainerStyles();
     RefreshMultiViewRenderer();
-}
-
-void MainWindow::UpdateVideoContainerStyles() {
-    const int activeContainerIndex = SlotIndexForStream(mediaPlayController_->ActiveStream());
-    const std::array<QWidget*, kVideoSlotCount> containers = VideoContainers();
-    for (int index = 0; index < static_cast<int>(containers.size()); ++index) {
-        QWidget* container = containers.at(index);
-        if (!container) {
-            continue;
-        }
-
-        const bool active = index == activeContainerIndex;
-        container->setStyleSheet(active
-            ? "background-color: #101820; border: 3px solid #2f80ed;"
-            : "background-color: #101010; border: 1px solid #3a3a3a;");
-    }
 }
 
 void MainWindow::UpdateLayoutComboBox(MultiViewLayout layout) {
@@ -990,7 +856,7 @@ void MainWindow::AddMultiStreamFiles() {
         MediaPlayController::StreamId streamId = MediaPlayController::InvalidStreamId;
         const MediaPlayController::FrameSinkFactory frameSinkFactory =
             CreateMultiViewFrameSinkFactory();
-        QWidget* fallbackRendererContainer = frameSinkFactory ? nullptr : VideoContainerAt(slotIndex);
+        QWidget* fallbackRendererContainer = frameSinkFactory ? nullptr : FallbackRendererContainer();
         if (!frameSinkFactory && !fallbackRendererContainer) {
             APP_LOG_WARN_STREAM() << "Add stream failed: fallback video container missing";
             break;
@@ -1011,7 +877,6 @@ void MainWindow::AddMultiStreamFiles() {
 
         BindStreamToVideoSlot(streamId, slotIndex);
         streamDisplayNames_.insert(streamId, QFileInfo(filePath).fileName());
-        InstallVideoContainerEventFilters();
     }
 
     RefreshStreamView();
@@ -1033,7 +898,7 @@ void MainWindow::AddCameraStream() {
 
     APP_LOG_DEBUG_STREAM() << "MainWindow::AddCameraStream() - 添加摄像头:" << options.Description();
 
-    // 查找可用的逻辑视频 slot，旧容器仅作为当前 fallback renderer container。
+    // 查找可用的逻辑视频 slot，默认 VideoRender 回退时复用主视频区域容器。
     const int slotIndex = FirstAvailableVideoSlotIndex();
     if (slotIndex < 0) {
         APP_LOG_WARN_STREAM() << "Add camera failed: no available video slot";
@@ -1046,7 +911,7 @@ void MainWindow::AddCameraStream() {
     MediaPlayController::StreamId streamId = MediaPlayController::InvalidStreamId;
     const MediaPlayController::FrameSinkFactory frameSinkFactory =
         CreateMultiViewFrameSinkFactory();
-    QWidget* fallbackRendererContainer = frameSinkFactory ? nullptr : VideoContainerAt(slotIndex);
+    QWidget* fallbackRendererContainer = frameSinkFactory ? nullptr : FallbackRendererContainer();
     if (!frameSinkFactory && !fallbackRendererContainer) {
         APP_LOG_WARN_STREAM() << "Add camera failed: fallback video container missing";
         return;
@@ -1072,7 +937,6 @@ void MainWindow::AddCameraStream() {
         .arg(options.width)
         .arg(options.height)
         .arg(options.frameRate));
-    InstallVideoContainerEventFilters();
 
     RefreshStreamView();
 
@@ -1144,7 +1008,7 @@ bool MainWindow::SwitchToPlaylistIndex(int index, bool autoStart) {
     std::shared_ptr<IMediaSource> mediaSource = std::make_shared<FileMediaSource>(item.filePath);
     const MediaPlayController::FrameSinkFactory frameSinkFactory =
         CreateMultiViewFrameSinkFactory();
-    QWidget* fallbackRendererContainer = frameSinkFactory ? nullptr : PrimaryVideoContainer();
+    QWidget* fallbackRendererContainer = frameSinkFactory ? nullptr : FallbackRendererContainer();
     const bool switched = frameSinkFactory
         ? mediaPlayController_->SwitchSourceWithFrameSinkFactory(
               mediaSource,
@@ -1165,7 +1029,6 @@ bool MainWindow::SwitchToPlaylistIndex(int index, bool autoStart) {
     if (activeStreamId != MediaPlayController::InvalidStreamId) {
         BindStreamToVideoSlot(activeStreamId, 0);
         streamDisplayNames_.insert(activeStreamId, item.displayName);
-        InstallVideoContainerEventFilters();
         RefreshStreamView();
     }
     return true;

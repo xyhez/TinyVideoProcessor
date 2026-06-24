@@ -7,6 +7,7 @@
 #include <QMouseEvent>
 #include <QOpenGLPixelTransferOptions>
 #include <QOpenGLTexture>
+#include <QtGlobal>
 
 extern "C" {
 #include <libavutil/pixdesc.h>
@@ -145,7 +146,7 @@ MultiViewRenderer::Viewport MultiViewRenderer::ViewportForSlot(int slotIndex) co
         slotIndex,
         viewSlots_.value(slotIndex, InvalidStreamId),
         qtRect,
-        ToOpenGLViewportRect(qtRect)
+        ToFramebufferRect(qtRect)
     };
 }
 
@@ -210,7 +211,8 @@ void MultiViewRenderer::initializeGL() {
 void MultiViewRenderer::paintGL() {
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_SCISSOR_TEST);
-    glViewport(0, 0, width(), height());
+    const QSize framebufferSize = FramebufferSize();
+    glViewport(0, 0, framebufferSize.width(), framebufferSize.height());
     glClearColor(kBackgroundRed, kBackgroundGreen, kBackgroundBlue, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
@@ -341,26 +343,34 @@ QRect MultiViewRenderer::QtRectForSlot(int slotIndex) const {
     return rect();
 }
 
-QRect MultiViewRenderer::ToOpenGLViewportRect(const QRect& qtRect) const {
+QSize MultiViewRenderer::FramebufferSize() const {
+    const qreal pixelRatio = devicePixelRatioF();
+    return QSize(qRound(width() * pixelRatio), qRound(height() * pixelRatio));
+}
+
+QRect MultiViewRenderer::ToFramebufferRect(const QRect& qtRect) const {
     if (qtRect.isEmpty() || height() <= 0) {
         return {};
     }
 
-    return QRect(qtRect.x(),
-                 height() - qtRect.y() - qtRect.height(),
-                 qtRect.width(),
-                 qtRect.height());
+    const qreal pixelRatio = devicePixelRatioF();
+    const QSize framebufferSize = FramebufferSize();
+    const int left = qRound(qtRect.x() * pixelRatio);
+    const int right = qRound((qtRect.x() + qtRect.width()) * pixelRatio);
+    const int top = qRound(qtRect.y() * pixelRatio);
+    const int bottom = qRound((qtRect.y() + qtRect.height()) * pixelRatio);
+    return QRect(left, framebufferSize.height() - bottom, right - left, bottom - top);
 }
 
 void MultiViewRenderer::DrawViewport(const Viewport& viewport) {
-    if (viewport.glViewportRect.isEmpty()) {
+    if (viewport.framebufferRect.isEmpty()) {
         return;
     }
 
     if (viewport.IsBound()) {
-        FillOpenGLRect(viewport.glViewportRect, kSlotRed, kSlotGreen, kSlotBlue, 1.0f);
+        FillOpenGLRect(viewport.framebufferRect, kSlotRed, kSlotGreen, kSlotBlue, 1.0f);
     } else {
-        FillOpenGLRect(viewport.glViewportRect, kEmptySlotRed, kEmptySlotGreen, kEmptySlotBlue, 1.0f);
+        FillOpenGLRect(viewport.framebufferRect, kEmptySlotRed, kEmptySlotGreen, kEmptySlotBlue, 1.0f);
     }
 
     if (viewport.IsBound()) {
@@ -372,7 +382,7 @@ void MultiViewRenderer::DrawViewport(const Viewport& viewport) {
     }
 
     const bool active = viewport.IsBound() && viewport.streamId == activeStreamId_;
-    DrawViewportBorder(viewport.glViewportRect, active);
+    DrawViewportBorder(viewport.framebufferRect, active);
 }
 
 bool MultiViewRenderer::DrawStreamFrame(const Viewport& viewport, StreamRenderState& state) {
@@ -400,7 +410,7 @@ bool MultiViewRenderer::DrawStreamFrame(const Viewport& viewport, StreamRenderSt
     float h = 2.0f;
     CalcFrameRect(viewport, state, x, y, w, h);
 
-    const QRect& rect = viewport.glViewportRect;
+    const QRect& rect = viewport.framebufferRect;
     glViewport(rect.x(), rect.y(), rect.width(), rect.height());
     glScissor(rect.x(), rect.y(), rect.width(), rect.height());
 
@@ -418,7 +428,8 @@ bool MultiViewRenderer::DrawStreamFrame(const Viewport& viewport, StreamRenderSt
     frameShader_.disableAttributeArray("textureIn");
     frameShader_.release();
 
-    glViewport(0, 0, width(), height());
+    const QSize framebufferSize = FramebufferSize();
+    glViewport(0, 0, framebufferSize.width(), framebufferSize.height());
     return true;
 }
 
@@ -479,8 +490,8 @@ void MultiViewRenderer::CalcFrameRect(const Viewport& viewport,
                                       float& y,
                                       float& w,
                                       float& h) const {
-    const int viewportWidth = viewport.glViewportRect.width();
-    const int viewportHeight = viewport.glViewportRect.height();
+    const int viewportWidth = viewport.framebufferRect.width();
+    const int viewportHeight = viewport.framebufferRect.height();
     if (state.videoWidth <= 0 || state.videoHeight <= 0 ||
         viewportWidth <= 0 || viewportHeight <= 0) {
         x = -1.0f;

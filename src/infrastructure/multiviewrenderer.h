@@ -7,6 +7,7 @@
 #include <QOpenGLShaderProgram>
 #include <QOpenGLWidget>
 #include <QRect>
+#include <QSize>
 #include <QVector>
 
 extern "C" {
@@ -46,7 +47,7 @@ public:
         int slotIndex = -1;
         StreamId streamId = InvalidStreamId;
         QRect qtRect;
-        QRect glViewportRect;
+        QRect framebufferRect;
 
         /**
          * @brief IsBound 判断当前 viewport 是否绑定有效流
@@ -273,11 +274,17 @@ private:
     QRect QtRectForSlot(int slotIndex) const;
 
     /**
-     * @brief ToOpenGLViewportRect 将 Qt 坐标区域转换为 OpenGL viewport 坐标
-     * @param qtRect Qt 坐标系区域
-     * @return OpenGL viewport 坐标区域
+     * @brief FramebufferSize 获取 OpenGL framebuffer 物理像素尺寸
+     * @return framebuffer 尺寸
      */
-    QRect ToOpenGLViewportRect(const QRect& qtRect) const;
+    QSize FramebufferSize() const;
+
+    /**
+     * @brief ToFramebufferRect 将 Qt 逻辑坐标区域转换为 OpenGL framebuffer 坐标
+     * @param qtRect Qt 逻辑坐标区域
+     * @return OpenGL framebuffer 坐标区域
+     */
+    QRect ToFramebufferRect(const QRect& qtRect) const;
 
     /**
      * @brief DrawViewport 绘制单个 viewport 的背景、视频帧和边框

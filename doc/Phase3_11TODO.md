@@ -207,23 +207,23 @@ refactor: 移除主窗口统一渲染路径对旧容器参数的依赖
 
 **任务清单**：
 
-- [ ] 梳理当前 `multiViewRendererDock_` 的创建和生命周期。
-- [ ] 决定 `MultiViewRenderer` 的主窗口承载位置。
-- [ ] 将 `MultiViewRenderer` 嵌入主视频显示区域。
-- [ ] 避免 `MultiViewRenderer` 同时被 dock 和主布局双重持有。
-- [ ] 保留旧容器但隐藏或降低为临时兼容控件。
-- [ ] 确认主窗口关闭时不引入新的 QObject 父子关系或析构顺序问题。
+- [x] 梳理当前 `multiViewRendererDock_` 的创建和生命周期。
+- [x] 决定 `MultiViewRenderer` 的主窗口承载位置。
+- [x] 将 `MultiViewRenderer` 嵌入主视频显示区域。
+- [x] 避免 `MultiViewRenderer` 同时被 dock 和主布局双重持有。
+- [x] 保留旧容器但隐藏或降低为临时兼容控件。
+- [x] 确认主窗口关闭时不引入新的 QObject 父子关系或析构顺序问题。
 
 **验收标准**：
 
-- [ ] 常规播放画面显示在主 `MultiViewRenderer` 区域。
-- [ ] 不再需要打开实验 dock 才能看到统一渲染画面。
-- [ ] 多路布局仍由 `MultiViewRenderer` 绘制。
-- [ ] 析构顺序清晰，不引入重复 delete 或悬空访问风险。
+- [x] 常规播放画面显示在主 `MultiViewRenderer` 区域。
+- [x] 不再需要打开实验 dock 才能看到统一渲染画面。
+- [x] 多路布局仍由 `MultiViewRenderer` 绘制。
+- [x] 析构顺序清晰，不引入重复 delete 或悬空访问风险。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\ui\mainwindow.h src\ui\mainwindow.cpp src\ui\mainwindow.ui doc\Phase3_11TODO.md`
+- [x] 静态检查：`git diff --check -- src\ui\mainwindow.h src\ui\mainwindow.cpp src\ui\mainwindow.ui doc\Phase3_11TODO.md`
 - [ ] 人工运行建议：启动、添加多路、切换布局、pause all、stop all、关闭程序。
 
 **Commit message**：
@@ -249,21 +249,21 @@ refactor: 将 MultiViewRenderer 迁移为主视频显示区域
 
 **任务清单**：
 
-- [ ] 移除 `RefreshMultiViewLayout()` 中对旧容器 `setVisible()` 的依赖。
-- [ ] 根据当前布局模式刷新 `MultiViewRenderer`。
-- [ ] 根据逻辑 slot 映射刷新 `MultiViewRenderer::SetViewSlots()`。
-- [ ] 根据 active stream 刷新 `MultiViewRenderer` active 状态。
-- [ ] 确认 empty slot 的显示由 `MultiViewRenderer` 负责。
+- [x] 移除 `RefreshMultiViewLayout()` 中对旧容器 `setVisible()` 的依赖。
+- [x] 根据当前布局模式刷新 `MultiViewRenderer`。
+- [x] 根据逻辑 slot 映射刷新 `MultiViewRenderer::SetViewSlots()`。
+- [x] 根据 active stream 刷新 `MultiViewRenderer` active 状态。
+- [x] 确认 empty slot 的显示由 `MultiViewRenderer` 负责。
 
 **验收标准**：
 
-- [ ] `Single` / `Grid2x2` 布局切换只影响 `MultiViewRenderer`。
-- [ ] 旧容器显示隐藏不再参与布局逻辑。
-- [ ] 空 slot、active slot 和多路显示语义一致。
+- [x] `Single` / `Grid2x2` 布局切换只影响 `MultiViewRenderer`。
+- [x] 旧容器显示隐藏不再参与布局逻辑。
+- [x] 空 slot、active slot 和多路显示语义一致。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\ui\mainwindow.cpp doc\Phase3_11TODO.md`
+- [x] 静态检查：`git diff --check -- src\ui\mainwindow.cpp doc\Phase3_11TODO.md`
 - [ ] 人工运行建议：单路、多路、切换 `Single` / `Grid2x2`，确认画面位置和 active 状态正确。
 
 **Commit message**：
@@ -289,24 +289,24 @@ refactor: 将多路布局刷新收口到 MultiViewRenderer
 
 **任务清单**：
 
-- [ ] 移除旧容器事件过滤安装逻辑。
-- [ ] 移除旧容器点击到 active stream 的转换逻辑。
-- [ ] 连接 `MultiViewRenderer::StreamClicked` 到主窗口 active stream 切换。
-- [ ] 保持有音频流点击时同步 active audio stream。
-- [ ] 保持无音频流点击时静音策略不退化。
-- [ ] 移除旧容器 stylesheet active 高亮逻辑。
-- [ ] 确认 active 高亮由 `MultiViewRenderer` 绘制。
+- [x] 移除旧容器事件过滤安装逻辑。
+- [x] 移除旧容器点击到 active stream 的转换逻辑。
+- [x] 连接 `MultiViewRenderer::StreamClicked` 到主窗口 active stream 切换。
+- [x] 保持有音频流点击时同步 active audio stream。
+- [x] 保持无音频流点击时静音策略不退化。
+- [x] 移除旧容器 stylesheet active 高亮逻辑。
+- [x] 确认 active 高亮由 `MultiViewRenderer` 绘制。
 
 **验收标准**：
 
-- [ ] 点击 `MultiViewRenderer` 中任一路画面可切换 active stream。
-- [ ] active audio stream 跟随点击策略不退化。
-- [ ] 旧容器事件过滤不再参与 active stream 切换。
-- [ ] active 高亮只由统一渲染器负责。
+- [x] 点击 `MultiViewRenderer` 中任一路画面可切换 active stream。
+- [x] active audio stream 跟随点击策略不退化。
+- [x] 旧容器事件过滤不再参与 active stream 切换。
+- [x] active 高亮只由统一渲染器负责。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\ui\mainwindow.h src\ui\mainwindow.cpp doc\Phase3_11TODO.md`
+- [x] 静态检查：`git diff --check -- src\ui\mainwindow.h src\ui\mainwindow.cpp doc\Phase3_11TODO.md`
 - [ ] 人工运行建议：添加有音频和无音频视频，点击不同画面，确认进度条、音频和高亮同步。
 
 **Commit message**：
@@ -333,26 +333,26 @@ refactor: 将多路点击激活迁移到 MultiViewRenderer
 
 **任务清单**：
 
-- [ ] 删除 `.ui` 中 `video_widget`、`video_widget_1`、`video_widget_2`、`video_widget_3`。
-- [ ] 删除 `VideoContainers()`。
-- [ ] 删除 `PrimaryVideoContainer()`。
-- [ ] 删除 `VideoContainerAt()`。
-- [ ] 删除旧容器样式相关方法。
-- [ ] 删除旧容器 event filter 相关方法。
-- [ ] 清理不再需要的 include、字段和注释。
-- [ ] 保留 `VideoRender` 类和默认 fallback 路径。
+- [x] 删除 `.ui` 中 `video_widget`、`video_widget_1`、`video_widget_2`、`video_widget_3`。
+- [x] 删除 `VideoContainers()`。
+- [x] 删除 `PrimaryVideoContainer()`。
+- [x] 删除 `VideoContainerAt()`。
+- [x] 删除旧容器样式相关方法。
+- [x] 删除旧容器 event filter 相关方法。
+- [x] 清理不再需要的 include、字段和注释。
+- [x] 保留 `VideoRender` 类和默认 fallback 路径。
 
 **验收标准**：
 
-- [ ] `MainWindow` 不再引用旧 `video_widget*`。
-- [ ] `.ui` 中不再保留旧四个视频容器。
-- [ ] 主窗口常规显示只依赖 `MultiViewRenderer`。
-- [ ] `VideoRender` 仍作为基础设施层默认 sink 存在。
+- [x] `MainWindow` 不再引用旧 `video_widget*`。
+- [x] `.ui` 中不再保留旧四个视频容器。
+- [x] 主窗口常规显示只依赖 `MultiViewRenderer`。
+- [x] `VideoRender` 仍作为基础设施层默认 sink 存在。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\ui\mainwindow.h src\ui\mainwindow.cpp src\ui\mainwindow.ui doc\Phase3_11TODO.md`
-- [ ] 定向搜索：`rg -n "video_widget|VideoContainers|PrimaryVideoContainer|VideoContainerAt|InstallVideoContainerEventFilters|UpdateVideoContainerStyles" src\ui`
+- [x] 静态检查：`git diff --check -- src\ui\mainwindow.h src\ui\mainwindow.cpp src\ui\mainwindow.ui doc\Phase3_11TODO.md`
+- [x] 定向搜索：`rg -n "video_widget|VideoContainers|PrimaryVideoContainer|VideoContainerAt|InstallVideoContainerEventFilters|UpdateVideoContainerStyles" src\ui`
 - [ ] 人工运行建议：启动、播放列表切换、多路添加、点击 active、pause all、stop all、关闭程序。
 
 **Commit message**：
