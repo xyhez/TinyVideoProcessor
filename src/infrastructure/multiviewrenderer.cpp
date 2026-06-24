@@ -1,7 +1,16 @@
 #include "multiviewrenderer.h"
 
+#include "core/AppLog.h"
+
 #include <algorithm>
+#include <QMutexLocker>
 #include <QMouseEvent>
+#include <QOpenGLPixelTransferOptions>
+#include <QOpenGLTexture>
+
+extern "C" {
+#include <libavutil/pixdesc.h>
+}
 
 namespace {
 constexpr int kMaxLogicalSlots = 4;
@@ -25,6 +34,11 @@ constexpr float kBorderBlue = 0.28f;
 constexpr float kActiveBorderRed = 0.16f;
 constexpr float kActiveBorderGreen = 0.48f;
 constexpr float kActiveBorderBlue = 0.92f;
+
+QString PixelFormatName(AVPixelFormat format) {
+    const char* name = av_get_pix_fmt_name(format);
+    return name ? QString::fromUtf8(name) : QString("unknown(%1)").arg(static_cast<int>(format));
+}
 }
 
 MultiViewRenderer::MultiViewRenderer(QWidget* parent)
@@ -33,10 +47,19 @@ MultiViewRenderer::MultiViewRenderer(QWidget* parent)
 }
 
 MultiViewRenderer::~MultiViewRenderer() {
+    QMutexLocker locker(&renderStateMutex_);
+    if (context()) {
+        makeCurrent();
+    }
+
     for (auto it = renderStates_.begin(); it != renderStates_.end(); ++it) {
-        ReleaseCurrentFrame(it.value());
+        ReleaseStreamResources(it.value());
     }
     renderStates_.clear();
+
+    if (context()) {
+        doneCurrent();
+    }
 }
 
 bool MultiViewRenderer::Viewport::IsBound() const {
@@ -132,6 +155,7 @@ void MultiViewRenderer::PresentFrame(StreamId streamId, AVFrame* frame) {
         return;
     }
 
+    QMutexLocker locker(&renderStateMutex_);
     StreamRenderState& state = renderStates_[streamId];
     ReleaseCurrentFrame(state);
     state.currentFrame = frame;
@@ -146,6 +170,7 @@ void MultiViewRenderer::PresentFrame(StreamId streamId, AVFrame* frame) {
 }
 
 void MultiViewRenderer::ClearFrame(StreamId streamId) {
+    QMutexLocker locker(&renderStateMutex_);
     auto it = renderStates_.find(streamId);
     if (it == renderStates_.end()) {
         return;
@@ -156,12 +181,19 @@ void MultiViewRenderer::ClearFrame(StreamId streamId) {
 }
 
 void MultiViewRenderer::DetachStream(StreamId streamId) {
+    QMutexLocker locker(&renderStateMutex_);
     auto it = renderStates_.find(streamId);
     if (it == renderStates_.end()) {
         return;
     }
 
-    ReleaseCurrentFrame(it.value());
+    if (context()) {
+        makeCurrent();
+    }
+    ReleaseStreamResources(it.value());
+    if (context()) {
+        doneCurrent();
+    }
     renderStates_.erase(it);
     update();
 }
@@ -171,6 +203,8 @@ void MultiViewRenderer::initializeGL() {
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_SCISSOR_TEST);
     glClearColor(kBackgroundRed, kBackgroundGreen, kBackgroundBlue, 1.0f);
+    InitializeFrameShader();
+    glInitialized_ = frameShader_.isLinked();
 }
 
 void MultiViewRenderer::paintGL() {
@@ -215,6 +249,66 @@ void MultiViewRenderer::ReleaseCurrentFrame(StreamRenderState& state) {
     state.pixelFormat = AV_PIX_FMT_NONE;
     state.textureDirty = false;
     state.hasFrame = false;
+    state.unsupportedFormatLogged = false;
+}
+
+void MultiViewRenderer::ReleaseStreamResources(StreamRenderState& state) {
+    ReleaseCurrentFrame(state);
+    FreeTextures(state);
+}
+
+void MultiViewRenderer::FreeTextures(StreamRenderState& state) {
+    delete state.textureY;
+    delete state.textureU;
+    delete state.textureV;
+    state.textureY = nullptr;
+    state.textureU = nullptr;
+    state.textureV = nullptr;
+}
+
+void MultiViewRenderer::InitializeFrameShader() {
+    const char* vertexShader = R"(
+        attribute vec4 vertexIn;
+        attribute vec2 textureIn;
+        varying vec2 textureOut;
+        void main() {
+            gl_Position = vertexIn;
+            textureOut = textureIn;
+        })";
+
+    const char* fragmentShader = R"(
+        varying vec2 textureOut;
+        uniform sampler2D tex_y;
+        uniform sampler2D tex_u;
+        uniform sampler2D tex_v;
+        void main() {
+            float y = texture2D(tex_y, textureOut).r;
+            float u = texture2D(tex_u, textureOut).r - 0.5;
+            float v = texture2D(tex_v, textureOut).r - 0.5;
+            gl_FragColor = vec4(
+                y + 1.402 * v,
+                y - 0.344 * u - 0.714 * v,
+                y + 1.772 * u,
+                1.0);
+        })";
+
+    const bool vertexShaderReady =
+        frameShader_.addShaderFromSourceCode(QOpenGLShader::Vertex, vertexShader);
+    const bool fragmentShaderReady =
+        frameShader_.addShaderFromSourceCode(QOpenGLShader::Fragment, fragmentShader);
+    const bool shaderLinked = frameShader_.link();
+    if (!vertexShaderReady || !fragmentShaderReady || !shaderLinked) {
+        APP_LOG_WARN_STREAM().noquote()
+            << "MultiViewRenderer frame shader init failed:"
+            << frameShader_.log();
+        return;
+    }
+
+    frameShader_.bind();
+    frameShader_.setUniformValue("tex_y", 0);
+    frameShader_.setUniformValue("tex_u", 1);
+    frameShader_.setUniformValue("tex_v", 2);
+    frameShader_.release();
 }
 
 bool MultiViewRenderer::IsLogicalSlotIndex(int slotIndex) const {
@@ -269,8 +363,162 @@ void MultiViewRenderer::DrawViewport(const Viewport& viewport) {
         FillOpenGLRect(viewport.glViewportRect, kEmptySlotRed, kEmptySlotGreen, kEmptySlotBlue, 1.0f);
     }
 
+    if (viewport.slotIndex == 0 && viewport.IsBound()) {
+        QMutexLocker locker(&renderStateMutex_);
+        auto it = renderStates_.find(viewport.streamId);
+        if (it != renderStates_.end()) {
+            DrawStreamFrame(viewport, it.value());
+        }
+    }
+
     const bool active = viewport.IsBound() && viewport.streamId == activeStreamId_;
     DrawViewportBorder(viewport.glViewportRect, active);
+}
+
+bool MultiViewRenderer::DrawStreamFrame(const Viewport& viewport, StreamRenderState& state) {
+    if (!glInitialized_ || !state.hasFrame || !state.currentFrame) {
+        return false;
+    }
+
+    if (!UploadTexturesIfNeeded(state)) {
+        LogUnsupportedFrameIfNeeded(viewport.streamId, state);
+        return false;
+    }
+
+    if (!state.textureY || !state.textureU || !state.textureV) {
+        return false;
+    }
+
+    frameShader_.bind();
+    state.textureY->bind(0);
+    state.textureU->bind(1);
+    state.textureV->bind(2);
+
+    float x = -1.0f;
+    float y = -1.0f;
+    float w = 2.0f;
+    float h = 2.0f;
+    CalcFrameRect(viewport, state, x, y, w, h);
+
+    const QRect& rect = viewport.glViewportRect;
+    glViewport(rect.x(), rect.y(), rect.width(), rect.height());
+    glScissor(rect.x(), rect.y(), rect.width(), rect.height());
+
+    GLfloat vertices[] = {x, y, x + w, y, x, y + h, x + w, y + h};
+    GLfloat textures[] = {0, 1, 1, 1, 0, 0, 1, 0};
+
+    frameShader_.setAttributeArray("vertexIn", vertices, 2);
+    frameShader_.setAttributeArray("textureIn", textures, 2);
+    frameShader_.enableAttributeArray("vertexIn");
+    frameShader_.enableAttributeArray("textureIn");
+
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+    frameShader_.disableAttributeArray("vertexIn");
+    frameShader_.disableAttributeArray("textureIn");
+    frameShader_.release();
+
+    glViewport(0, 0, width(), height());
+    return true;
+}
+
+bool MultiViewRenderer::UploadTexturesIfNeeded(StreamRenderState& state) {
+    AVFrame* frame = state.currentFrame;
+    if (!frame || !IsSupportedFrameFormat(state)) {
+        return false;
+    }
+
+    state.unsupportedFormatLogged = false;
+    if (!state.textureDirty && state.textureY && state.textureU && state.textureV) {
+        return true;
+    }
+
+    if (state.textureY &&
+        (state.textureY->width() != frame->width || state.textureY->height() != frame->height)) {
+        FreeTextures(state);
+    }
+
+    if (!state.textureY) {
+        auto createTexture = [](int width, int height) -> QOpenGLTexture* {
+            auto* texture = new QOpenGLTexture(QOpenGLTexture::Target2D);
+            texture->setSize(width, height);
+            texture->setFormat(QOpenGLTexture::R8_UNorm);
+            texture->setMinMagFilters(QOpenGLTexture::Linear, QOpenGLTexture::Linear);
+            texture->setWrapMode(QOpenGLTexture::ClampToEdge);
+            texture->allocateStorage();
+            return texture;
+        };
+
+        state.textureY = createTexture(frame->width, frame->height);
+        state.textureU = createTexture(frame->width / 2, frame->height / 2);
+        state.textureV = createTexture(frame->width / 2, frame->height / 2);
+    }
+
+    QOpenGLPixelTransferOptions options;
+
+    options.setRowLength(frame->linesize[0]);
+    state.textureY->setData(QOpenGLTexture::Red, QOpenGLTexture::UInt8, frame->data[0], &options);
+
+    options.setRowLength(frame->linesize[1]);
+    state.textureU->setData(QOpenGLTexture::Red, QOpenGLTexture::UInt8, frame->data[1], &options);
+
+    options.setRowLength(frame->linesize[2]);
+    state.textureV->setData(QOpenGLTexture::Red, QOpenGLTexture::UInt8, frame->data[2], &options);
+
+    state.textureDirty = false;
+    return true;
+}
+
+bool MultiViewRenderer::IsSupportedFrameFormat(const StreamRenderState& state) const {
+    return state.currentFrame && state.pixelFormat == AV_PIX_FMT_YUV420P;
+}
+
+void MultiViewRenderer::CalcFrameRect(const Viewport& viewport,
+                                      const StreamRenderState& state,
+                                      float& x,
+                                      float& y,
+                                      float& w,
+                                      float& h) const {
+    const int viewportWidth = viewport.glViewportRect.width();
+    const int viewportHeight = viewport.glViewportRect.height();
+    if (state.videoWidth <= 0 || state.videoHeight <= 0 ||
+        viewportWidth <= 0 || viewportHeight <= 0) {
+        x = -1.0f;
+        y = -1.0f;
+        w = 2.0f;
+        h = 2.0f;
+        return;
+    }
+
+    const double sar = (state.sampleAspectRatio.num && state.sampleAspectRatio.den)
+        ? static_cast<double>(state.sampleAspectRatio.num) / state.sampleAspectRatio.den
+        : 1.0;
+    const double displayAspectRatio = static_cast<double>(state.videoWidth) * sar / state.videoHeight;
+    const double viewportAspectRatio = static_cast<double>(viewportWidth) / viewportHeight;
+
+    if (displayAspectRatio > viewportAspectRatio) {
+        w = 2.0f;
+        h = static_cast<float>(2.0 * viewportAspectRatio / displayAspectRatio);
+    } else {
+        h = 2.0f;
+        w = static_cast<float>(2.0 * displayAspectRatio / viewportAspectRatio);
+    }
+
+    x = -w / 2.0f;
+    y = -h / 2.0f;
+}
+
+void MultiViewRenderer::LogUnsupportedFrameIfNeeded(StreamId streamId, StreamRenderState& state) {
+    if (state.unsupportedFormatLogged || IsSupportedFrameFormat(state)) {
+        return;
+    }
+
+    state.unsupportedFormatLogged = true;
+    APP_LOG_WARN_STREAM().noquote()
+        << "MultiViewRenderer unsupported frame format:"
+        << QString("streamId=%1").arg(streamId)
+        << QString("pix_fmt=%1").arg(PixelFormatName(state.pixelFormat))
+        << QString("size=%1x%2").arg(state.videoWidth).arg(state.videoHeight);
 }
 
 void MultiViewRenderer::FillOpenGLRect(const QRect& rect,

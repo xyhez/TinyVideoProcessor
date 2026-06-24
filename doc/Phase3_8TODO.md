@@ -253,26 +253,26 @@ feat: 增加 MultiViewRenderer 单路接帧接口空壳
 
 **任务清单**：
 
-- [ ] 为 `StreamRenderState` 增加 Y/U/V 纹理状态。
-- [ ] 在 OpenGL 上下文线程创建和释放纹理。
-- [ ] 支持 YUV420P 帧上传。
-- [ ] 对不支持格式输出诊断日志。
-- [ ] 在 `paintGL()` 中找到 slot 0 对应 stream。
-- [ ] 将该 stream 的纹理绘制到 slot 0 viewport。
-- [ ] 保留空 slot 背景绘制。
-- [ ] 暂不接多路绘制。
+- [x] 为 `StreamRenderState` 增加 Y/U/V 纹理状态。
+- [x] 在 OpenGL 上下文线程创建和释放纹理。
+- [x] 支持 YUV420P 帧上传。
+- [x] 对不支持格式输出诊断日志。
+- [x] 在 `paintGL()` 中找到 slot 0 对应 stream。
+- [x] 将该 stream 的纹理绘制到 slot 0 viewport。
+- [x] 保留空 slot 背景绘制。
+- [x] 暂不接多路绘制。
 
 **验收标准**：
 
-- [ ] 一路 YUV420P 视频帧可以显示到 slot 0。
-- [ ] 空 slot 仍正常显示。
-- [ ] 不支持格式不会崩溃。
-- [ ] OpenGL 资源释放边界清晰。
-- [ ] 当前 `VideoRender` 默认路径仍可回退。
+- [x] 一路 YUV420P 视频帧可以显示到 slot 0。
+- [x] 空 slot 仍正常显示。
+- [x] 不支持格式不会崩溃。
+- [x] OpenGL 资源释放边界清晰。
+- [x] 当前 `VideoRender` 默认路径仍可回退。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\multiviewrenderer.h src\infrastructure\multiviewrenderer.cpp doc\Phase3_8TODO.md`
+- [x] 静态检查：`git diff --check -- src\infrastructure\multiviewrenderer.h src\infrastructure\multiviewrenderer.cpp doc\Phase3_8TODO.md`
 - [ ] 人工运行建议：单路普通 MP4。
 - [ ] 人工运行建议：无音频视频。
 - [ ] 人工运行建议：关闭程序不崩溃。

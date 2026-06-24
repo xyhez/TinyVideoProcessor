@@ -2,7 +2,9 @@
 #define MULTIVIEWRENDERER_H
 
 #include <QMap>
+#include <QMutex>
 #include <QOpenGLFunctions>
+#include <QOpenGLShaderProgram>
 #include <QOpenGLWidget>
 #include <QRect>
 #include <QVector>
@@ -14,6 +16,7 @@ extern "C" {
 }
 
 class QMouseEvent;
+class QOpenGLTexture;
 
 /**
  * @brief MultiViewRenderer 统一多画面渲染器空壳
@@ -172,12 +175,16 @@ private:
      */
     struct StreamRenderState {
         AVFrame* currentFrame = nullptr;
+        QOpenGLTexture* textureY = nullptr;
+        QOpenGLTexture* textureU = nullptr;
+        QOpenGLTexture* textureV = nullptr;
         int videoWidth = 0;
         int videoHeight = 0;
         AVRational sampleAspectRatio = {1, 1};
         AVPixelFormat pixelFormat = AV_PIX_FMT_NONE;
         bool textureDirty = false;
         bool hasFrame = false;
+        bool unsupportedFormatLogged = false;
     };
 
     /**
@@ -185,6 +192,71 @@ private:
      * @param state 单路渲染状态
      */
     void ReleaseCurrentFrame(StreamRenderState& state);
+
+    /**
+     * @brief ReleaseStreamResources 释放单路帧和 OpenGL 纹理资源
+     * @param state 单路渲染状态
+     */
+    void ReleaseStreamResources(StreamRenderState& state);
+
+    /**
+     * @brief FreeTextures 释放单路 OpenGL YUV 纹理
+     * @param state 单路渲染状态
+     */
+    void FreeTextures(StreamRenderState& state);
+
+    /**
+     * @brief InitializeFrameShader 初始化 YUV420P 绘制 shader
+     */
+    void InitializeFrameShader();
+
+    /**
+     * @brief DrawStreamFrame 绘制指定 viewport 中绑定 stream 的当前帧
+     * @param viewport 目标 viewport
+     * @param state 单路渲染状态
+     * @return true 已绘制视频帧
+     * @return false 没有可绘制帧
+     */
+    bool DrawStreamFrame(const Viewport& viewport, StreamRenderState& state);
+
+    /**
+     * @brief UploadTexturesIfNeeded 必要时上传 YUV420P 数据到 OpenGL 纹理
+     * @param state 单路渲染状态
+     * @return true 纹理可用于绘制
+     * @return false 当前帧格式不支持或纹理不可用
+     */
+    bool UploadTexturesIfNeeded(StreamRenderState& state);
+
+    /**
+     * @brief IsSupportedFrameFormat 判断 MultiViewRenderer 当前是否支持该帧格式
+     * @param state 单路渲染状态
+     * @return true 支持
+     * @return false 不支持
+     */
+    bool IsSupportedFrameFormat(const StreamRenderState& state) const;
+
+    /**
+     * @brief CalcFrameRect 计算保持宽高比后的帧绘制矩形
+     * @param viewport 目标 viewport
+     * @param state 单路渲染状态
+     * @param x 输出 OpenGL NDC 左下角 x
+     * @param y 输出 OpenGL NDC 左下角 y
+     * @param w 输出 OpenGL NDC 宽度
+     * @param h 输出 OpenGL NDC 高度
+     */
+    void CalcFrameRect(const Viewport& viewport,
+                       const StreamRenderState& state,
+                       float& x,
+                       float& y,
+                       float& w,
+                       float& h) const;
+
+    /**
+     * @brief LogUnsupportedFrameIfNeeded 输出不支持帧格式诊断日志
+     * @param streamId 目标 StreamId
+     * @param state 单路渲染状态
+     */
+    void LogUnsupportedFrameIfNeeded(StreamId streamId, StreamRenderState& state);
 
     /**
      * @brief IsLogicalSlotIndex 判断是否为合法逻辑 slot
@@ -234,6 +306,9 @@ private:
     QMap<int, StreamId> viewSlots_;
     QMap<StreamId, StreamRenderState> renderStates_;
     StreamId activeStreamId_ = InvalidStreamId;
+    QOpenGLShaderProgram frameShader_;
+    QMutex renderStateMutex_;
+    bool glInitialized_ = false;
 };
 
 #endif // MULTIVIEWRENDERER_H
