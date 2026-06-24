@@ -11,8 +11,8 @@
   - 旧 `video_widget*` 容器、事件过滤、点击激活和 stylesheet 高亮路径已清理。
   - Phase 3.12.2 已完成 `Grid3x3` / `Grid4x4` 布局模型定义。
   - Phase 3.12.3 已完成 `Grid3x3` / `Grid4x4` viewport 计算扩展。
+  - Phase 3.12.4 已完成主窗口布局下拉框对 `Grid3x3` / `Grid4x4` 的 UI 映射。
 - 未完成：
-  - 主窗口布局下拉框尚未覆盖更多多路布局。
   - 单路聚焦/恢复仍只依赖当前 `Single` / `Grid2x2` 语义，缺少明确的聚焦交互模型。
   - Phase 3 尚未形成布局交互能力的阶段性验收报告。
 - 已知风险：
@@ -228,25 +228,25 @@ feat: 扩展 MultiViewRenderer viewport 计算
 
 **任务清单**：
 
-- [ ] 在布局下拉框中增加 `3x3` 选项。
-- [ ] 在布局下拉框中增加 `4x4` 选项。
-- [ ] 更新 `InitializeMultiViewLayout()` 的默认选项。
-- [ ] 更新 `SetMultiViewLayout()` 的布局同步逻辑。
-- [ ] 更新 `RefreshMultiViewRenderer()` 的布局映射逻辑。
-- [ ] 如果当前逻辑 slot 仍保持 4 路，UI 文案或日志应避免暗示已经支持 9/16 路播放。
-- [ ] 不修改 stream 添加、删除和播放生命周期逻辑，除非 3.12.2 明确决定扩容。
+- [x] 在布局下拉框中增加 `3x3` 选项。
+- [x] 在布局下拉框中增加 `4x4` 选项。
+- [x] 更新 `InitializeMultiViewLayout()` 的默认选项。
+- [x] 更新 `SetMultiViewLayout()` 的布局同步逻辑。
+- [x] 更新 `RefreshMultiViewRenderer()` 的布局映射逻辑。
+- [x] 如果当前逻辑 slot 仍保持 4 路，UI 文案或日志应避免暗示已经支持 9/16 路播放。
+- [x] 不修改 stream 添加、删除和播放生命周期逻辑，除非 3.12.2 明确决定扩容。
 
 **验收标准**：
 
-- [ ] 布局下拉框能选择新增布局。
-- [ ] 选择新增布局后 `MultiViewRenderer` 显示区域发生对应变化。
-- [ ] 当前 active stream 和 active 高亮不退化。
-- [ ] 不影响播放、暂停、停止和关闭。
+- [x] 布局下拉框能选择新增布局。
+- [x] 选择新增布局后 `MultiViewRenderer` 显示区域发生对应变化。
+- [x] 当前 active stream 和 active 高亮不退化。
+- [x] 不影响播放、暂停、停止和关闭。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\ui\mainwindow.h src\ui\mainwindow.cpp doc\Phase3_12TODO.md`
-- [ ] 定向搜索：`rg -n "InitializeMultiViewLayout|SetMultiViewLayout|RefreshMultiViewRenderer|Grid3x3|Grid4x4" src\ui doc\Phase3_12TODO.md`
+- [x] 静态检查：`git diff --check -- src\ui\mainwindow.h src\ui\mainwindow.cpp doc\Phase3_12TODO.md`
+- [x] 定向搜索：`rg -n "InitializeMultiViewLayout|SetMultiViewLayout|RefreshMultiViewRenderer|Grid3x3|Grid4x4" src\ui doc\Phase3_12TODO.md`
 - [ ] 人工运行建议：添加 1 路、2 路、4 路文件后切换所有布局。
 
 **Commit message**：

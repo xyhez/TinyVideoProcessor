@@ -464,6 +464,8 @@ void MainWindow::InitializeMultiViewLayout() {
     ui->comboBox_layout->clear();
     ui->comboBox_layout->addItem("Single", static_cast<int>(MultiViewLayout::Single));
     ui->comboBox_layout->addItem("2x2", static_cast<int>(MultiViewLayout::Grid2x2));
+    ui->comboBox_layout->addItem("3x3", static_cast<int>(MultiViewLayout::Grid3x3));
+    ui->comboBox_layout->addItem("4x4", static_cast<int>(MultiViewLayout::Grid4x4));
     UpdateLayoutComboBox(multiViewLayout_);
     RefreshMultiViewLayout();
 }
@@ -540,7 +542,9 @@ void MainWindow::SetMultiViewLayout(MultiViewLayout layout) {
     multiViewLayout_ = layout;
     UpdateLayoutComboBox(multiViewLayout_);
     RefreshMultiViewLayout();
-    APP_LOG_INFO_STREAM() << "Multi view layout changed, max visible streams:" << MaxVisibleStreams();
+    APP_LOG_INFO_STREAM()
+        << "Multi view layout changed, visible slots:" << MaxVisibleStreams()
+        << "playable slots:" << MaxVideoSlots();
 }
 
 MainWindow::MultiViewLayout MainWindow::CurrentMultiViewLayout() const {
