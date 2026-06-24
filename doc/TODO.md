@@ -1187,3 +1187,20 @@ docs: 规划 MultiViewRenderer 单路真实帧接入
 - 不让 `MultiViewRenderer` 做同步判断。
 - 不替换当前 `VideoRender` 默认播放路径。
 - 先接一路，再考虑扩展多路。
+
+## Phase 3.9 MultiViewRenderer 多 slot 真实帧扩展
+
+**目标**：在 Phase 3.8 slot 0 单路真实帧接入完成后，将统一渲染扩展到多个可见 slot，让第二路及后续路也进入 `MultiViewRenderer`。
+
+**独立 TODO**：
+
+- `doc/Phase3_9TODO.md`
+
+**阶段原则**：
+
+- 不把 `StreamId` 放进 `MediaPipeline`。
+- 不让 `MultiViewRenderer` 访问 `VFrame_`。
+- 不让 `MultiViewRenderer` 访问 `SyncManager`。
+- 不让 `MultiViewRenderer` 做同步判断、取帧判断或队列消费。
+- 暂时继续由 `VideoRender` 承担单路帧调度和默认回退路径。
+- 先支持 Grid2x2 中的多 slot YUV420P 绘制，不做格式转换和性能优化。
