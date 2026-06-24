@@ -1242,3 +1242,25 @@ docs: 规划 MultiViewRenderer 单路真实帧接入
 - 不让 `MultiViewRenderer` 做同步判断、取帧判断或队列消费。
 - 保留 `VideoRender` 作为默认 sink 回退能力，不从基础设施层删除。
 - 先迁移旧容器承担的 UI 逻辑职责，再删除 `.ui` 中的旧视频容器。
+
+**阶段状态**：
+
+- [x] 已完成 UI 全面转向 `MultiViewRenderer`。
+- [x] 已完成验收报告：`doc/Phase3_11_UI全面转向MultiViewRenderer验收报告.md`
+
+## Phase 3.12 MultiViewRenderer 布局与交互完善
+
+**目标**：在 `MultiViewRenderer` 已成为主窗口常规视频显示区域后，补齐基础布局能力和单路聚焦交互，让统一渲染区域具备更完整的多路预览操作能力。
+
+**独立 TODO**：
+
+- `doc/Phase3_12TODO.md`
+
+**阶段原则**：
+
+- 不把 `StreamId` 放进 `MediaPipeline`。
+- 不把 `StreamId` 放进 `VideoFrameScheduler`。
+- 不让 `MultiViewRenderer` 访问 `VFrame_` 或 `SyncManager`。
+- 不让 `MultiViewRenderer` 做同步判断、取帧判断或队列消费。
+- 不让 `MultiViewRenderer` 决定 stream 与 slot 的绑定关系。
+- 先完善布局与交互，不处理格式转换、色彩异常和性能优化。
