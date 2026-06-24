@@ -57,7 +57,8 @@ void MediaPipeline::Shutdown()
 
 void MediaPipeline::Start()
 {
-    if (!demuxer_ || !Vdecoder_ || !videoRender_ || !positionTimer_ || !demuxerTH_ || !VdecoderTH_) {
+    if (!demuxer_ || !Vdecoder_ || !videoFrameScheduler_ || !activeVideoFrameSink_ ||
+        !positionTimer_ || !demuxerTH_ || !VdecoderTH_) {
         APP_LOG_WARN("MediaPipeline start failed: playback pipeline is not initialized");
         emit ErrorOccurred("Playback pipeline is not initialized");
         return;
@@ -87,12 +88,12 @@ void MediaPipeline::Start()
         Adecoder_->Start();
         audioplay_->Start();
     }
-    videoRender_->StartRendering();
+    videoFrameScheduler_->Start();
 }
 
 void MediaPipeline::Pause()
 {
-    if (!demuxer_ || !Vdecoder_ || !videoRender_ || !positionTimer_) {
+    if (!demuxer_ || !Vdecoder_ || !videoFrameScheduler_ || !positionTimer_) {
         APP_LOG_WARN("MediaPipeline pause failed: playback pipeline is not initialized");
         emit ErrorOccurred("Playback pipeline is not initialized");
         return;
@@ -107,7 +108,7 @@ void MediaPipeline::Pause()
     if (audioplay_) {
         audioplay_->Pause();
     }
-    videoRender_->Pause();
+    videoFrameScheduler_->Pause();
     positionTimer_->stop();
 }
 
@@ -164,8 +165,8 @@ bool MediaPipeline::SeekTo(double seconds)
         return false;
     }
 
-    if (videoRender_) {
-        videoRender_->ClearFrame();
+    if (videoFrameScheduler_) {
+        videoFrameScheduler_->ClearOutputFrame();
     }
 
     ClearQueues();
@@ -220,7 +221,8 @@ double MediaPipeline::Position() const
 
 bool MediaPipeline::IsInitialized() const
 {
-    return demuxer_ && Vdecoder_ && videoRender_ && positionTimer_ && demuxerTH_ && VdecoderTH_;
+    return demuxer_ && Vdecoder_ && videoFrameScheduler_ && activeVideoFrameSink_ &&
+           positionTimer_ && demuxerTH_ && VdecoderTH_;
 }
 
 void MediaPipeline::SetPlaybackSpeed(double speed)
@@ -228,8 +230,8 @@ void MediaPipeline::SetPlaybackSpeed(double speed)
     if (audioplay_) {
         audioplay_->SetSpeed(speed);
     }
-    if (videoRender_) {
-        videoRender_->SetSpeed(speed);
+    if (videoFrameScheduler_) {
+        videoFrameScheduler_->SetSpeed(speed);
     }
 }
 
@@ -279,9 +281,9 @@ bool MediaPipeline::CreatePipelineResources(std::shared_ptr<IMediaSource> mediaS
         audioplay_ = std::make_unique<AudioPlayer>();
     }
 
-    videoRender_ = new VideoRender(rendererContainer);
     syncManager_ = std::make_shared<syncmanager>();
     syncManager_->SetSyncType(hasAudio ? SYNCTYPE::AUDIO : SYNCTYPE::VIDEO);
+    videoFrameScheduler_ = std::make_unique<VideoFrameScheduler>();
     positionTimer_ = std::make_unique<QTimer>();
     positionTimer_->setInterval(200);
 
@@ -304,18 +306,25 @@ bool MediaPipeline::CreatePipelineResources(std::shared_ptr<IMediaSource> mediaS
         audioplay_->InitAudioPlay(demuxer_->ReAcoderPar(), AFrame_, syncManager_, sourceInfo.A_timeBase);
         audioplay_->moveToThread(audioplayTH_.get());
     }
-    videoRender_->InitVideoRender(VFrame_, syncManager_, sourceInfo.FrameRate, sourceInfo.V_timeBase);
-    videoRender_->SetExternalFrameSink(videoFrameSink);
-
     const bool useDefaultVisibleRenderer = videoFrameSink == nullptr;
-    if (rendererContainer && useDefaultVisibleRenderer) {
-        if (!rendererContainer->layout()) {
-            rendererContainer->setLayout(new QVBoxLayout());
+    if (useDefaultVisibleRenderer) {
+        videoRender_ = new VideoRender(rendererContainer);
+        if (rendererContainer) {
+            if (!rendererContainer->layout()) {
+                rendererContainer->setLayout(new QVBoxLayout());
+            }
+            rendererContainer->layout()->addWidget(videoRender_);
         }
-        rendererContainer->layout()->addWidget(videoRender_);
-    } else if (videoFrameSink) {
-        videoRender_->hide();
     }
+
+    activeVideoFrameSink_ = videoFrameSink ? videoFrameSink : videoRender_;
+    if (!activeVideoFrameSink_) {
+        APP_LOG_CRITICAL("MediaPipeline create resources failed: video frame sink is null");
+        return false;
+    }
+
+    videoFrameScheduler_->Initialize(VFrame_, syncManager_, sourceInfo.FrameRate, sourceInfo.V_timeBase);
+    videoFrameScheduler_->SetFrameSink(activeVideoFrameSink_);
 
     return true;
 }
@@ -390,10 +399,11 @@ void MediaPipeline::ReleaseResources()
         APP_LOG_DEBUG("MediaPipeline release: stop audio player");
         audioplay_->Stop();
     }
-    if (videoRender_) {
-        APP_LOG_DEBUG("MediaPipeline release: stop video render");
-        videoRender_->StopRendering();
-        videoRender_->ClearFrame();
+    if (videoFrameScheduler_) {
+        APP_LOG_DEBUG("MediaPipeline release: stop video frame scheduler");
+        videoFrameScheduler_->Stop();
+        videoFrameScheduler_->ClearOutputFrame();
+        videoFrameScheduler_->SetFrameSink(nullptr);
     }
 
     auto stopThread = [](const char* name, std::unique_ptr<QThread>& thread) {
@@ -417,11 +427,13 @@ void MediaPipeline::ReleaseResources()
     Adecoder_.reset();
     Vdecoder_.reset();
     audioplay_.reset();
+    videoFrameScheduler_.reset();
     if (videoRender_) {
         APP_LOG_DEBUG("MediaPipeline release: delete video render");
         delete videoRender_;
         videoRender_ = nullptr;
     }
+    activeVideoFrameSink_ = nullptr;
 
     APP_LOG_DEBUG("MediaPipeline release: reset queues and sync manager");
     APacket_.reset();
@@ -484,9 +496,9 @@ void MediaPipeline::HandleDemuxError(const QString& message)
     if (audioplay_) {
         audioplay_->Pause();
     }
-    if (videoRender_) {
-        videoRender_->Pause();
-        videoRender_->ClearFrame();
+    if (videoFrameScheduler_) {
+        videoFrameScheduler_->Pause();
+        videoFrameScheduler_->ClearOutputFrame();
     }
 
     emit ErrorOccurred(message.isEmpty() ? QString("Demuxer runtime error") : message);
@@ -496,9 +508,9 @@ bool MediaPipeline::SuspendPipelineAndWait()
 {
     APP_LOG_DEBUG("MediaPipeline suspend begin");
 
-    if (videoRender_) {
-        APP_LOG_DEBUG("MediaPipeline suspend: pause video render");
-        videoRender_->Pause();
+    if (videoFrameScheduler_) {
+        APP_LOG_DEBUG("MediaPipeline suspend: pause video frame scheduler");
+        videoFrameScheduler_->Pause();
     }
     if (audioplay_) {
         APP_LOG_DEBUG("MediaPipeline suspend: pause audio player");
@@ -528,9 +540,9 @@ bool MediaPipeline::SuspendPipelineAndWait()
 
 void MediaPipeline::ResetPipelineToStart()
 {
-    if (videoRender_) {
-        videoRender_->StopRendering();
-        videoRender_->ClearFrame();
+    if (videoFrameScheduler_) {
+        videoFrameScheduler_->Stop();
+        videoFrameScheduler_->ClearOutputFrame();
     }
     if (audioplay_) {
         audioplay_->Pause();
@@ -545,9 +557,9 @@ void MediaPipeline::ResetPipelineToStart()
 
 void MediaPipeline::ResetRealtimePipelineStop()
 {
-    if (videoRender_) {
-        videoRender_->StopRendering();
-        videoRender_->ClearFrame();
+    if (videoFrameScheduler_) {
+        videoFrameScheduler_->Stop();
+        videoFrameScheduler_->ClearOutputFrame();
     }
     if (audioplay_) {
         audioplay_->Pause();

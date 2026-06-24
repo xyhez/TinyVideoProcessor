@@ -12,6 +12,7 @@
 #include "infrastructure/decoder.h"
 #include "infrastructure/demuxer.h"
 #include "infrastructure/syncmanager.h"
+#include "infrastructure/videoframescheduler.h"
 #include "infrastructure/videorender.h"
 
 class QWidget;
@@ -231,7 +232,9 @@ private:
     std::unique_ptr<decoder> Adecoder_;
     std::unique_ptr<decoder> Vdecoder_;
     std::unique_ptr<AudioPlayer> audioplay_;
+    std::unique_ptr<VideoFrameScheduler> videoFrameScheduler_;
     VideoRender* videoRender_ = nullptr;
+    IVideoFrameSink* activeVideoFrameSink_ = nullptr;
 
     std::unique_ptr<QThread> demuxerTH_;
     std::unique_ptr<QThread> AdecoderTH_;

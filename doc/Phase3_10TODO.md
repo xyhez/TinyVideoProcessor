@@ -11,8 +11,8 @@
   - `VideoFrameScheduler` 抽取方案已完成。
   - `VideoFrameScheduler` 空壳类已新增并接入构建文件。
   - `VideoRender` 内部取帧、同步判断、丢帧和自调度循环已迁移到 `VideoFrameScheduler`。
+  - `MediaPipeline` 已显式组合 `VideoFrameScheduler` 和当前 `IVideoFrameSink`。
 - 未完成：
-  - `MediaPipeline` 仍通过创建 `VideoRender` 间接获得视频帧调度能力。
   - `MultiViewRenderer` 尚未成为 UI 唯一视频显示区域。
 - 已知风险：
   - 直接删除 `VideoRender` 会同时破坏取帧、同步判断、丢帧追赶和 VIDEO sync 时钟刷新。
@@ -267,23 +267,23 @@ refactor: 将 VideoRender 帧调度迁移到 VideoFrameScheduler
 
 **任务清单**：
 
-- [ ] 在 `MediaPipeline` 中持有 `VideoFrameScheduler`。
-- [ ] 默认路径创建 `VideoRender` 作为 sink。
-- [ ] 外部 sink 路径使用传入的 `IVideoFrameSink`。
-- [ ] scheduler 统一接收当前 sink。
-- [ ] `Start()` / `Pause()` / `Stop()` / `SeekTo()` / `ReleaseResources()` 改为控制 scheduler。
-- [ ] `VideoRender` 不再暴露调度启动停止语义，或仅保留兼容壳。
+- [x] 在 `MediaPipeline` 中持有 `VideoFrameScheduler`。
+- [x] 默认路径创建 `VideoRender` 作为 sink。
+- [x] 外部 sink 路径使用传入的 `IVideoFrameSink`。
+- [x] scheduler 统一接收当前 sink。
+- [x] `Start()` / `Pause()` / `Stop()` / `SeekTo()` / `ReleaseResources()` 改为控制 scheduler。
+- [x] `VideoRender` 不再暴露调度启动停止语义，或仅保留兼容壳。
 
 **验收标准**：
 
-- [ ] `MediaPipeline` 的视频调度入口变为 scheduler。
-- [ ] `VideoRender` 只作为默认显示 sink。
-- [ ] 外部 sink 路径不需要创建隐藏的 `VideoRender` 来调度。
-- [ ] `StreamId` 仍不进入 `MediaPipeline`。
+- [x] `MediaPipeline` 的视频调度入口变为 scheduler。
+- [x] `VideoRender` 只作为默认显示 sink。
+- [x] 外部 sink 路径不需要创建隐藏的 `VideoRender` 来调度。
+- [x] `StreamId` 仍不进入 `MediaPipeline`。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\domain\MediaPipeline.h src\domain\MediaPipeline.cpp src\infrastructure\videorender.h src\infrastructure\videorender.cpp src\infrastructure\videoframescheduler.h src\infrastructure\videoframescheduler.cpp doc\Phase3_10TODO.md`
+- [x] 静态检查：`git diff --check -- src\domain\MediaPipeline.h src\domain\MediaPipeline.cpp src\infrastructure\videorender.h src\infrastructure\videorender.cpp src\infrastructure\videoframescheduler.h src\infrastructure\videoframescheduler.cpp doc\Phase3_10TODO.md`
 - [ ] 人工运行建议：默认单路播放仍能显示。
 - [ ] 人工运行建议：多路统一渲染仍能显示多路画面。
 - [ ] 人工运行建议：seek / stop / pause / shutdown 不阻塞、不残留旧帧。
