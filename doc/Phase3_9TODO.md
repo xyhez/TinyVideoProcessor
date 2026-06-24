@@ -120,25 +120,25 @@ docs: 拆分 Phase 3.9 多 slot 真实帧扩展任务
 
 **任务清单**：
 
-- [ ] 梳理 `StreamId -> slot` 的来源。
-- [ ] 梳理 `slot -> viewport` 的来源。
-- [ ] 明确 `paintGL()` 中遍历 slot 还是遍历 stream。
-- [ ] 明确无帧 stream、已清理 stream、无映射 stream 的绘制行为。
-- [ ] 明确纹理上传时机：`PresentFrame` 只接管帧，`paintGL` 或 OpenGL 上下文内函数负责上传。
-- [ ] 明确旧 slot 0 特判应如何移除。
-- [ ] 明确多 slot 绘制下的日志边界，只保留必要诊断输出。
+- [x] 梳理 `StreamId -> slot` 的来源。
+- [x] 梳理 `slot -> viewport` 的来源。
+- [x] 明确 `paintGL()` 中遍历 slot 还是遍历 stream。
+- [x] 明确无帧 stream、已清理 stream、无映射 stream 的绘制行为。
+- [x] 明确纹理上传时机：`PresentFrame` 只接管帧，`paintGL` 或 OpenGL 上下文内函数负责上传。
+- [x] 明确旧 slot 0 特判应如何移除。
+- [x] 明确多 slot 绘制下的日志边界，只保留必要诊断输出。
 
 **验收标准**：
 
-- [ ] 能说明多 slot 绘制不依赖 slot 0 特判。
-- [ ] 能说明 stream 与 slot 映射变化后如何避免残留旧帧。
-- [ ] 能说明空 slot、无帧 slot 和正常 slot 的绘制差异。
-- [ ] 能说明 OpenGL 资源创建、更新、释放仍在 renderer 上下文内完成。
+- [x] 能说明多 slot 绘制不依赖 slot 0 特判。
+- [x] 能说明 stream 与 slot 映射变化后如何避免残留旧帧。
+- [x] 能说明空 slot、无帧 slot 和正常 slot 的绘制差异。
+- [x] 能说明 OpenGL 资源创建、更新、释放仍在 renderer 上下文内完成。
 
 **测试流程**：
 
-- [ ] 本任务为设计文档，不运行程序。
-- [ ] 静态检查：`git diff --check -- doc\Phase3_9_MultiViewRenderer多slot绘制方案.md doc\Phase3_9TODO.md`
+- [x] 本任务为设计文档，不运行程序。
+- [x] 静态检查：`git diff --check -- doc\Phase3_9_MultiViewRenderer多slot绘制方案.md doc\Phase3_9TODO.md`
 
 **Commit message**：
 
