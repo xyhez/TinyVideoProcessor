@@ -1171,3 +1171,19 @@ docs: 规划 MultiViewRenderer 单路真实帧接入
 - 明确 OpenGL 上下文线程和帧清理要求
 - 明确先接一路真实帧再扩展多路的验收路线
 ```
+
+## Phase 3.8 MultiViewRenderer 单路真实帧接入
+
+**目标**：在 Phase 3.7 已经拆清视频帧输出边界后，开始推进 `MultiViewRenderer` 单路真实帧接入。第一阶段只接一路到 slot 0，并保留当前 `VideoRender` 默认路径作为回退。
+
+**独立 TODO**：
+
+- `doc/Phase3_8TODO.md`
+
+**阶段原则**：
+
+- 不把 `StreamId` 放进 `MediaPipeline`。
+- 不让 `MultiViewRenderer` 访问 `VFrame_`。
+- 不让 `MultiViewRenderer` 做同步判断。
+- 不替换当前 `VideoRender` 默认播放路径。
+- 先接一路，再考虑扩展多路。
