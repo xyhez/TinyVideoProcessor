@@ -251,6 +251,26 @@ void MultiViewRenderer::mousePressEvent(QMouseEvent* event) {
     QOpenGLWidget::mousePressEvent(event);
 }
 
+void MultiViewRenderer::mouseDoubleClickEvent(QMouseEvent* event) {
+    if (!event || event->button() != Qt::LeftButton) {
+        QOpenGLWidget::mouseDoubleClickEvent(event);
+        return;
+    }
+
+    const QPoint clickPosition = event->pos();
+    for (const Viewport& viewport : Viewports()) {
+        if (!viewport.IsBound() || !viewport.qtRect.contains(clickPosition)) {
+            continue;
+        }
+
+        emit StreamDoubleClicked(viewport.streamId);
+        event->accept();
+        return;
+    }
+
+    QOpenGLWidget::mouseDoubleClickEvent(event);
+}
+
 void MultiViewRenderer::ReleaseCurrentFrame(StreamRenderState& state) {
     av_frame_free(&state.currentFrame);
     state.videoWidth = 0;

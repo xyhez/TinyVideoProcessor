@@ -482,6 +482,8 @@ void MainWindow::InitializeMultiViewRenderer() {
 
     connect(multiViewRenderer_, &MultiViewRenderer::StreamClicked,
             this, &MainWindow::ActivateStreamFromView);
+    connect(multiViewRenderer_, &MultiViewRenderer::StreamDoubleClicked,
+            this, &MainWindow::ToggleFocusedStreamView);
 }
 
 void MainWindow::RefreshMultiViewRenderer() {
@@ -490,19 +492,21 @@ void MainWindow::RefreshMultiViewRenderer() {
     }
 
     MultiViewRenderer::Layout rendererLayout = MultiViewRenderer::Layout::Single;
-    switch (CurrentMultiViewLayout()) {
-    case MultiViewLayout::Single:
-        rendererLayout = MultiViewRenderer::Layout::Single;
-        break;
-    case MultiViewLayout::Grid2x2:
-        rendererLayout = MultiViewRenderer::Layout::Grid2x2;
-        break;
-    case MultiViewLayout::Grid3x3:
-        rendererLayout = MultiViewRenderer::Layout::Grid3x3;
-        break;
-    case MultiViewLayout::Grid4x4:
-        rendererLayout = MultiViewRenderer::Layout::Grid4x4;
-        break;
+    if (!IsMultiViewFocused()) {
+        switch (CurrentMultiViewLayout()) {
+        case MultiViewLayout::Single:
+            rendererLayout = MultiViewRenderer::Layout::Single;
+            break;
+        case MultiViewLayout::Grid2x2:
+            rendererLayout = MultiViewRenderer::Layout::Grid2x2;
+            break;
+        case MultiViewLayout::Grid3x3:
+            rendererLayout = MultiViewRenderer::Layout::Grid3x3;
+            break;
+        case MultiViewLayout::Grid4x4:
+            rendererLayout = MultiViewRenderer::Layout::Grid4x4;
+            break;
+        }
     }
 
     multiViewRenderer_->SetLayout(rendererLayout);
@@ -527,6 +531,11 @@ MediaPlayController::FrameSinkFactory MainWindow::CreateMultiViewFrameSinkFactor
 
 QMap<int, MediaPlayController::StreamId> MainWindow::MultiViewRendererViewSlots() const {
     QMap<int, MediaPlayController::StreamId> viewSlots;
+    if (IsMultiViewFocused()) {
+        viewSlots.insert(0, focusedStreamId_);
+        return viewSlots;
+    }
+
     for (auto it = streamSlotIndexes_.cbegin(); it != streamSlotIndexes_.cend(); ++it) {
         viewSlots.insert(it.value(), it.key());
     }
@@ -534,11 +543,41 @@ QMap<int, MediaPlayController::StreamId> MainWindow::MultiViewRendererViewSlots(
     return viewSlots;
 }
 
+bool MainWindow::IsMultiViewFocused() const {
+    return focusedStreamId_ != MediaPlayController::InvalidStreamId &&
+           streamSlotIndexes_.contains(focusedStreamId_);
+}
+
+void MainWindow::ToggleFocusedStreamView(MediaPlayController::StreamId streamId) {
+    if (streamId == MediaPlayController::InvalidStreamId || !streamSlotIndexes_.contains(streamId)) {
+        return;
+    }
+
+    if (focusedStreamId_ == streamId) {
+        ExitFocusedStreamView();
+        return;
+    }
+
+    focusedStreamId_ = streamId;
+    ActivateStreamFromView(streamId);
+    RefreshMultiViewLayout();
+}
+
+void MainWindow::ExitFocusedStreamView() {
+    if (focusedStreamId_ == MediaPlayController::InvalidStreamId) {
+        return;
+    }
+
+    focusedStreamId_ = MediaPlayController::InvalidStreamId;
+    RefreshMultiViewLayout();
+}
+
 void MainWindow::SetMultiViewLayout(MultiViewLayout layout) {
     if (multiViewLayout_ == layout) {
         return;
     }
 
+    focusedStreamId_ = MediaPlayController::InvalidStreamId;
     multiViewLayout_ = layout;
     UpdateLayoutComboBox(multiViewLayout_);
     RefreshMultiViewLayout();
@@ -606,6 +645,10 @@ void MainWindow::BindStreamToVideoSlot(MediaPlayController::StreamId streamId,
 }
 
 void MainWindow::ReleaseVideoSlotForStream(MediaPlayController::StreamId streamId) {
+    if (focusedStreamId_ == streamId) {
+        focusedStreamId_ = MediaPlayController::InvalidStreamId;
+    }
+
     streamSlotIndexes_.remove(streamId);
 }
 

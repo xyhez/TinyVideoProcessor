@@ -206,6 +206,24 @@ private:
     QMap<int, MediaPlayController::StreamId> MultiViewRendererViewSlots() const;
 
     /**
+     * @brief IsMultiViewFocused 判断当前是否处于单路聚焦显示状态
+     * @return true 已聚焦单路
+     * @return false 常规多路布局
+     */
+    bool IsMultiViewFocused() const;
+
+    /**
+     * @brief ToggleFocusedStreamView 切换指定流的单路聚焦显示状态
+     * @param streamId 目标流 ID
+     */
+    void ToggleFocusedStreamView(MediaPlayController::StreamId streamId);
+
+    /**
+     * @brief ExitFocusedStreamView 退出单路聚焦显示状态
+     */
+    void ExitFocusedStreamView();
+
+    /**
      * @brief SetMultiViewLayout 切换多路显示布局状态
      * @param layout 目标布局
      */
@@ -421,6 +439,7 @@ private:
     bool isFullScreenMode_ = false;
     bool isCursorHidden_ = false;
     MultiViewLayout multiViewLayout_ = MultiViewLayout::Single;
+    MediaPlayController::StreamId focusedStreamId_ = MediaPlayController::InvalidStreamId;
     QMap<MediaPlayController::StreamId, QString> streamDisplayNames_;
     QMap<MediaPlayController::StreamId, int> streamSlotIndexes_;
 

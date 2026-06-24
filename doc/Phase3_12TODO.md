@@ -12,8 +12,8 @@
   - Phase 3.12.2 已完成 `Grid3x3` / `Grid4x4` 布局模型定义。
   - Phase 3.12.3 已完成 `Grid3x3` / `Grid4x4` viewport 计算扩展。
   - Phase 3.12.4 已完成主窗口布局下拉框对 `Grid3x3` / `Grid4x4` 的 UI 映射。
+  - Phase 3.12.5 已完成双击单路聚焦与恢复交互。
 - 未完成：
-  - 单路聚焦/恢复仍只依赖当前 `Single` / `Grid2x2` 语义，缺少明确的聚焦交互模型。
   - Phase 3 尚未形成布局交互能力的阶段性验收报告。
 - 已知风险：
   - 布局能力、全屏能力、格式转换和性能优化容易混在一起，需要本阶段严格收口。
@@ -274,27 +274,27 @@ feat: 接入主窗口多路布局选择
 
 **任务清单**：
 
-- [ ] 明确触发方式：优先考虑双击已绑定画面。
-- [ ] 明确恢复方式：再次双击或切换布局恢复。
-- [ ] 明确聚焦状态归属：由 `MainWindow` 维护还是由 `MultiViewRenderer` 维护。
-- [ ] 保持 click 仍用于 active stream 切换。
-- [ ] double click 只改变显示布局，不改变 stream 生命周期。
-- [ ] 聚焦无音频流时保持现有 active audio 策略。
-- [ ] 聚焦状态下仍能绘制 active 高亮。
-- [ ] 退出聚焦后恢复进入聚焦前的布局。
+- [x] 明确触发方式：优先考虑双击已绑定画面。
+- [x] 明确恢复方式：再次双击或切换布局恢复。
+- [x] 明确聚焦状态归属：由 `MainWindow` 维护还是由 `MultiViewRenderer` 维护。
+- [x] 保持 click 仍用于 active stream 切换。
+- [x] double click 只改变显示布局，不改变 stream 生命周期。
+- [x] 聚焦无音频流时保持现有 active audio 策略。
+- [x] 聚焦状态下仍能绘制 active 高亮。
+- [x] 退出聚焦后恢复进入聚焦前的布局。
 
 **验收标准**：
 
-- [ ] 双击某一路可以放大该路。
-- [ ] 再次双击或切换布局可以恢复。
-- [ ] active stream 和 active audio stream 策略不退化。
-- [ ] 聚焦/恢复不影响播放生命周期。
-- [ ] 空 slot 双击不触发聚焦。
+- [x] 双击某一路可以放大该路。
+- [x] 再次双击或切换布局可以恢复。
+- [x] active stream 和 active audio stream 策略不退化。
+- [x] 聚焦/恢复不影响播放生命周期。
+- [x] 空 slot 双击不触发聚焦。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\multiviewrenderer.h src\infrastructure\multiviewrenderer.cpp src\ui\mainwindow.h src\ui\mainwindow.cpp doc\Phase3_12TODO.md`
-- [ ] 定向搜索：`rg -n "mouseDoubleClickEvent|StreamDoubleClicked|Focus|focused|ActivateStreamFromView|SetMultiViewLayout" src\infrastructure src\ui doc\Phase3_12TODO.md`
+- [x] 静态检查：`git diff --check -- src\infrastructure\multiviewrenderer.h src\infrastructure\multiviewrenderer.cpp src\ui\mainwindow.h src\ui\mainwindow.cpp doc\Phase3_12TODO.md`
+- [x] 定向搜索：`rg -n "mouseDoubleClickEvent|StreamDoubleClicked|Focus|focused|ActivateStreamFromView|SetMultiViewLayout" src\infrastructure src\ui doc\Phase3_12TODO.md`
 - [ ] 人工运行建议：2 路和 4 路播放时分别双击有音频/无音频画面，确认画面、声音和高亮符合预期。
 
 **Commit message**：

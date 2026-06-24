@@ -155,6 +155,12 @@ signals:
      */
     void StreamClicked(MultiViewRenderer::StreamId streamId);
 
+    /**
+     * @brief StreamDoubleClicked 双击已绑定 view slot 时发出的信号
+     * @param streamId 被双击的 StreamId
+     */
+    void StreamDoubleClicked(MultiViewRenderer::StreamId streamId);
+
 protected:
     /**
      * @brief initializeGL 初始化 OpenGL 状态
@@ -171,6 +177,12 @@ protected:
      * @param event 鼠标按下事件
      */
     void mousePressEvent(QMouseEvent* event) override;
+
+    /**
+     * @brief mouseDoubleClickEvent 处理 viewport 双击命中
+     * @param event 鼠标双击事件
+     */
+    void mouseDoubleClickEvent(QMouseEvent* event) override;
 
 private:
     /**
