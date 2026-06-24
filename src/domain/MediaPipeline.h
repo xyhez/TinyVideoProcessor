@@ -40,7 +40,8 @@ public:
     /**
      * @brief Initialize 初始化单路播放管线
      * @param mediaSource 媒体源抽象
-     * @param rendererContainer 视频渲染容器
+     * @param rendererContainer 默认视频渲染容器
+     * @param videoFrameSink 外部视频帧输出目标，为空时使用默认 VideoRender 可见路径
      * @return true 初始化成功
      * @return false 初始化失败
      */
@@ -161,7 +162,8 @@ private:
     /**
      * @brief CreatePipelineResources 创建当前媒体源对应的单路播放资源
      * @param mediaSource 已打开或待接入的媒体源抽象
-     * @param rendererContainer 视频渲染容器
+     * @param rendererContainer 默认视频渲染容器
+     * @param videoFrameSink 外部视频帧输出目标，为空时把 VideoRender 加入默认容器
      * @return true 创建成功
      * @return false 创建失败
      */

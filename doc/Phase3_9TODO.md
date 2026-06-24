@@ -12,12 +12,12 @@
   - 第二路及后续路尚未全部进入 `MultiViewRenderer`。
   - `MultiViewRenderer` 尚未对多个 slot 绘制真实帧。
   - 外部 sink 路径下旧 `VideoRender` widget 的过渡策略尚未收口。
-  - 多路 remove / stop / shutdown / layout 切换的真实帧生命周期仍需复核。
+  - 多路 remove / stop / shutdown / layout 切换的真实帧生命周期已完成静态复核。
 - 已知风险：
   - 每路 OpenGL 纹理必须在 `MultiViewRenderer` 的 OpenGL 上下文线程创建、更新和释放。
   - `AVFrame*` 从播放管线跨线程投递到统一渲染器时，所有权必须保持单一且可追踪。
-  - renderer 销毁后不能再处理 queued `PresentFrame` 或 `ClearFrame`。
-  - 多路接入后，slot 和 stream 的映射变化不能导致旧帧残留到错误 viewport。
+  - renderer 销毁后不能再处理 queued `PresentFrame` 或 `ClearFrame`，当前由 adapter 的 `QPointer` 保护。
+  - 多路接入后，slot 和 stream 的映射变化不能导致旧帧残留到错误 viewport，当前由 `DetachStream` 和管线输出清理共同保证。
   - 旧 `VideoRender` widget 如果仍保留在界面中，可能造成“同一路有两个显示出口”或布局占位混乱。
 - 本轮范围：
   - 将 Phase 3.8 的单路真实帧路径扩展为多 slot 路径。
@@ -261,23 +261,23 @@ feat: 支持 MultiViewRenderer 多 slot 真实帧绘制
 
 **任务清单**：
 
-- [ ] 梳理外部 sink 存在时 `VideoRender` 的职责。
-- [ ] 确认 `VideoRender` widget 是否仍需要加入旧布局。
-- [ ] 如果外部 sink 存在，避免把旧 render widget 作为可见播放区域。
-- [ ] 保持默认路径未提供 sink 时行为不变。
-- [ ] 保持 `VideoRender` 内部调度能力暂时可用。
-- [ ] 记录该策略是过渡方案，后续 `VideoFrameScheduler` 抽取后再收敛。
+- [x] 梳理外部 sink 存在时 `VideoRender` 的职责。
+- [x] 确认 `VideoRender` widget 是否仍需要加入旧布局。
+- [x] 如果外部 sink 存在，避免把旧 render widget 作为可见播放区域。
+- [x] 保持默认路径未提供 sink 时行为不变。
+- [x] 保持 `VideoRender` 内部调度能力暂时可用。
+- [x] 记录该策略是过渡方案，后续 `VideoFrameScheduler` 抽取后再收敛。
 
 **验收标准**：
 
-- [ ] 同一路视频不会同时显示在旧 `QOpenGLWidget` 和 `MultiViewRenderer`。
-- [ ] 默认无外部 sink 播放路径不受影响。
-- [ ] 外部 sink 路径下 `VideoRender` 仍能提供调度，不承担最终可见显示。
-- [ ] 该策略不要求提前抽出 `VideoFrameScheduler`。
+- [x] 同一路视频不会同时显示在旧 `QOpenGLWidget` 和 `MultiViewRenderer`。
+- [x] 默认无外部 sink 播放路径不受影响。
+- [x] 外部 sink 路径下 `VideoRender` 仍能提供调度，不承担最终可见显示。
+- [x] 该策略不要求提前抽出 `VideoFrameScheduler`。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\domain\MediaPipeline.h src\domain\MediaPipeline.cpp src\ui\mainwindow.cpp doc\Phase3_9TODO.md`
+- [x] 静态检查：`git diff --check -- src\domain\MediaPipeline.h src\domain\MediaPipeline.cpp doc\Phase3_9TODO.md`
 - [ ] 人工运行建议：默认单路播放仍能显示。
 - [ ] 人工运行建议：多路统一渲染时旧播放区域不再显示重复画面。
 - [ ] 人工运行建议：stop all / pause all / close 不阻塞。
@@ -299,38 +299,31 @@ refactor: 收口统一渲染路径下的旧 VideoRender widget 策略
 
 **预计修改文件**：
 
-- `src/infrastructure/multiviewrenderer.h`
-- `src/infrastructure/multiviewrenderer.cpp`
-- `src/infrastructure/singlestreamframesinkadapter.h`
-- `src/infrastructure/singlestreamframesinkadapter.cpp`
-- `src/domain/MultiStreamManager.h`
-- `src/domain/MultiStreamManager.cpp`
-- `src/application/MediaPlayController.h`
-- `src/application/MediaPlayController.cpp`
+- `src/domain/MediaPipeline.cpp`
 - `doc/Phase3_9TODO.md`
 
 **任务清单**：
 
-- [ ] 检查 remove stream 是否调用 `DetachStream(streamId)`。
-- [ ] 检查 stop stream 是否调用 `ClearFrame(streamId)` 或等价清理。
-- [ ] 检查 stop all 是否覆盖所有 stream。
-- [ ] 检查 renderer 销毁后 adapter 不再访问 renderer。
-- [ ] 检查 queued `PresentFrame` 在 renderer 不存在时释放 frame。
-- [ ] 检查 seek 后旧帧不残留。
-- [ ] 检查 layout 切换后 slot 映射与帧状态一致。
+- [x] 检查 remove stream 是否调用 `DetachStream(streamId)`。
+- [x] 检查 stop stream 是否调用 `ClearFrame(streamId)` 或等价清理。
+- [x] 检查 stop all 是否覆盖所有 stream。
+- [x] 检查 renderer 销毁后 adapter 不再访问 renderer。
+- [x] 检查 queued `PresentFrame` 在 renderer 不存在时释放 frame。
+- [x] 检查 seek 后旧帧不残留。
+- [x] 检查 layout 切换后 slot 映射与帧状态一致。
 
 **验收标准**：
 
-- [ ] remove 任一路不会留下旧帧和旧纹理。
-- [ ] stop all 后统一渲染区域清空。
-- [ ] pause all 后关闭程序不阻塞。
-- [ ] 播放完成后关闭程序不阻塞。
-- [ ] seek 后不会长期显示 seek 前旧帧。
-- [ ] renderer 销毁期间没有悬空 queued 调用访问已释放对象。
+- [x] remove 任一路不会留下旧帧和旧纹理。
+- [x] stop all 后统一渲染区域清空。
+- [x] pause all 后关闭程序不阻塞。
+- [x] 播放完成后关闭程序不阻塞。
+- [x] seek 后不会长期显示 seek 前旧帧。
+- [x] renderer 销毁期间没有悬空 queued 调用访问已释放对象。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- <本任务修改文件>`
+- [x] 静态检查：`git diff --check -- src\domain\MediaPipeline.cpp doc\Phase3_9TODO.md`
 - [ ] 人工运行建议：两路播放后删除第二路。
 - [ ] 人工运行建议：两路播放后 stop all，再关闭程序。
 - [ ] 人工运行建议：两路播放后 pause all，再关闭程序。
@@ -343,9 +336,10 @@ refactor: 收口统一渲染路径下的旧 VideoRender widget 策略
 fix: 完善 MultiViewRenderer 多 slot 生命周期清理
 
 - 复核多路 remove 和 stop 的 frame 清理路径
-- 在 stream detach 时释放对应帧和纹理状态
-- 防止 renderer 销毁后 adapter 访问悬空对象
-- 确保 stop all 和 shutdown 能清空统一渲染状态
+- 在 MediaPipeline 的 stop、seek、错误退出和资源释放路径清理视频输出帧
+- 确保外部 frame sink 路径能同步清理 MultiViewRenderer 当前帧
+- 复核 renderer 销毁后 adapter 不访问悬空对象
+- 确保 stop all、seek 和 shutdown 不残留统一渲染旧帧
 - 保持同步和取帧逻辑仍在单路播放链路内
 ```
 

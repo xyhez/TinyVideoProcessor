@@ -164,6 +164,10 @@ bool MediaPipeline::SeekTo(double seconds)
         return false;
     }
 
+    if (videoRender_) {
+        videoRender_->ClearFrame();
+    }
+
     ClearQueues();
 
     const int seekResult = demuxer_->SeekTo(targetSeconds);
@@ -303,11 +307,14 @@ bool MediaPipeline::CreatePipelineResources(std::shared_ptr<IMediaSource> mediaS
     videoRender_->InitVideoRender(VFrame_, syncManager_, sourceInfo.FrameRate, sourceInfo.V_timeBase);
     videoRender_->SetExternalFrameSink(videoFrameSink);
 
-    if (rendererContainer) {
+    const bool useDefaultVisibleRenderer = videoFrameSink == nullptr;
+    if (rendererContainer && useDefaultVisibleRenderer) {
         if (!rendererContainer->layout()) {
             rendererContainer->setLayout(new QVBoxLayout());
         }
         rendererContainer->layout()->addWidget(videoRender_);
+    } else if (videoFrameSink) {
+        videoRender_->hide();
     }
 
     return true;
@@ -386,6 +393,7 @@ void MediaPipeline::ReleaseResources()
     if (videoRender_) {
         APP_LOG_DEBUG("MediaPipeline release: stop video render");
         videoRender_->StopRendering();
+        videoRender_->ClearFrame();
     }
 
     auto stopThread = [](const char* name, std::unique_ptr<QThread>& thread) {
@@ -478,6 +486,7 @@ void MediaPipeline::HandleDemuxError(const QString& message)
     }
     if (videoRender_) {
         videoRender_->Pause();
+        videoRender_->ClearFrame();
     }
 
     emit ErrorOccurred(message.isEmpty() ? QString("Demuxer runtime error") : message);
@@ -521,6 +530,7 @@ void MediaPipeline::ResetPipelineToStart()
 {
     if (videoRender_) {
         videoRender_->StopRendering();
+        videoRender_->ClearFrame();
     }
     if (audioplay_) {
         audioplay_->Pause();
@@ -537,6 +547,7 @@ void MediaPipeline::ResetRealtimePipelineStop()
 {
     if (videoRender_) {
         videoRender_->StopRendering();
+        videoRender_->ClearFrame();
     }
     if (audioplay_) {
         audioplay_->Pause();
