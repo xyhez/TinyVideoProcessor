@@ -40,7 +40,6 @@ QString ColorTransferName(AVColorTransferCharacteristic transfer)
 
 VideoRender::VideoRender(QWidget* parent)
     : QOpenGLWidget(parent)
-    , m_frameScheduler(std::make_unique<VideoFrameScheduler>())
 {
     setAttribute(Qt::WA_OpaquePaintEvent);
     setMinimumSize(320, 240);
@@ -48,63 +47,15 @@ VideoRender::VideoRender(QWidget* parent)
 
 VideoRender::~VideoRender()
 {
-    StopRendering();
-    if (m_frameScheduler) {
-        m_frameScheduler->SetFrameSink(nullptr);
-    }
     makeCurrent();
     FreeTextures();
     ClearCurrentFrame(false);
     doneCurrent();
 }
 
-void VideoRender::InitVideoRender(std::shared_ptr<SyncQueue<AVFrame*>> frameQueue,
-                                  std::shared_ptr<syncmanager> syncManager,
-                                  double frameRate,
-                                  double videoTimeBase)
-{
-    if (!m_frameScheduler) {
-        m_frameScheduler = std::make_unique<VideoFrameScheduler>();
-    }
-
-    m_frameScheduler->Initialize(frameQueue, syncManager, frameRate, videoTimeBase);
-    m_frameScheduler->SetFrameSink(this);
-}
-
-void VideoRender::StartRendering()
-{
-    if (m_frameScheduler) {
-        m_frameScheduler->Start();
-    }
-}
-
-void VideoRender::StopRendering()
-{
-    if (m_frameScheduler) {
-        m_frameScheduler->Stop();
-    }
-}
-
-void VideoRender::SetSpeed(double speed)
-{
-    if (m_frameScheduler) {
-        m_frameScheduler->SetSpeed(speed);
-    }
-}
-
-void VideoRender::SetExternalFrameSink(IVideoFrameSink* externalFrameSink)
-{
-    m_externalFrameSink = externalFrameSink;
-}
-
 void VideoRender::PresentFrame(AVFrame* frame)
 {
     if (!frame) {
-        return;
-    }
-
-    if (m_externalFrameSink) {
-        m_externalFrameSink->PresentFrame(frame);
         return;
     }
 
@@ -123,18 +74,7 @@ void VideoRender::PresentFrame(AVFrame* frame)
 
 void VideoRender::ClearFrame()
 {
-    ClearOutputFrame(true);
-}
-
-void VideoRender::ClearOutputFrame(bool requestUpdate)
-{
-    if (m_externalFrameSink) {
-        m_externalFrameSink->ClearFrame();
-        ClearCurrentFrame(false);
-        return;
-    }
-
-    ClearCurrentFrame(requestUpdate);
+    ClearCurrentFrame(true);
 }
 
 void VideoRender::ClearCurrentFrame(bool requestUpdate)

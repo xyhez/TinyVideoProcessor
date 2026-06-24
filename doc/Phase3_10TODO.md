@@ -12,6 +12,7 @@
   - `VideoFrameScheduler` 空壳类已新增并接入构建文件。
   - `VideoRender` 内部取帧、同步判断、丢帧和自调度循环已迁移到 `VideoFrameScheduler`。
   - `MediaPipeline` 已显式组合 `VideoFrameScheduler` 和当前 `IVideoFrameSink`。
+  - `VideoRender` 已收口为默认视频帧 sink 和 OpenGL widget。
 - 未完成：
   - `MultiViewRenderer` 尚未成为 UI 唯一视频显示区域。
 - 已知风险：
@@ -312,21 +313,21 @@ refactor: 让 MediaPipeline 显式组合 VideoFrameScheduler
 
 **任务清单**：
 
-- [ ] 移除或废弃 `StartRendering()`、`StopRendering()`、`Pause()` 的调度语义。
-- [ ] 移除 frame queue、sync manager、frameRate、videoTimeBase、speed 等调度字段。
-- [ ] 保留 `PresentFrame()` 和 `ClearFrame()`。
-- [ ] 保留 OpenGL 初始化、纹理上传和绘制。
-- [ ] 保留默认 widget sink 回退能力。
+- [x] 移除或废弃 `StartRendering()`、`StopRendering()`、`Pause()` 的调度语义。
+- [x] 移除 frame queue、sync manager、frameRate、videoTimeBase、speed 等调度字段。
+- [x] 保留 `PresentFrame()` 和 `ClearFrame()`。
+- [x] 保留 OpenGL 初始化、纹理上传和绘制。
+- [x] 保留默认 widget sink 回退能力。
 
 **验收标准**：
 
-- [ ] `VideoRender` 不再包含调度职责。
-- [ ] `VideoRender` 仍可作为默认单路显示 sink。
-- [ ] `MultiViewRenderer` 统一渲染路径不受影响。
+- [x] `VideoRender` 不再包含调度职责。
+- [x] `VideoRender` 仍可作为默认单路显示 sink。
+- [x] `MultiViewRenderer` 统一渲染路径不受影响。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\videorender.h src\infrastructure\videorender.cpp doc\Phase3_10TODO.md`
+- [x] 静态检查：`git diff --check -- src\infrastructure\videorender.h src\infrastructure\videorender.cpp doc\Phase3_10TODO.md`
 - [ ] 人工运行建议：默认单路播放。
 - [ ] 人工运行建议：多路统一渲染。
 

@@ -6,12 +6,8 @@
 #include <QOpenGLShaderProgram>
 #include <QOpenGLTexture>
 #include <QMutex>
-#include <memory>
 
 #include "infrastructure/ivideoframesink.h"
-#include "infrastructure/syncmanager.h"
-#include "infrastructure/videoframescheduler.h"
-#include "core/queue.h"
 
 extern "C" {
 #include <libavutil/frame.h>
@@ -22,8 +18,7 @@ extern "C" {
 /**
  * @brief 视频渲染器
  * @details 默认视频帧输出目标和 OpenGL 绘制窗口。取帧、同步判断和调度由
- *          VideoFrameScheduler 负责，VideoRender 只接管可显示帧并完成本地绘制；
- *          设置外部 sink 后，可显示帧会继续转交给外部渲染目标。
+ *          VideoFrameScheduler 负责，VideoRender 只接管可显示帧并完成本地绘制。
  */
 class VideoRender : public QOpenGLWidget, public IVideoFrameSink, protected QOpenGLFunctions
 {
@@ -42,50 +37,8 @@ public:
     ~VideoRender();
 
     /**
-     * @brief InitVideoRender 初始化视频渲染器
-     * @param frameQueue 视频帧队列
-     * @param syncManager 同步时钟管理器
-     * @param frameRate 视频帧率
-     * @param videoTimeBase 视频流时间基
-     */
-    void InitVideoRender(std::shared_ptr<SyncQueue<AVFrame*>> frameQueue,
-                         std::shared_ptr<syncmanager> syncManager,
-                         double frameRate,
-                         double videoTimeBase);
-
-    /**
-     * @brief StartRendering 启动视频渲染调度
-     */
-    void StartRendering();
-
-    /**
-     * @brief StopRendering 停止视频渲染调度
-     */
-    void StopRendering();
-
-    /**
-     * @brief Pause 暂停视频渲染
-     */
-    void Pause() { StopRendering(); }
-
-    /**
-     * @brief SetSpeed 设置渲染调度感知的播放速度
-     * @param speed 支持的播放速度档位
-     */
-    void SetSpeed(double speed);
-
-    /**
-     * @brief SetExternalFrameSink 设置外部视频帧输出目标
-     * @details 设置后调度器仍以 VideoRender 作为输出入口，VideoRender 会把可显示帧
-     *          转交给 externalFrameSink。传入 nullptr 时恢复默认自身渲染路径。
-     * @param externalFrameSink 外部帧消费者，不转移所有权
-     */
-    void SetExternalFrameSink(IVideoFrameSink* externalFrameSink);
-
-    /**
      * @brief PresentFrame 接管可显示帧并请求重绘
-     * @details IVideoFrameSink 接口实现。未设置外部 sink 时，frame 所有权转移给
-     *          VideoRender 的当前显示帧；设置外部 sink 时，frame 所有权继续转交给外部目标。
+     * @details IVideoFrameSink 接口实现。frame 所有权转移给 VideoRender 的当前显示帧。
      * @param frame 可显示帧
      */
     void PresentFrame(AVFrame* frame) override;
@@ -116,12 +69,6 @@ protected:
     void paintGL() override;
 
 private:
-    /**
-     * @brief ClearOutputFrame 清理当前输出 sink 的显示帧
-     * @param requestUpdate 默认自身渲染路径下是否请求重绘
-     */
-    void ClearOutputFrame(bool requestUpdate);
-
     /**
      * @brief ClearCurrentFrame 释放当前显示帧并重置显示状态
      * @param requestUpdate 是否请求重绘
@@ -171,8 +118,6 @@ private:
      */
     void FreeTextures();
 
-    std::unique_ptr<VideoFrameScheduler> m_frameScheduler;
-
     QOpenGLShaderProgram m_shader;
     QOpenGLTexture *m_texY = nullptr, *m_texU = nullptr, *m_texV = nullptr;
     bool m_glInited = false;
@@ -180,7 +125,6 @@ private:
     // 当前显示帧所有权由 VideoRender 接管：从队列弹出后赋值给该指针，
     // 替换显示帧或析构时由 VideoRender 调用 av_frame_free() 释放。
     AVFrame* m_displayFrame = nullptr;
-    IVideoFrameSink* m_externalFrameSink = nullptr;
     QMutex m_frameMutex;
 
     bool m_hasFrame = false;
