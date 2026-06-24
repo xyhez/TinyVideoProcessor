@@ -961,26 +961,26 @@ docs: 设计 IVideoFrameSink 接口草案
 
 **任务清单**：
 
-- [ ] 明确谁从 `VFrame_` 取出 `AVFrame*`，谁负责最终释放。
-- [ ] 明确调度器把帧交给 sink 后是否转移所有权。
-- [ ] 明确 sink 替换 current frame 时释放旧帧。
-- [ ] 明确 `ClearFrame()` 释放当前显示帧。
-- [ ] 明确 seek 时停止调度、清队列、flush decoder、清 current frame、刷新时钟的顺序。
-- [ ] 明确 stop 时停止调度、清 current frame、重置时钟的顺序。
-- [ ] 明确 remove stream 时 detach sink 和释放纹理/帧的顺序。
-- [ ] 明确 shutdown 时不能有排队 UI 更新访问已释放对象。
+- [x] 明确谁从 `VFrame_` 取出 `AVFrame*`，谁负责最终释放。
+- [x] 明确调度器把帧交给 sink 后是否转移所有权。
+- [x] 明确 sink 替换 current frame 时释放旧帧。
+- [x] 明确 `ClearFrame()` 释放当前显示帧。
+- [x] 明确 seek 时停止调度、清队列、flush decoder、清 current frame、刷新时钟的顺序。
+- [x] 明确 stop 时停止调度、清 current frame、重置时钟的顺序。
+- [x] 明确 remove stream 时 detach sink 和释放纹理/帧的顺序。
+- [x] 明确 shutdown 时不能有排队 UI 更新访问已释放对象。
 
 **验收标准**：
 
-- [ ] 能说明每个 `AVFrame*` 只有一个释放责任方。
-- [ ] 能说明 seek 后不会显示旧帧。
-- [ ] 能说明 remove stream 后不会访问已释放帧。
-- [ ] 能说明 shutdown 的释放顺序。
+- [x] 能说明每个 `AVFrame*` 只有一个释放责任方。
+- [x] 能说明 seek 后不会显示旧帧。
+- [x] 能说明 remove stream 后不会访问已释放帧。
+- [x] 能说明 shutdown 的释放顺序。
 
 **测试流程**：
 
-- [ ] 本任务为协议设计文档，不运行程序。
-- [ ] 静态检查：`git diff --check -- doc\Phase3_7_帧所有权与清理协议.md doc\TODO.md`
+- [x] 本任务为协议设计文档，不运行程序。
+- [x] 静态检查：`git diff --check -- doc\Phase3_7_帧所有权与清理协议.md doc\TODO.md`
 
 **Commit message**：
 
