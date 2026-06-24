@@ -10,8 +10,8 @@
   - 主窗口常规视频显示已由单个 `MultiViewRenderer` 承载。
   - 旧 `video_widget*` 容器、事件过滤、点击激活和 stylesheet 高亮路径已清理。
   - Phase 3.12.2 已完成 `Grid3x3` / `Grid4x4` 布局模型定义。
+  - Phase 3.12.3 已完成 `Grid3x3` / `Grid4x4` viewport 计算扩展。
 - 未完成：
-  - `MultiViewRenderer` 当前 viewport 计算仍主要支持 `Single` 和 `Grid2x2`。
   - 主窗口布局下拉框尚未覆盖更多多路布局。
   - 单路聚焦/恢复仍只依赖当前 `Single` / `Grid2x2` 语义，缺少明确的聚焦交互模型。
   - Phase 3 尚未形成布局交互能力的阶段性验收报告。
@@ -182,26 +182,26 @@ feat: 扩展 MultiViewRenderer 布局模型
 
 **任务清单**：
 
-- [ ] 将 `Grid2x2` 的网格计算抽成通用网格 viewport 计算方法。
-- [ ] 支持 `Grid3x3` viewport 计算。
-- [ ] 支持 `Grid4x4` viewport 计算。
-- [ ] 保持 `qtRect` 用于鼠标命中。
-- [ ] 保持 `framebufferRect` 用于 `glViewport()` / `glScissor()`。
-- [ ] 确认高 DPI 下新增布局不再出现左下角集中问题。
-- [ ] 空 slot 仍由 `MultiViewRenderer` 绘制背景。
+- [x] 将 `Grid2x2` 的网格计算抽成通用网格 viewport 计算方法。
+- [x] 支持 `Grid3x3` viewport 计算。
+- [x] 支持 `Grid4x4` viewport 计算。
+- [x] 保持 `qtRect` 用于鼠标命中。
+- [x] 保持 `framebufferRect` 用于 `glViewport()` / `glScissor()`。
+- [x] 确认高 DPI 下新增布局不再出现左下角集中问题。
+- [x] 空 slot 仍由 `MultiViewRenderer` 绘制背景。
 
 **验收标准**：
 
-- [ ] `Grid2x2` 行为不退化。
-- [ ] `Grid3x3` 能计算 9 个 viewport。
-- [ ] `Grid4x4` 能计算 16 个 viewport。
-- [ ] 鼠标点击命中仍使用 Qt 逻辑坐标。
-- [ ] OpenGL 绘制仍使用 framebuffer 物理像素。
+- [x] `Grid2x2` 行为不退化。
+- [x] `Grid3x3` 能计算 9 个 viewport。
+- [x] `Grid4x4` 能计算 16 个 viewport。
+- [x] 鼠标点击命中仍使用 Qt 逻辑坐标。
+- [x] OpenGL 绘制仍使用 framebuffer 物理像素。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\multiviewrenderer.h src\infrastructure\multiviewrenderer.cpp doc\Phase3_12TODO.md`
-- [ ] 定向搜索：`rg -n "QtRectForSlot|ToFramebufferRect|FramebufferSize|MaxVisibleSlots|Grid3x3|Grid4x4" src\infrastructure\multiviewrenderer.h src\infrastructure\multiviewrenderer.cpp doc\Phase3_12TODO.md`
+- [x] 静态检查：`git diff --check -- src\infrastructure\multiviewrenderer.h src\infrastructure\multiviewrenderer.cpp doc\Phase3_12TODO.md`
+- [x] 定向搜索：`rg -n "QtRectForSlot|ToFramebufferRect|FramebufferSize|MaxVisibleSlots|Grid3x3|Grid4x4" src\infrastructure\multiviewrenderer.h src\infrastructure\multiviewrenderer.cpp doc\Phase3_12TODO.md`
 - [ ] 人工运行建议：切换 `Single` / `Grid2x2` / `Grid3x3` / `Grid4x4`，确认画面区域位置正确。
 
 **Commit message**：

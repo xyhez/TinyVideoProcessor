@@ -14,9 +14,13 @@ extern "C" {
 }
 
 namespace {
-constexpr int kMaxLogicalSlots = 4;
 constexpr int kGrid2x2Columns = 2;
 constexpr int kGrid2x2Rows = 2;
+constexpr int kGrid3x3Columns = 3;
+constexpr int kGrid3x3Rows = 3;
+constexpr int kGrid4x4Columns = 4;
+constexpr int kGrid4x4Rows = 4;
+constexpr int kMaxLogicalSlots = kGrid4x4Columns * kGrid4x4Rows;
 constexpr int kSlotBorderWidth = 2;
 constexpr int kActiveSlotBorderWidth = 4;
 
@@ -119,7 +123,11 @@ int MultiViewRenderer::MaxVisibleSlots() const {
     case Layout::Single:
         return 1;
     case Layout::Grid2x2:
-        return kMaxLogicalSlots;
+        return kGrid2x2Columns * kGrid2x2Rows;
+    case Layout::Grid3x3:
+        return kGrid3x3Columns * kGrid3x3Rows;
+    case Layout::Grid4x4:
+        return kGrid4x4Columns * kGrid4x4Rows;
     }
 
     return 1;
@@ -325,22 +333,34 @@ QRect MultiViewRenderer::QtRectForSlot(int slotIndex) const {
     switch (layout_) {
     case Layout::Single:
         return slotIndex == 0 ? rect() : QRect();
-    case Layout::Grid2x2: {
-        if (!IsLogicalSlotIndex(slotIndex)) {
-            return {};
-        }
-
-        const int row = slotIndex / kGrid2x2Columns;
-        const int column = slotIndex % kGrid2x2Columns;
-        const int left = column * width() / kGrid2x2Columns;
-        const int right = (column + 1) * width() / kGrid2x2Columns;
-        const int top = row * height() / kGrid2x2Rows;
-        const int bottom = (row + 1) * height() / kGrid2x2Rows;
-        return QRect(left, top, right - left, bottom - top);
-    }
+    case Layout::Grid2x2:
+        return GridRectForSlot(slotIndex, kGrid2x2Columns, kGrid2x2Rows);
+    case Layout::Grid3x3:
+        return GridRectForSlot(slotIndex, kGrid3x3Columns, kGrid3x3Rows);
+    case Layout::Grid4x4:
+        return GridRectForSlot(slotIndex, kGrid4x4Columns, kGrid4x4Rows);
     }
 
     return rect();
+}
+
+QRect MultiViewRenderer::GridRectForSlot(int slotIndex, int columns, int rows) const {
+    if (!IsLogicalSlotIndex(slotIndex) || columns <= 0 || rows <= 0) {
+        return {};
+    }
+
+    const int maxSlots = columns * rows;
+    if (slotIndex >= maxSlots) {
+        return {};
+    }
+
+    const int row = slotIndex / columns;
+    const int column = slotIndex % columns;
+    const int left = column * width() / columns;
+    const int right = (column + 1) * width() / columns;
+    const int top = row * height() / rows;
+    const int bottom = (row + 1) * height() / rows;
+    return QRect(left, top, right - left, bottom - top);
 }
 
 QSize MultiViewRenderer::FramebufferSize() const {

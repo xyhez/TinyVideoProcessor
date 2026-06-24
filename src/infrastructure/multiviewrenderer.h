@@ -276,6 +276,15 @@ private:
     QRect QtRectForSlot(int slotIndex) const;
 
     /**
+     * @brief GridRectForSlot 计算网格布局中指定 slot 的 Qt 坐标区域
+     * @param slotIndex slot 索引
+     * @param columns 网格列数
+     * @param rows 网格行数
+     * @return Qt 坐标系显示区域
+     */
+    QRect GridRectForSlot(int slotIndex, int columns, int rows) const;
+
+    /**
      * @brief FramebufferSize 获取 OpenGL framebuffer 物理像素尺寸
      * @return framebuffer 尺寸
      */
