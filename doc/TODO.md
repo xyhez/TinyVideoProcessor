@@ -1196,6 +1196,11 @@ docs: 规划 MultiViewRenderer 单路真实帧接入
 
 - `doc/Phase3_9TODO.md`
 
+**阶段状态**：
+
+- [x] 已完成多 slot 真实帧扩展。
+- [x] 已完成验收报告：`doc/Phase3_9_MultiViewRenderer多slot真实帧扩展验收报告.md`
+
 **阶段原则**：
 
 - 不把 `StreamId` 放进 `MediaPipeline`。
@@ -1204,3 +1209,19 @@ docs: 规划 MultiViewRenderer 单路真实帧接入
 - 不让 `MultiViewRenderer` 做同步判断、取帧判断或队列消费。
 - 暂时继续由 `VideoRender` 承担单路帧调度和默认回退路径。
 - 先支持 Grid2x2 中的多 slot YUV420P 绘制，不做格式转换和性能优化。
+
+## Phase 3.10 VideoFrameScheduler 抽取
+
+**目标**：在 Phase 3.9 多 slot 真实帧路径稳定后，把仍留在 `VideoRender` 内部的取帧、同步判断、丢帧追赶和视频时钟刷新职责抽成独立 `VideoFrameScheduler`，为后续 UI 全面转向 `MultiViewRenderer` 做准备。
+
+**独立 TODO**：
+
+- `doc/Phase3_10TODO.md`
+
+**阶段原则**：
+
+- 不把 `StreamId` 放进 `VideoFrameScheduler`。
+- 不让 `VideoFrameScheduler` 依赖 `MultiViewRenderer`。
+- 不让 `MultiViewRenderer` 访问 `VFrame_` 或 `SyncManager`。
+- 让 `IVideoFrameSink` 继续作为调度器和显示 sink 之间的边界。
+- 先抽出调度器，再判断是否删除旧 `VideoRender` widget 容器。

@@ -8,11 +8,14 @@
   - `MultiViewRenderer` 已具备 YUV420P 纹理上传和 slot 0 绘制能力。
   - 播放列表 slot 0 路径已能进入统一渲染实验区域。
   - 默认 `VideoRender` 路径仍可作为回退路径。
-- 未完成：
-  - 第二路及后续路尚未全部进入 `MultiViewRenderer`。
-  - `MultiViewRenderer` 尚未对多个 slot 绘制真实帧。
-  - 外部 sink 路径下旧 `VideoRender` widget 的过渡策略尚未收口。
+  - 第二路及后续路已可通过 `SingleStreamFrameSinkAdapter` 进入 `MultiViewRenderer`。
+  - `MultiViewRenderer` 已支持多个 slot 绘制真实帧。
+  - 外部 sink 路径下旧 `VideoRender` widget 的可见职责已收口。
   - 多路 remove / stop / shutdown / layout 切换的真实帧生命周期已完成静态复核。
+  - Phase 3.9 多 slot 真实帧扩展验收报告已完成。
+- 未完成：
+  - Phase 3.9 范围内无剩余功能项。
+  - `VideoFrameScheduler` 抽取、非 YUV420P 格式转换、性能优化属于后续阶段。
 - 已知风险：
   - 每路 OpenGL 纹理必须在 `MultiViewRenderer` 的 OpenGL 上下文线程创建、更新和释放。
   - `AVFrame*` 从播放管线跨线程投递到统一渲染器时，所有权必须保持单一且可追踪。
@@ -354,24 +357,24 @@ fix: 完善 MultiViewRenderer 多 slot 生命周期清理
 
 **任务清单**：
 
-- [ ] 记录两路、三路、四路真实帧显示结果。
-- [ ] 记录文件 + 摄像头混合显示结果。
-- [ ] 记录 remove / stop / pause / seek / shutdown 验证结果。
-- [ ] 记录旧 `VideoRender` widget 过渡策略是否成立。
-- [ ] 记录非 YUV420P、性能和 `VideoFrameScheduler` 未处理限制。
-- [ ] 判断是否进入下一阶段：抽离 `VideoFrameScheduler` 或继续优化 `MultiViewRenderer`。
+- [x] 记录两路、三路、四路真实帧显示结果。
+- [x] 记录文件 + 摄像头混合显示结果。
+- [x] 记录 remove / stop / pause / seek / shutdown 验证结果。
+- [x] 记录旧 `VideoRender` widget 过渡策略是否成立。
+- [x] 记录非 YUV420P、性能和 `VideoFrameScheduler` 未处理限制。
+- [x] 判断是否进入下一阶段：抽离 `VideoFrameScheduler` 或继续优化 `MultiViewRenderer`。
 
 **验收标准**：
 
-- [ ] 能说明多 slot 真实帧接入是否成功。
-- [ ] 能说明默认回退路径是否仍可用。
-- [ ] 能说明当前剩余限制。
-- [ ] 能说明下一阶段推荐方向。
+- [x] 能说明多 slot 真实帧接入是否成功。
+- [x] 能说明默认回退路径是否仍可用。
+- [x] 能说明当前剩余限制。
+- [x] 能说明下一阶段推荐方向。
 
 **测试流程**：
 
-- [ ] 本任务为验收报告，不运行程序。
-- [ ] 静态检查：`git diff --check -- doc\Phase3_9_MultiViewRenderer多slot真实帧扩展验收报告.md doc\Phase3_9TODO.md`
+- [x] 本任务为验收报告，不运行程序。
+- [x] 静态检查：`git diff --check -- doc\Phase3_9_MultiViewRenderer多slot真实帧扩展验收报告.md doc\Phase3_9TODO.md`
 
 **Commit message**：
 
