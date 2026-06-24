@@ -917,26 +917,26 @@ docs: 设计视频帧调度边界
 
 **任务清单**：
 
-- [ ] 定义 `PresentFrame()` 语义。
-- [ ] 定义 `ClearFrame()` 语义。
-- [ ] 定义 `DetachStream()` 是否属于 sink 接口。
-- [ ] 明确 `PresentFrame()` 是否转移 `AVFrame*` 所有权。
-- [ ] 明确调用线程要求。
-- [ ] 明确 sink 清理当前显示帧的责任。
-- [ ] 明确第一版不使用 shared ownership。
-- [ ] 明确接口归属层级。
+- [x] 定义 `PresentFrame()` 语义。
+- [x] 定义 `ClearFrame()` 语义。
+- [x] 定义 `DetachStream()` 是否属于 sink 接口。
+- [x] 明确 `PresentFrame()` 是否转移 `AVFrame*` 所有权。
+- [x] 明确调用线程要求。
+- [x] 明确 sink 清理当前显示帧的责任。
+- [x] 明确第一版不使用 shared ownership。
+- [x] 明确接口归属层级。
 
 **验收标准**：
 
-- [ ] 能说明 sink 接收的是可显示帧，不是原始解码队列。
-- [ ] 能说明 `AVFrame*` 所有权在接口调用后的归属。
-- [ ] 能说明 `VideoRender` 如何作为默认 sink 保持现有路径。
-- [ ] 能说明 `MultiViewRenderer` 后续如何作为另一个 sink 接入。
+- [x] 能说明 sink 接收的是可显示帧，不是原始解码队列。
+- [x] 能说明 `AVFrame*` 所有权在接口调用后的归属。
+- [x] 能说明 `VideoRender` 如何作为默认 sink 保持现有路径。
+- [x] 能说明 `MultiViewRenderer` 后续如何作为另一个 sink 接入。
 
 **测试流程**：
 
-- [ ] 本任务为接口设计文档，不运行程序。
-- [ ] 静态检查：`git diff --check -- doc\Phase3_7_IVideoFrameSink接口草案.md doc\TODO.md`
+- [x] 本任务为接口设计文档，不运行程序。
+- [x] 静态检查：`git diff --check -- doc\Phase3_7_IVideoFrameSink接口草案.md doc\TODO.md`
 
 **Commit message**：
 
