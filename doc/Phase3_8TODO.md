@@ -112,26 +112,26 @@ docs: 拆分 Phase 3.8 单路真实帧接入任务
 
 **任务清单**：
 
-- [ ] 设计 `StreamRenderState` 的字段。
-- [ ] 明确 `AVFrame* currentFrame` 所有权。
-- [ ] 明确 texture 状态是 `QOpenGLTexture*` 还是 OpenGL texture id。
-- [ ] 明确 dirty flag 的作用。
-- [ ] 明确 width / height / SAR 的保存位置。
-- [ ] 明确 `streamId -> StreamRenderState` 容器。
-- [ ] 明确状态释放时机。
-- [ ] 暂不改 `MultiViewRenderer` 代码。
+- [x] 设计 `StreamRenderState` 的字段。
+- [x] 明确 `AVFrame* currentFrame` 所有权。
+- [x] 明确 texture 状态是 `QOpenGLTexture*` 还是 OpenGL texture id。
+- [x] 明确 dirty flag 的作用。
+- [x] 明确 width / height / SAR 的保存位置。
+- [x] 明确 `streamId -> StreamRenderState` 容器。
+- [x] 明确状态释放时机。
+- [x] 暂不改 `MultiViewRenderer` 代码。
 
 **验收标准**：
 
-- [ ] 能说明一条 stream 在 `MultiViewRenderer` 中需要保存哪些状态。
-- [ ] 能说明 current frame 与 texture 的生命周期关系。
-- [ ] 能说明状态释放由 `ClearFrame(streamId)` 和 `DetachStream(streamId)` 分别负责什么。
-- [ ] 没有引入真实帧绘制代码。
+- [x] 能说明一条 stream 在 `MultiViewRenderer` 中需要保存哪些状态。
+- [x] 能说明 current frame 与 texture 的生命周期关系。
+- [x] 能说明状态释放由 `ClearFrame(streamId)` 和 `DetachStream(streamId)` 分别负责什么。
+- [x] 没有引入真实帧绘制代码。
 
 **测试流程**：
 
-- [ ] 本任务为设计文档，不运行程序。
-- [ ] 静态检查：`git diff --check -- doc\Phase3_8_MultiViewRenderer帧状态模型设计.md doc\Phase3_8TODO.md`
+- [x] 本任务为设计文档，不运行程序。
+- [x] 静态检查：`git diff --check -- doc\Phase3_8_MultiViewRenderer帧状态模型设计.md doc\Phase3_8TODO.md`
 
 **Commit message**：
 
