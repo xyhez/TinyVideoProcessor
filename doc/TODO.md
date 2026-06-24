@@ -1264,3 +1264,51 @@ docs: 规划 MultiViewRenderer 单路真实帧接入
 - 不让 `MultiViewRenderer` 做同步判断、取帧判断或队列消费。
 - 不让 `MultiViewRenderer` 决定 stream 与 slot 的绑定关系。
 - 先完善布局与交互，不处理格式转换、色彩异常和性能优化。
+
+## Phase 3.13 渲染输入格式与显示质量完善
+
+**目标**：解决非 `YUV420P` 视频和 4K MKV 在统一渲染路径中的颜色异常、画面比例异常和局部显示问题。
+
+**独立 TODO**：
+
+- `doc/Phase3_13TODO.md`
+
+**阶段原则**：
+
+- 不把格式转换逻辑放进 `MainWindow`。
+- 不把格式转换逻辑放进 `VideoFrameScheduler`。
+- 不让 `MultiViewRenderer` 访问 `VFrame_` 或 `SyncManager`。
+- 不为单个异常文件写特殊分支。
+- 先保证显示正确性，再进入多路性能优化。
+
+## Phase 3.14 MultiViewRenderer 多路性能优化
+
+**目标**：在显示正确性完成后，建立多路渲染性能指标、优化纹理复用和刷新策略，为真实 9/16 路扩容提供性能基线。
+
+**独立 TODO**：
+
+- `doc/Phase3_14TODO.md`
+
+**阶段原则**：
+
+- 不用性能优化掩盖显示正确性问题。
+- 不让 `MultiViewRenderer` 管理播放管线生命周期。
+- 不让 `MultiViewRenderer` 做同步判断、取帧判断或队列消费。
+- 不在没有指标前盲目引入复杂 GPU 异步上传。
+- 优化结果必须能服务 Phase 3.15 的容量判断。
+
+## Phase 3.15 9/16 路真实播放扩容
+
+**目标**：在显示正确性和多路性能基线完成后，将 `Grid3x3` / `Grid4x4` 从布局显示能力推进到真实 9/16 路播放能力。
+
+**独立 TODO**：
+
+- `doc/Phase3_15TODO.md`
+
+**阶段原则**：
+
+- 不只修改容量常量，必须覆盖 stream 生命周期、slot 分配、UI 交互、音频策略和关闭释放。
+- 不把 `StreamId` 放进 `MediaPipeline`。
+- 不把 `StreamId` 放进 `VideoFrameScheduler`。
+- 不让 `MultiViewRenderer` 决定 stream 与 slot 的绑定关系。
+- 先验证 9 路，再评估 16 路。
