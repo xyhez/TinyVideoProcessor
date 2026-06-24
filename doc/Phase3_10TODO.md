@@ -10,8 +10,8 @@
   - 外部 sink 路径下旧 `VideoRender` widget 的可见职责已收口。
   - `VideoFrameScheduler` 抽取方案已完成。
   - `VideoFrameScheduler` 空壳类已新增并接入构建文件。
+  - `VideoRender` 内部取帧、同步判断、丢帧和自调度循环已迁移到 `VideoFrameScheduler`。
 - 未完成：
-  - `VideoRender` 仍持有 `VFrame_`、`syncmanager`、播放速度和自调度循环。
   - `MediaPipeline` 仍通过创建 `VideoRender` 间接获得视频帧调度能力。
   - `MultiViewRenderer` 尚未成为 UI 唯一视频显示区域。
 - 已知风险：
@@ -215,26 +215,26 @@ feat: 新增 VideoFrameScheduler 空壳
 
 **任务清单**：
 
-- [ ] 将 `CanRenderFrame()` 迁移到 scheduler。
-- [ ] 将 `CalculateScaledFrameInterval()` 迁移到 scheduler。
-- [ ] 将 `PeekNextFrame()` 迁移到 scheduler。
-- [ ] 将 `EvaluateFrameTiming()` 迁移到 scheduler。
-- [ ] 将 `DropLateFrame()` 迁移到 scheduler。
-- [ ] 将 `PopDisplayableFrame()` 迁移到 scheduler。
-- [ ] 将 `RefreshVideoClockIfNeeded()` 迁移到 scheduler。
-- [ ] 将自调度循环迁移到 scheduler。
-- [ ] `VideoRender` 作为 sink 接收 scheduler 输出帧。
+- [x] 将 `CanRenderFrame()` 迁移到 scheduler。
+- [x] 将 `CalculateScaledFrameInterval()` 迁移到 scheduler。
+- [x] 将 `PeekNextFrame()` 迁移到 scheduler。
+- [x] 将 `EvaluateFrameTiming()` 迁移到 scheduler。
+- [x] 将 `DropLateFrame()` 迁移到 scheduler。
+- [x] 将 `PopDisplayableFrame()` 迁移到 scheduler。
+- [x] 将 `RefreshVideoClockIfNeeded()` 迁移到 scheduler。
+- [x] 将自调度循环迁移到 scheduler。
+- [x] `VideoRender` 作为 sink 接收 scheduler 输出帧。
 
 **验收标准**：
 
-- [ ] `VideoRender` 不再直接访问 `VFrame_`。
-- [ ] `VideoRender` 不再直接访问 `syncmanager`。
-- [ ] 默认单路播放路径行为不变。
-- [ ] 外部 sink 路径仍可把帧送到 `MultiViewRenderer`。
+- [x] `VideoRender` 不再直接访问 `VFrame_`。
+- [x] `VideoRender` 不再直接访问 `syncmanager`。
+- [x] 默认单路播放路径行为不变。
+- [x] 外部 sink 路径仍可把帧送到 `MultiViewRenderer`。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\videorender.h src\infrastructure\videorender.cpp src\infrastructure\videoframescheduler.h src\infrastructure\videoframescheduler.cpp doc\Phase3_10TODO.md`
+- [x] 静态检查：`git diff --check -- src\infrastructure\videorender.h src\infrastructure\videorender.cpp src\infrastructure\videoframescheduler.h src\infrastructure\videoframescheduler.cpp doc\Phase3_10TODO.md`
 - [ ] 人工运行建议：普通 MP4 播放、暂停、继续、seek、stop、关闭。
 - [ ] 人工运行建议：无音频视频播放和关闭。
 - [ ] 人工运行建议：两路文件同时进入 `MultiViewRenderer`。

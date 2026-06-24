@@ -6,6 +6,12 @@
 #include <QtGlobal>
 #include <cmath>
 
+extern "C" {
+#include <libavutil/avutil.h>
+}
+
+static const int SYNC_THRESHOLD_MS = 40;
+
 namespace {
 constexpr double kSpeedEpsilon = 0.001;
 
@@ -50,19 +56,19 @@ void VideoFrameScheduler::SetFrameSink(IVideoFrameSink* frameSink)
 
 void VideoFrameScheduler::Start()
 {
-    if (running_) {
+    if (running_.load()) {
         return;
     }
 
-    running_ = true;
-    rendered_ = 0;
-    dropped_ = 0;
+    running_.store(true);
+    rendered_.store(0);
+    dropped_.store(0);
     QTimer::singleShot(0, this, &VideoFrameScheduler::Tick);
 }
 
 void VideoFrameScheduler::Stop()
 {
-    running_ = false;
+    running_.store(false);
     if (frameQueue_) {
         frameQueue_->WakeAll();
     }
@@ -96,10 +102,126 @@ void VideoFrameScheduler::Tick()
         return;
     }
 
-    // 调度逻辑将在后续步骤从 VideoRender::RenderFrame 迁移到这里。
+    const double speedSnapshot = speed_.load();
+    const int scaledInterval = CalculateScaledFrameInterval(speedSnapshot);
+
+    AVFrame* nextFrame = nullptr;
+    if (!PeekNextFrame(nextFrame)) {
+        ScheduleNextFrame(scaledInterval);
+        return;
+    }
+
+    const SYNCTYPE syncType = syncManager_->SyncType();
+    int waitMs = 0;
+    const FrameTimingDecision timingDecision = EvaluateFrameTiming(nextFrame, syncType, waitMs);
+    if (timingDecision == FrameTimingDecision::Wait) {
+        ScheduleNextFrame(waitMs);
+        return;
+    }
+    if (timingDecision == FrameTimingDecision::Drop) {
+        DropLateFrame();
+        ScheduleNextFrame(0);
+        return;
+    }
+
+    AVFrame* newFrame = nullptr;
+    if (!PopDisplayableFrame(newFrame)) {
+        ScheduleNextFrame(scaledInterval);
+        return;
+    }
+
+    RefreshVideoClockIfNeeded(newFrame, syncType);
+    PresentDisplayableFrame(newFrame);
+    ScheduleNextFrame(scaledInterval);
 }
 
 bool VideoFrameScheduler::CanScheduleFrame() const
 {
-    return running_ && frameQueue_ && syncManager_ && frameSink_;
+    return running_.load() && frameQueue_ && syncManager_ && frameSink_;
+}
+
+int VideoFrameScheduler::CalculateScaledFrameInterval(double speed) const
+{
+    return qMax(1, qRound(frameIntervalMs_ / speed));
+}
+
+bool VideoFrameScheduler::PeekNextFrame(AVFrame*& frame)
+{
+    frame = nullptr;
+    return frameQueue_ && frameQueue_->Front(frame) && frame;
+}
+
+VideoFrameScheduler::FrameTimingDecision VideoFrameScheduler::EvaluateFrameTiming(
+    const AVFrame* frame,
+    SYNCTYPE syncType,
+    int& waitMs) const
+{
+    waitMs = 0;
+    if (!frame || syncType != SYNCTYPE::AUDIO) {
+        return FrameTimingDecision::Display;
+    }
+
+    const double videoPts = frame->pts * videoTimeBase_ * 1000.0;
+    const double audioPts = syncManager_->GetClock() - 20;
+    const double diff = videoPts - audioPts;
+
+    if (diff > SYNC_THRESHOLD_MS) {
+        waitMs = qMin(qRound(diff), 30);
+        return FrameTimingDecision::Wait;
+    }
+
+    if (diff < -SYNC_THRESHOLD_MS) {
+        return FrameTimingDecision::Drop;
+    }
+
+    return FrameTimingDecision::Display;
+}
+
+bool VideoFrameScheduler::DropLateFrame()
+{
+    AVFrame* drop = nullptr;
+    if (!frameQueue_ || !frameQueue_->TryPop(drop) || !drop) {
+        return false;
+    }
+
+    av_frame_free(&drop);
+    dropped_.fetch_add(1);
+    return true;
+}
+
+bool VideoFrameScheduler::PopDisplayableFrame(AVFrame*& frame)
+{
+    frame = nullptr;
+    return frameQueue_ && frameQueue_->TryPop(frame) && frame;
+}
+
+void VideoFrameScheduler::RefreshVideoClockIfNeeded(const AVFrame* frame, SYNCTYPE syncType)
+{
+    if (syncType == SYNCTYPE::VIDEO &&
+        frame &&
+        frame->pts != AV_NOPTS_VALUE &&
+        videoTimeBase_ > 0.0) {
+        const double videoPts = frame->pts * videoTimeBase_ * 1000.0;
+        syncManager_->RefreshClock(videoPts);
+    }
+}
+
+void VideoFrameScheduler::PresentDisplayableFrame(AVFrame* frame)
+{
+    if (!frame) {
+        return;
+    }
+
+    if (!frameSink_) {
+        av_frame_free(&frame);
+        return;
+    }
+
+    frameSink_->PresentFrame(frame);
+    rendered_.fetch_add(1);
+}
+
+void VideoFrameScheduler::ScheduleNextFrame(int delayMs)
+{
+    QTimer::singleShot(delayMs, this, &VideoFrameScheduler::Tick);
 }

@@ -1,25 +1,12 @@
 ﻿#include "videorender.h"
 #include "core/AppLog.h"
 #include <QOpenGLPixelTransferOptions>
-#include <cmath>
 
 extern "C" {
 #include <libavutil/pixdesc.h>
 }
 
-static const int SYNC_THRESHOLD_MS = 40;
-
 namespace {
-constexpr double kSpeedEpsilon = 0.001;
-
-bool IsSupportedSpeed(double speed)
-{
-    return std::fabs(speed - 0.5) < kSpeedEpsilon
-        || std::fabs(speed - 1.0) < kSpeedEpsilon
-        || std::fabs(speed - 1.5) < kSpeedEpsilon
-        || std::fabs(speed - 2.0) < kSpeedEpsilon;
-}
-
 QString PixelFormatName(int format)
 {
     const char* name = av_get_pix_fmt_name(static_cast<AVPixelFormat>(format));
@@ -53,6 +40,7 @@ QString ColorTransferName(AVColorTransferCharacteristic transfer)
 
 VideoRender::VideoRender(QWidget* parent)
     : QOpenGLWidget(parent)
+    , m_frameScheduler(std::make_unique<VideoFrameScheduler>())
 {
     setAttribute(Qt::WA_OpaquePaintEvent);
     setMinimumSize(320, 240);
@@ -61,6 +49,9 @@ VideoRender::VideoRender(QWidget* parent)
 VideoRender::~VideoRender()
 {
     StopRendering();
+    if (m_frameScheduler) {
+        m_frameScheduler->SetFrameSink(nullptr);
+    }
     makeCurrent();
     FreeTextures();
     ClearCurrentFrame(false);
@@ -72,39 +63,33 @@ void VideoRender::InitVideoRender(std::shared_ptr<SyncQueue<AVFrame*>> frameQueu
                                   double frameRate,
                                   double videoTimeBase)
 {
-    m_frameQueue = frameQueue;
-    m_syncManager = syncManager;
-    m_videoTimeBase = videoTimeBase;
-
-    if (frameRate > 0 && frameRate < 120) {
-        m_frameIntervalMs = qRound(1000.0 / frameRate);
+    if (!m_frameScheduler) {
+        m_frameScheduler = std::make_unique<VideoFrameScheduler>();
     }
+
+    m_frameScheduler->Initialize(frameQueue, syncManager, frameRate, videoTimeBase);
+    m_frameScheduler->SetFrameSink(this);
 }
 
 void VideoRender::StartRendering()
 {
-    m_running = true;
-    m_rendered = 0;
-    m_dropped = 0;
-    QTimer::singleShot(0, this, &VideoRender::RenderFrame);
+    if (m_frameScheduler) {
+        m_frameScheduler->Start();
+    }
 }
 
 void VideoRender::StopRendering()
 {
-    m_running = false;
-    if (m_frameQueue) {
-        m_frameQueue->WakeAll();
+    if (m_frameScheduler) {
+        m_frameScheduler->Stop();
     }
 }
 
 void VideoRender::SetSpeed(double speed)
 {
-    if (!std::isfinite(speed) || !IsSupportedSpeed(speed)) {
-        APP_LOG_WARN_STREAM() << "VideoRender rejected unsupported speed:" << speed;
-        return;
+    if (m_frameScheduler) {
+        m_frameScheduler->SetSpeed(speed);
     }
-
-    m_speed.store(speed);
 }
 
 void VideoRender::SetExternalFrameSink(IVideoFrameSink* externalFrameSink)
@@ -112,112 +97,14 @@ void VideoRender::SetExternalFrameSink(IVideoFrameSink* externalFrameSink)
     m_externalFrameSink = externalFrameSink;
 }
 
-void VideoRender::RenderFrame()
-{
-    if (!CanRenderFrame()) return;
-
-    const double speedSnapshot = m_speed.load();
-    const int scaledInterval = CalculateScaledFrameInterval(speedSnapshot);
-
-    // 帧调度阶段：先查看队首帧，不弹出队列，避免过早接管 AVFrame 所有权。
-    AVFrame* nextFrame = nullptr;
-    if (!PeekNextFrame(nextFrame)) {
-        ScheduleNextFrame(scaledInterval);
-        return;
-    }
-
-    // 同步判断阶段：AUDIO sync 下以音频时钟为主时钟，判断视频帧早晚。
-    const SYNCTYPE syncType = m_syncManager->SyncType();
-    int waitMs = 0;
-    const FrameTimingDecision timingDecision = EvaluateFrameTiming(nextFrame, syncType, waitMs);
-    if (timingDecision == FrameTimingDecision::Wait) {
-        ScheduleNextFrame(waitMs);
-        return;
-    }
-    if (timingDecision == FrameTimingDecision::Drop) {
-        // 帧来得太晚：弹出并释放该帧，立即调度下一轮追赶主时钟。
-        DropLateFrame();
-        ScheduleNextFrame(0);
-        return;
-    }
-
-    // 显示帧接管阶段：只有同步窗口内的帧才从队列弹出并交给 m_displayFrame。
-    AVFrame* newFrame = nullptr;
-    if (!PopDisplayableFrame(newFrame)) {
-        ScheduleNextFrame(scaledInterval);
-        return;
-    }
-
-    RefreshVideoClockIfNeeded(newFrame, syncType);
-    PresentDisplayableFrame(newFrame);
-
-    // 下一轮调度阶段：保持自调度模型，由 Qt 事件循环再次进入 RenderFrame。
-    ScheduleNextFrame(scaledInterval);
-}
-
-bool VideoRender::CanRenderFrame() const
-{
-    return m_running && m_frameQueue && m_syncManager;
-}
-
-int VideoRender::CalculateScaledFrameInterval(double speed) const
-{
-    return qMax(1, qRound(m_frameIntervalMs / speed));
-}
-
-bool VideoRender::PeekNextFrame(AVFrame*& frame)
-{
-    frame = nullptr;
-    return m_frameQueue && m_frameQueue->Front(frame) && frame;
-}
-
-VideoRender::FrameTimingDecision VideoRender::EvaluateFrameTiming(const AVFrame* frame,
-                                                                  SYNCTYPE syncType,
-                                                                  int& waitMs) const
-{
-    waitMs = 0;
-    if (!frame || syncType != SYNCTYPE::AUDIO) {
-        return FrameTimingDecision::Display;
-    }
-
-    const double videoPts = frame->pts * m_videoTimeBase * 1000.0;
-    const double audioPts = m_syncManager->GetClock() - 20;
-    const double diff = videoPts - audioPts;
-
-    // 帧来得太早：不弹出队列，只延迟后重新判断同一队首帧。
-    if (diff > SYNC_THRESHOLD_MS) {
-        waitMs = qMin(qRound(diff), 30);
-        return FrameTimingDecision::Wait;
-    }
-
-    if (diff < -SYNC_THRESHOLD_MS) {
-        return FrameTimingDecision::Drop;
-    }
-
-    return FrameTimingDecision::Display;
-}
-
-bool VideoRender::DropLateFrame()
-{
-    AVFrame* drop = nullptr;
-    if (!m_frameQueue || !m_frameQueue->TryPop(drop) || !drop) {
-        return false;
-    }
-
-    av_frame_free(&drop);
-    m_dropped++;
-    return true;
-}
-
-bool VideoRender::PopDisplayableFrame(AVFrame*& frame)
-{
-    frame = nullptr;
-    return m_frameQueue && m_frameQueue->TryPop(frame) && frame;
-}
-
 void VideoRender::PresentFrame(AVFrame* frame)
 {
     if (!frame) {
+        return;
+    }
+
+    if (m_externalFrameSink) {
+        m_externalFrameSink->PresentFrame(frame);
         return;
     }
 
@@ -231,39 +118,12 @@ void VideoRender::PresentFrame(AVFrame* frame)
     m_hasFrame = true;
     m_frameMutex.unlock();
 
-    m_rendered++;
     update();
 }
 
 void VideoRender::ClearFrame()
 {
     ClearOutputFrame(true);
-}
-
-void VideoRender::RefreshVideoClockIfNeeded(const AVFrame* frame, SYNCTYPE syncType)
-{
-    if (syncType == SYNCTYPE::VIDEO &&
-        frame &&
-        frame->pts != AV_NOPTS_VALUE &&
-        m_videoTimeBase > 0.0) {
-        const double videoPts = frame->pts * m_videoTimeBase * 1000.0;
-        m_syncManager->RefreshClock(videoPts);
-    }
-}
-
-void VideoRender::PresentDisplayableFrame(AVFrame* frame)
-{
-    if (!frame) {
-        return;
-    }
-
-    if (m_externalFrameSink) {
-        m_externalFrameSink->PresentFrame(frame);
-        m_rendered++;
-        return;
-    }
-
-    PresentFrame(frame);
 }
 
 void VideoRender::ClearOutputFrame(bool requestUpdate)
@@ -290,12 +150,6 @@ void VideoRender::ClearCurrentFrame(bool requestUpdate)
     if (requestUpdate) {
         update();
     }
-}
-
-void VideoRender::ScheduleNextFrame(int delayMs)
-{
-    // 帧调度职责：这里只安排下一次调度，不做取帧、同步判断或 OpenGL 绘制。
-    QTimer::singleShot(delayMs, this, &VideoRender::RenderFrame);
 }
 
 void VideoRender::initializeGL()

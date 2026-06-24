@@ -5,13 +5,12 @@
 #include <QOpenGLFunctions>
 #include <QOpenGLShaderProgram>
 #include <QOpenGLTexture>
-#include <QTimer>
 #include <QMutex>
 #include <memory>
-#include <atomic>
 
 #include "infrastructure/ivideoframesink.h"
 #include "infrastructure/syncmanager.h"
+#include "infrastructure/videoframescheduler.h"
 #include "core/queue.h"
 
 extern "C" {
@@ -21,13 +20,10 @@ extern "C" {
 }
 
 /**
- * @brief 视频渲染器 - 自调度事件驱动版
- * @details 核心逻辑：自调度 RenderFrame → 取帧 → 同步判断 diff = frame.PTS - masterClock
- *          → diff > 阈值：ScheduleNextFrame(delay) 精确等待
- *          → diff < -阈值：丢帧，立即 ScheduleNextFrame(0) 追赶
- *          → 正常：渲染，ScheduleNextFrame(帧间隔)
- *          空闲时以帧间隔回退轮询，队列有帧则按需唤醒。
- *          参考 ffplay video_refresh() 的自调度模式。
+ * @brief 视频渲染器
+ * @details 默认视频帧输出目标和 OpenGL 绘制窗口。取帧、同步判断和调度由
+ *          VideoFrameScheduler 负责，VideoRender 只接管可显示帧并完成本地绘制；
+ *          设置外部 sink 后，可显示帧会继续转交给外部渲染目标。
  */
 class VideoRender : public QOpenGLWidget, public IVideoFrameSink, protected QOpenGLFunctions
 {
@@ -80,16 +76,16 @@ public:
 
     /**
      * @brief SetExternalFrameSink 设置外部视频帧输出目标
-     * @details 设置后 VideoRender 仍负责取帧和同步判断，但可显示帧会转交给
-     *          externalFrameSink。传入 nullptr 时恢复默认自身渲染路径。
+     * @details 设置后调度器仍以 VideoRender 作为输出入口，VideoRender 会把可显示帧
+     *          转交给 externalFrameSink。传入 nullptr 时恢复默认自身渲染路径。
      * @param externalFrameSink 外部帧消费者，不转移所有权
      */
     void SetExternalFrameSink(IVideoFrameSink* externalFrameSink);
 
     /**
      * @brief PresentFrame 接管可显示帧并请求重绘
-     * @details IVideoFrameSink 接口实现。调用后 frame 所有权转移给 VideoRender
-     *          的当前显示帧。
+     * @details IVideoFrameSink 接口实现。未设置外部 sink 时，frame 所有权转移给
+     *          VideoRender 的当前显示帧；设置外部 sink 时，frame 所有权继续转交给外部目标。
      * @param frame 可显示帧
      */
     void PresentFrame(AVFrame* frame) override;
@@ -100,15 +96,6 @@ public:
      *          不清空队列、不刷新 decoder、不重置同步时钟。
      */
     void ClearFrame() override;
-
-private slots:
-    /**
-     * @brief RenderFrame 自调度渲染循环入口
-     * @details 当前同时承担帧调度职责：查看队首帧、按 syncmanager 判断早晚、
-     *          丢弃过晚帧、接管可显示帧所有权，并触发下一次调度。
-     *          后续拆分帧输出边界时，应优先从该函数切出调度逻辑。
-     */
-    void RenderFrame();
 
 protected:
     /**
@@ -129,75 +116,6 @@ protected:
     void paintGL() override;
 
 private:
-    /**
-     * @brief FrameTimingDecision 表示当前队首帧的调度判断结果
-     */
-    enum class FrameTimingDecision {
-        Display,
-        Wait,
-        Drop
-    };
-
-    /**
-     * @brief CanRenderFrame 判断当前是否具备渲染调度条件
-     * @return true 可以继续调度
-     * @return false 当前缺少运行状态、帧队列或同步管理器
-     */
-    bool CanRenderFrame() const;
-
-    /**
-     * @brief CalculateScaledFrameInterval 计算播放速度修正后的帧间隔
-     * @param speed 当前播放速度快照
-     * @return 修正后的帧间隔，单位毫秒
-     */
-    int CalculateScaledFrameInterval(double speed) const;
-
-    /**
-     * @brief PeekNextFrame 查看队首帧但不弹出队列
-     * @param frame 输出队首帧指针
-     * @return true 成功取得队首帧
-     * @return false 队列为空或队首帧无效
-     */
-    bool PeekNextFrame(AVFrame*& frame);
-
-    /**
-     * @brief EvaluateFrameTiming 根据同步时钟判断队首帧应显示、等待或丢弃
-     * @param frame 队首帧
-     * @param syncType 当前同步类型
-     * @param waitMs 输出等待时间，只有返回 Wait 时有效
-     * @return 当前帧调度结果
-     */
-    FrameTimingDecision EvaluateFrameTiming(const AVFrame* frame, SYNCTYPE syncType, int& waitMs) const;
-
-    /**
-     * @brief DropLateFrame 弹出并释放过晚帧
-     * @return true 成功弹出并释放过晚帧
-     * @return false 队列中没有可丢弃帧
-     */
-    bool DropLateFrame();
-
-    /**
-     * @brief PopDisplayableFrame 弹出可显示帧并转交给调用方
-     * @param frame 输出可显示帧指针
-     * @return true 成功弹出可显示帧
-     * @return false 没有可显示帧
-     */
-    bool PopDisplayableFrame(AVFrame*& frame);
-
-    /**
-     * @brief RefreshVideoClockIfNeeded 在 VIDEO sync 模式下刷新视频主时钟
-     * @param frame 当前已显示帧
-     * @param syncType 当前同步类型
-     */
-    void RefreshVideoClockIfNeeded(const AVFrame* frame, SYNCTYPE syncType);
-
-    /**
-     * @brief PresentDisplayableFrame 将可显示帧提交给当前输出 sink
-     * @details 调用后 frame 所有权转移给目标 sink，调用方不能再访问该指针。
-     * @param frame 已完成调度判断的可显示帧
-     */
-    void PresentDisplayableFrame(AVFrame* frame);
-
     /**
      * @brief ClearOutputFrame 清理当前输出 sink 的显示帧
      * @param requestUpdate 默认自身渲染路径下是否请求重绘
@@ -253,15 +171,7 @@ private:
      */
     void FreeTextures();
 
-    /**
-     * @brief ScheduleNextFrame 安排下一次渲染调度
-     * @details 帧调度职责，当前使用 Qt 事件循环自调度下一次 RenderFrame。
-     * @param delayMs 延迟时间，单位毫秒
-     */
-    void ScheduleNextFrame(int delayMs);
-
-    std::shared_ptr<SyncQueue<AVFrame*>> m_frameQueue;
-    std::shared_ptr<syncmanager> m_syncManager;
+    std::unique_ptr<VideoFrameScheduler> m_frameScheduler;
 
     QOpenGLShaderProgram m_shader;
     QOpenGLTexture *m_texY = nullptr, *m_texU = nullptr, *m_texV = nullptr;
@@ -273,17 +183,10 @@ private:
     IVideoFrameSink* m_externalFrameSink = nullptr;
     QMutex m_frameMutex;
 
-    int m_frameIntervalMs = 33;
-    double m_videoTimeBase = 0.0;
-    std::atomic<double> m_speed {1.0};
     bool m_hasFrame = false;
-    bool m_running = false;
 
     int m_videoW = 0, m_videoH = 0;
     AVRational m_sar = {1, 1};
-
-    int m_rendered = 0;
-    int m_dropped = 0;
 
     AVPixelFormat m_lastLoggedFormat = AV_PIX_FMT_NONE;
     int m_lastLoggedWidth = 0;

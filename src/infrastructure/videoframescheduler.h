@@ -16,7 +16,7 @@ extern "C" {
 /**
  * @brief VideoFrameScheduler 单路视频帧调度器
  * @details 负责从视频帧队列取帧、执行同步判断并把可显示帧交给 IVideoFrameSink。
- *          第一版仅建立调度器边界和生命周期接口，暂不接管 VideoRender 现有调度逻辑。
+ *          不负责 OpenGL 绘制、QWidget 显示、多路布局或 StreamId 管理。
  */
 class VideoFrameScheduler : public QObject
 {
@@ -83,7 +83,7 @@ public:
 private slots:
     /**
      * @brief Tick 自调度入口
-     * @details 后续迁移 VideoRender 调度逻辑时由该函数替代 RenderFrame。
+     * @details 从帧队列查看队首帧，完成同步判断、丢帧追赶、可显示帧转交和下一轮调度。
      */
     void Tick();
 
@@ -95,12 +95,80 @@ private:
      */
     bool CanScheduleFrame() const;
 
+    /**
+     * @brief FrameTimingDecision 表示当前队首帧的调度判断结果
+     */
+    enum class FrameTimingDecision {
+        Display,
+        Wait,
+        Drop
+    };
+
+    /**
+     * @brief CalculateScaledFrameInterval 计算播放速度修正后的帧间隔
+     * @param speed 当前播放速度快照
+     * @return 修正后的帧间隔，单位毫秒
+     */
+    int CalculateScaledFrameInterval(double speed) const;
+
+    /**
+     * @brief PeekNextFrame 查看队首帧但不弹出队列
+     * @param frame 输出队首帧指针
+     * @return true 成功取得队首帧
+     * @return false 队列为空或队首帧无效
+     */
+    bool PeekNextFrame(AVFrame*& frame);
+
+    /**
+     * @brief EvaluateFrameTiming 根据同步时钟判断队首帧应显示、等待或丢弃
+     * @param frame 队首帧
+     * @param syncType 当前同步类型
+     * @param waitMs 输出等待时间，只有返回 Wait 时有效
+     * @return 当前帧调度结果
+     */
+    FrameTimingDecision EvaluateFrameTiming(const AVFrame* frame, SYNCTYPE syncType, int& waitMs) const;
+
+    /**
+     * @brief DropLateFrame 弹出并释放过晚帧
+     * @return true 成功弹出并释放过晚帧
+     * @return false 队列中没有可丢弃帧
+     */
+    bool DropLateFrame();
+
+    /**
+     * @brief PopDisplayableFrame 弹出可显示帧并转交给调用方
+     * @param frame 输出可显示帧指针
+     * @return true 成功弹出可显示帧
+     * @return false 没有可显示帧
+     */
+    bool PopDisplayableFrame(AVFrame*& frame);
+
+    /**
+     * @brief RefreshVideoClockIfNeeded 在 VIDEO sync 模式下刷新视频主时钟
+     * @param frame 当前已显示帧
+     * @param syncType 当前同步类型
+     */
+    void RefreshVideoClockIfNeeded(const AVFrame* frame, SYNCTYPE syncType);
+
+    /**
+     * @brief PresentDisplayableFrame 将可显示帧提交给当前输出 sink
+     * @details 调用后 frame 所有权转移给目标 sink，调用方不能再访问该指针。
+     * @param frame 已完成调度判断的可显示帧
+     */
+    void PresentDisplayableFrame(AVFrame* frame);
+
+    /**
+     * @brief ScheduleNextFrame 安排下一次调度
+     * @param delayMs 延迟时间，单位毫秒
+     */
+    void ScheduleNextFrame(int delayMs);
+
     std::shared_ptr<SyncQueue<AVFrame*>> frameQueue_;
     std::shared_ptr<syncmanager> syncManager_;
     IVideoFrameSink* frameSink_ = nullptr;
 
     double videoTimeBase_ = 0.0;
-    int frameIntervalMs_ = 40;
+    int frameIntervalMs_ = 33;
     std::atomic<double> speed_{1.0};
     std::atomic<bool> running_{false};
     std::atomic<int> dropped_{0};
