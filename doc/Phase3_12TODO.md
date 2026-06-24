@@ -9,8 +9,9 @@
   - Phase 3.11 已完成主窗口 UI 全面转向 `MultiViewRenderer`。
   - 主窗口常规视频显示已由单个 `MultiViewRenderer` 承载。
   - 旧 `video_widget*` 容器、事件过滤、点击激活和 stylesheet 高亮路径已清理。
+  - Phase 3.12.2 已完成 `Grid3x3` / `Grid4x4` 布局模型定义。
 - 未完成：
-  - `MultiViewRenderer` 当前主要支持 `Single` 和 `Grid2x2`。
+  - `MultiViewRenderer` 当前 viewport 计算仍主要支持 `Single` 和 `Grid2x2`。
   - 主窗口布局下拉框尚未覆盖更多多路布局。
   - 单路聚焦/恢复仍只依赖当前 `Single` / `Grid2x2` 语义，缺少明确的聚焦交互模型。
   - Phase 3 尚未形成布局交互能力的阶段性验收报告。
@@ -130,25 +131,31 @@ docs: 拆分 Phase 3.12 MultiViewRenderer 布局与交互任务
 
 **任务清单**：
 
-- [ ] 梳理当前 `MultiViewLayout` 与 `MultiViewRenderer::Layout` 的映射。
-- [ ] 新增 `Grid3x3` 布局语义。
-- [ ] 新增 `Grid4x4` 布局语义。
-- [ ] 明确 `Grid3x3` 最大可见 slot 数量为 9。
-- [ ] 明确 `Grid4x4` 最大可见 slot 数量为 16。
-- [ ] 明确当前 stream 容量是否仍先保持 4 路，还是同步扩展逻辑 slot 容量。
-- [ ] 对 `Focus1PlusN` 做设计预留，但不在本步实现。
-- [ ] 不修改播放管线。
+- [x] 梳理当前 `MultiViewLayout` 与 `MultiViewRenderer::Layout` 的映射。
+- [x] 新增 `Grid3x3` 布局语义。
+- [x] 新增 `Grid4x4` 布局语义。
+- [x] 明确 `Grid3x3` 最大可见 slot 数量为 9。
+- [x] 明确 `Grid4x4` 最大可见 slot 数量为 16。
+- [x] 明确当前 stream 容量是否仍先保持 4 路，还是同步扩展逻辑 slot 容量。
+- [x] 对 `Focus1PlusN` 做设计预留，但不在本步实现。
+- [x] 不修改播放管线。
 
 **验收标准**：
 
-- [ ] 代码中能表达 `Grid3x3` / `Grid4x4` 布局。
-- [ ] 布局枚举语义清晰，不和 active stream 策略混淆。
-- [ ] 如果本步决定暂不扩展实际 stream 容量，文档中必须明确原因。
+- [x] 代码中能表达 `Grid3x3` / `Grid4x4` 布局。
+- [x] 布局枚举语义清晰，不和 active stream 策略混淆。
+- [x] 如果本步决定暂不扩展实际 stream 容量，文档中必须明确原因。
+
+**本步结论**：
+
+- 当前仅扩展布局模型语义，实际 stream 容量仍保持 4 路。
+- `Grid3x3` / `Grid4x4` 表示显示布局可见区域能力，不等同于本步已经支持 9/16 路真实播放。
+- 9/16 路真实播放需要另行评估逻辑 slot 容量、UI 列表交互、多路生命周期压力和渲染性能，不在 3.12.2 中一起扩展。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\ui\mainwindow.h src\ui\mainwindow.cpp src\infrastructure\multiviewrenderer.h doc\Phase3_12TODO.md`
-- [ ] 定向搜索：`rg -n "Grid3x3|Grid4x4|Focus1PlusN|MaxVisibleSlots|MultiViewLayout|Layout" src\ui src\infrastructure doc\Phase3_12TODO.md`
+- [x] 静态检查：`git diff --check -- src\ui\mainwindow.h src\ui\mainwindow.cpp src\infrastructure\multiviewrenderer.h doc\Phase3_12TODO.md`
+- [x] 定向搜索：`rg -n "Grid3x3|Grid4x4|Focus1PlusN|MaxVisibleSlots|MultiViewLayout|Layout" src\ui src\infrastructure doc\Phase3_12TODO.md`
 - [ ] 人工运行建议：启动程序，确认默认布局不退化。
 
 **Commit message**：

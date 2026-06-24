@@ -120,7 +120,9 @@ private:
 
     enum class MultiViewLayout {
         Single,
-        Grid2x2
+        Grid2x2,
+        Grid3x3,
+        Grid4x4
     };
 
     Ui::MainWindow *ui;

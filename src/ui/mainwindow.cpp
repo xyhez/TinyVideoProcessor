@@ -487,10 +487,21 @@ void MainWindow::RefreshMultiViewRenderer() {
         return;
     }
 
-    const MultiViewRenderer::Layout rendererLayout =
-        CurrentMultiViewLayout() == MultiViewLayout::Grid2x2
-            ? MultiViewRenderer::Layout::Grid2x2
-            : MultiViewRenderer::Layout::Single;
+    MultiViewRenderer::Layout rendererLayout = MultiViewRenderer::Layout::Single;
+    switch (CurrentMultiViewLayout()) {
+    case MultiViewLayout::Single:
+        rendererLayout = MultiViewRenderer::Layout::Single;
+        break;
+    case MultiViewLayout::Grid2x2:
+        rendererLayout = MultiViewRenderer::Layout::Grid2x2;
+        break;
+    case MultiViewLayout::Grid3x3:
+        rendererLayout = MultiViewRenderer::Layout::Grid3x3;
+        break;
+    case MultiViewLayout::Grid4x4:
+        rendererLayout = MultiViewRenderer::Layout::Grid4x4;
+        break;
+    }
 
     multiViewRenderer_->SetLayout(rendererLayout);
     multiViewRenderer_->SetViewSlots(MultiViewRendererViewSlots());
@@ -542,6 +553,10 @@ int MainWindow::MaxVisibleStreamsForLayout(MultiViewLayout layout) const {
         return 1;
     case MultiViewLayout::Grid2x2:
         return 4;
+    case MultiViewLayout::Grid3x3:
+        return 9;
+    case MultiViewLayout::Grid4x4:
+        return 16;
     }
 
     return 1;

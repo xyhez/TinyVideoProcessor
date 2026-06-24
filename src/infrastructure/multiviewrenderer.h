@@ -37,7 +37,9 @@ public:
      */
     enum class Layout {
         Single,
-        Grid2x2
+        Grid2x2,
+        Grid3x3,
+        Grid4x4
     };
 
     /**
