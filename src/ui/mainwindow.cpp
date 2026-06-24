@@ -3,6 +3,7 @@
 #include "domain/FileMediaSource.h"
 #include "domain/CameraMediaSource.h"
 #include "infrastructure/multiviewrenderer.h"
+#include "infrastructure/singlestreamframesinkadapter.h"
 #include "ui/CameraSettingsDialog.h"
 #include "core/AppLog.h"
 
@@ -114,6 +115,9 @@ void MainWindow::CreateConnects() {
     connect(mediaPlayController_.get(), &MediaPlayController::StreamRemoved,
             this, [this](MediaPlayController::StreamId id) {
                 streamDisplayNames_.remove(id);
+                if (multiViewRenderer_) {
+                    multiViewRenderer_->DetachStream(id);
+                }
                 ReleaseVideoContainerForStream(id);
                 RefreshStreamView();
             });
@@ -958,8 +962,18 @@ void MainWindow::AddMultiStreamFiles() {
         }
 
         std::shared_ptr<IMediaSource> mediaSource = std::make_shared<FileMediaSource>(filePath);
-        const MediaPlayController::StreamId streamId =
-            mediaPlayController_->AddStream(mediaSource, container);
+        MediaPlayController::StreamId streamId = MediaPlayController::InvalidStreamId;
+        if (containerIndex == 0 && multiViewRenderer_) {
+            streamId = mediaPlayController_->AddStreamWithFrameSinkFactory(
+                mediaSource,
+                container,
+                [this](MediaPlayController::StreamId id) {
+                    return std::unique_ptr<IVideoFrameSink>(
+                        new SingleStreamFrameSinkAdapter(multiViewRenderer_, id));
+                });
+        } else {
+            streamId = mediaPlayController_->AddStream(mediaSource, container);
+        }
         if (streamId == MediaPlayController::InvalidStreamId) {
             APP_LOG_WARN_STREAM() << "Add stream failed:" << filePath;
             continue;
@@ -1000,8 +1014,18 @@ void MainWindow::AddCameraStream() {
     // 创建摄像头媒体源
     auto cameraSource = std::make_shared<CameraMediaSource>(options);
 
-    const MediaPlayController::StreamId streamId =
-        mediaPlayController_->AddStream(cameraSource, container);
+    MediaPlayController::StreamId streamId = MediaPlayController::InvalidStreamId;
+    if (containerIndex == 0 && multiViewRenderer_) {
+        streamId = mediaPlayController_->AddStreamWithFrameSinkFactory(
+            cameraSource,
+            container,
+            [this](MediaPlayController::StreamId id) {
+                return std::unique_ptr<IVideoFrameSink>(
+                    new SingleStreamFrameSinkAdapter(multiViewRenderer_, id));
+            });
+    } else {
+        streamId = mediaPlayController_->AddStream(cameraSource, container);
+    }
 
     if (streamId == MediaPlayController::InvalidStreamId) {
         APP_LOG_WARN_STREAM() << "Add camera failed: could not add stream";

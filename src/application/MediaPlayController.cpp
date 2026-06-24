@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 namespace {
 constexpr double kSeekStepSeconds = 10.0;
@@ -102,6 +103,14 @@ bool MediaPlayController::SwitchSource(std::shared_ptr<IMediaSource> mediaSource
 MediaPlayController::StreamId MediaPlayController::AddStream(std::shared_ptr<IMediaSource> mediaSource,
                                                              QWidget* rendererContainer)
 {
+    return AddStreamWithFrameSinkFactory(mediaSource, rendererContainer, {});
+}
+
+MediaPlayController::StreamId MediaPlayController::AddStreamWithFrameSinkFactory(
+    std::shared_ptr<IMediaSource> mediaSource,
+    QWidget* rendererContainer,
+    FrameSinkFactory frameSinkFactory)
+{
     if (!multiStreamManager_) {
         APP_LOG_WARN("AddStream failed: multi stream manager is not initialized");
         return InvalidStreamId;
@@ -113,7 +122,7 @@ MediaPlayController::StreamId MediaPlayController::AddStream(std::shared_ptr<IMe
     }
 
     const MultiStreamManager::StreamId streamId =
-        multiStreamManager_->AddStream(mediaSource, rendererContainer);
+        multiStreamManager_->AddStream(mediaSource, rendererContainer, std::move(frameSinkFactory));
     if (streamId == MultiStreamManager::InvalidStreamId) {
         return InvalidStreamId;
     }

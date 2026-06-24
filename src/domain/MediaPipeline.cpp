@@ -32,14 +32,15 @@ MediaPipeline::~MediaPipeline()
 }
 
 bool MediaPipeline::Initialize(std::shared_ptr<IMediaSource> mediaSource,
-                               QWidget* rendererContainer)
+                               QWidget* rendererContainer,
+                               IVideoFrameSink* videoFrameSink)
 {
     if (!mediaSource) {
         APP_LOG_CRITICAL("MediaPipeline initialize failed: media source is null");
         return false;
     }
 
-    if (!CreatePipelineResources(mediaSource, rendererContainer)) {
+    if (!CreatePipelineResources(mediaSource, rendererContainer, videoFrameSink)) {
         ReleaseResources();
         return false;
     }
@@ -250,7 +251,8 @@ void MediaPipeline::SetMuted(bool muted)
 }
 
 bool MediaPipeline::CreatePipelineResources(std::shared_ptr<IMediaSource> mediaSource,
-                                            QWidget* rendererContainer)
+                                            QWidget* rendererContainer,
+                                            IVideoFrameSink* videoFrameSink)
 {
     mediaSource_ = mediaSource;
 
@@ -299,6 +301,7 @@ bool MediaPipeline::CreatePipelineResources(std::shared_ptr<IMediaSource> mediaS
         audioplay_->moveToThread(audioplayTH_.get());
     }
     videoRender_->InitVideoRender(VFrame_, syncManager_, sourceInfo.FrameRate, sourceInfo.V_timeBase);
+    videoRender_->SetExternalFrameSink(videoFrameSink);
 
     if (rendererContainer) {
         if (!rendererContainer->layout()) {

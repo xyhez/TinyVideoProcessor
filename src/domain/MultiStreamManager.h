@@ -6,10 +6,12 @@
 #include <QString>
 
 #include <map>
+#include <functional>
 #include <memory>
 
 #include "domain/IMediaSource.h"
 #include "domain/MediaPipeline.h"
+#include "infrastructure/ivideoframesink.h"
 
 class QWidget;
 
@@ -25,6 +27,7 @@ class MultiStreamManager : public QObject {
 public:
     using StreamId = int;
     static constexpr StreamId InvalidStreamId = -1;
+    using FrameSinkFactory = std::function<std::unique_ptr<IVideoFrameSink>(StreamId)>;
 
     /**
      * @brief MultiStreamManager 构造函数
@@ -39,7 +42,8 @@ public:
      * @return 新分配的 StreamId
      */
     StreamId AddStream(std::shared_ptr<IMediaSource> mediaSource,
-                       QWidget* rendererContainer);
+                       QWidget* rendererContainer,
+                       FrameSinkFactory frameSinkFactory = {});
 
     /**
      * @brief RemoveStream 移除指定逻辑流
@@ -313,6 +317,7 @@ private:
     struct StreamSlot {
         std::shared_ptr<IMediaSource> mediaSource;
         QWidget* rendererContainer = nullptr;
+        std::unique_ptr<IVideoFrameSink> videoFrameSink;
         std::unique_ptr<MediaPipeline> pipeline;
     };
 

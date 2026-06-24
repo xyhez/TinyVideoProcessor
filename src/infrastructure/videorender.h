@@ -79,6 +79,14 @@ public:
     void SetSpeed(double speed);
 
     /**
+     * @brief SetExternalFrameSink 设置外部视频帧输出目标
+     * @details 设置后 VideoRender 仍负责取帧和同步判断，但可显示帧会转交给
+     *          externalFrameSink。传入 nullptr 时恢复默认自身渲染路径。
+     * @param externalFrameSink 外部帧消费者，不转移所有权
+     */
+    void SetExternalFrameSink(IVideoFrameSink* externalFrameSink);
+
+    /**
      * @brief PresentFrame 接管可显示帧并请求重绘
      * @details IVideoFrameSink 接口实现。调用后 frame 所有权转移给 VideoRender
      *          的当前显示帧。
@@ -184,6 +192,19 @@ private:
     void RefreshVideoClockIfNeeded(const AVFrame* frame, SYNCTYPE syncType);
 
     /**
+     * @brief PresentDisplayableFrame 将可显示帧提交给当前输出 sink
+     * @details 调用后 frame 所有权转移给目标 sink，调用方不能再访问该指针。
+     * @param frame 已完成调度判断的可显示帧
+     */
+    void PresentDisplayableFrame(AVFrame* frame);
+
+    /**
+     * @brief ClearOutputFrame 清理当前输出 sink 的显示帧
+     * @param requestUpdate 默认自身渲染路径下是否请求重绘
+     */
+    void ClearOutputFrame(bool requestUpdate);
+
+    /**
      * @brief ClearCurrentFrame 释放当前显示帧并重置显示状态
      * @param requestUpdate 是否请求重绘
      */
@@ -249,6 +270,7 @@ private:
     // 当前显示帧所有权由 VideoRender 接管：从队列弹出后赋值给该指针，
     // 替换显示帧或析构时由 VideoRender 调用 av_frame_free() 释放。
     AVFrame* m_displayFrame = nullptr;
+    IVideoFrameSink* m_externalFrameSink = nullptr;
     QMutex m_frameMutex;
 
     int m_frameIntervalMs = 33;

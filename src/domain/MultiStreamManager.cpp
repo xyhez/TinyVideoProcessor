@@ -8,7 +8,8 @@ MultiStreamManager::MultiStreamManager(QObject* parent)
 }
 
 MultiStreamManager::StreamId MultiStreamManager::AddStream(std::shared_ptr<IMediaSource> mediaSource,
-                                                           QWidget* rendererContainer) {
+                                                           QWidget* rendererContainer,
+                                                           FrameSinkFactory frameSinkFactory) {
     if (!mediaSource) {
         emit StreamErrorOccurred(InvalidStreamId, "Media source is null");
         return InvalidStreamId;
@@ -37,18 +38,23 @@ MultiStreamManager::StreamId MultiStreamManager::AddStream(std::shared_ptr<IMedi
         return InvalidStreamId;
     }
 
+    const StreamId id = nextStreamId_;
+    std::unique_ptr<IVideoFrameSink> videoFrameSink =
+        frameSinkFactory ? frameSinkFactory(id) : nullptr;
+
     auto pipeline = std::make_unique<MediaPipeline>();
-    if (!pipeline->Initialize(mediaSource, rendererContainer)) {
+    if (!pipeline->Initialize(mediaSource, rendererContainer, videoFrameSink.get())) {
         pipeline->Shutdown();
         mediaSource->Close();
         emit StreamErrorOccurred(InvalidStreamId, "Initialize media pipeline failed");
         return InvalidStreamId;
     }
 
-    const StreamId id = nextStreamId_++;
+    nextStreamId_++;
     StreamSlot slot;
     slot.mediaSource = std::move(mediaSource);
     slot.rendererContainer = rendererContainer;
+    slot.videoFrameSink = std::move(videoFrameSink);
     slot.pipeline = std::move(pipeline);
 
     ConnectPipelineSignals(id, slot.pipeline.get());

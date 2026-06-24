@@ -308,26 +308,26 @@ feat: 支持 MultiViewRenderer slot 0 单路帧绘制
 
 **任务清单**：
 
-- [ ] 设计外部 sink 注入方式。
-- [ ] 确认是否修改 `MediaPipeline::Initialize(...)`。
-- [ ] 保持默认路径仍创建 `VideoRender`。
-- [ ] 实验路径使用 `SingleStreamFrameSinkAdapter`。
-- [ ] 第一版只接一路 stream 到 slot 0。
-- [ ] 保持 active audio 策略不变。
-- [ ] 保持 `StreamId` 不进入 `MediaPipeline`。
-- [ ] 提供失败回退到 `VideoRender` 路径的方式。
+- [x] 设计外部 sink 注入方式。
+- [x] 确认是否修改 `MediaPipeline::Initialize(...)`。
+- [x] 保持默认路径仍创建 `VideoRender`。
+- [x] 实验路径使用 `SingleStreamFrameSinkAdapter`。
+- [x] 第一版只接一路 stream 到 slot 0。
+- [x] 保持 active audio 策略不变。
+- [x] 保持 `StreamId` 不进入 `MediaPipeline`。
+- [x] 提供失败回退到 `VideoRender` 路径的方式。
 
 **验收标准**：
 
-- [ ] 默认播放路径不变。
-- [ ] 实验路径可以显示一路到 `MultiViewRenderer` slot 0。
-- [ ] `MediaPipeline` 不保存 `StreamId`。
-- [ ] active audio 不退化。
-- [ ] stop / remove / shutdown 不访问已释放对象。
+- [x] 默认播放路径不变。
+- [x] 实验路径可以显示一路到 `MultiViewRenderer` slot 0。
+- [x] `MediaPipeline` 不保存 `StreamId`。
+- [x] active audio 不退化。
+- [x] stop / remove / shutdown 不访问已释放对象。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- <本任务修改文件>`
+- [x] 静态检查：`git diff --check -- <本任务修改文件>`
 - [ ] 人工运行建议：默认路径普通 MP4。
 - [ ] 人工运行建议：实验路径普通 MP4。
 - [ ] 人工运行建议：实验路径无音频视频。

@@ -5,9 +5,11 @@
 #include <QList>
 #include <QObject>
 #include <QString>
+#include <functional>
 #include <memory>
 
 #include "domain/IMediaSource.h"
+#include "infrastructure/ivideoframesink.h"
 
 class MultiStreamManager;
 class QWidget;
@@ -31,6 +33,7 @@ public:
 
     using StreamId = int;
     static constexpr StreamId InvalidStreamId = -1;
+    using FrameSinkFactory = std::function<std::unique_ptr<IVideoFrameSink>(StreamId)>;
 
     /**
      * @brief MediaPlayController 构造函数
@@ -73,6 +76,17 @@ public:
      */
     StreamId AddStream(std::shared_ptr<IMediaSource> mediaSource,
                        QWidget* rendererContainer);
+
+    /**
+     * @brief AddStreamWithFrameSinkFactory 添加一条使用外部视频帧 sink 的实验流
+     * @param mediaSource 媒体源抽象
+     * @param rendererContainer 默认渲染容器，保留回退路径
+     * @param frameSinkFactory 根据 StreamId 创建外部 sink 的工厂
+     * @return 新增流 ID，失败返回 InvalidStreamId
+     */
+    StreamId AddStreamWithFrameSinkFactory(std::shared_ptr<IMediaSource> mediaSource,
+                                           QWidget* rendererContainer,
+                                           FrameSinkFactory frameSinkFactory);
 
     /**
      * @brief RemoveStream 移除一路媒体源

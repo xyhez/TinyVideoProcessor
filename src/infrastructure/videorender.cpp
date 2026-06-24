@@ -107,6 +107,11 @@ void VideoRender::SetSpeed(double speed)
     m_speed.store(speed);
 }
 
+void VideoRender::SetExternalFrameSink(IVideoFrameSink* externalFrameSink)
+{
+    m_externalFrameSink = externalFrameSink;
+}
+
 void VideoRender::RenderFrame()
 {
     if (!CanRenderFrame()) return;
@@ -143,8 +148,8 @@ void VideoRender::RenderFrame()
         return;
     }
 
-    PresentFrame(newFrame);
     RefreshVideoClockIfNeeded(newFrame, syncType);
+    PresentDisplayableFrame(newFrame);
 
     // 下一轮调度阶段：保持自调度模型，由 Qt 事件循环再次进入 RenderFrame。
     ScheduleNextFrame(scaledInterval);
@@ -232,7 +237,7 @@ void VideoRender::PresentFrame(AVFrame* frame)
 
 void VideoRender::ClearFrame()
 {
-    ClearCurrentFrame(true);
+    ClearOutputFrame(true);
 }
 
 void VideoRender::RefreshVideoClockIfNeeded(const AVFrame* frame, SYNCTYPE syncType)
@@ -244,6 +249,32 @@ void VideoRender::RefreshVideoClockIfNeeded(const AVFrame* frame, SYNCTYPE syncT
         const double videoPts = frame->pts * m_videoTimeBase * 1000.0;
         m_syncManager->RefreshClock(videoPts);
     }
+}
+
+void VideoRender::PresentDisplayableFrame(AVFrame* frame)
+{
+    if (!frame) {
+        return;
+    }
+
+    if (m_externalFrameSink) {
+        m_externalFrameSink->PresentFrame(frame);
+        m_rendered++;
+        return;
+    }
+
+    PresentFrame(frame);
+}
+
+void VideoRender::ClearOutputFrame(bool requestUpdate)
+{
+    if (m_externalFrameSink) {
+        m_externalFrameSink->ClearFrame();
+        ClearCurrentFrame(false);
+        return;
+    }
+
+    ClearCurrentFrame(requestUpdate);
 }
 
 void VideoRender::ClearCurrentFrame(bool requestUpdate)

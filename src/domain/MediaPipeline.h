@@ -15,6 +15,7 @@
 #include "infrastructure/videorender.h"
 
 class QWidget;
+class IVideoFrameSink;
 
 /**
  * @brief MediaPipeline 管理单路媒体源的播放管线资源
@@ -44,7 +45,8 @@ public:
      * @return false 初始化失败
      */
     bool Initialize(std::shared_ptr<IMediaSource> mediaSource,
-                    QWidget* rendererContainer);
+                    QWidget* rendererContainer,
+                    IVideoFrameSink* videoFrameSink = nullptr);
 
     /**
      * @brief Shutdown 关闭并释放当前播放管线
@@ -164,7 +166,8 @@ private:
      * @return false 创建失败
      */
     bool CreatePipelineResources(std::shared_ptr<IMediaSource> mediaSource,
-                                 QWidget* rendererContainer);
+                                 QWidget* rendererContainer,
+                                 IVideoFrameSink* videoFrameSink);
 
     /**
      * @brief CreateConnects 创建 Pipeline 内部信号槽连接
