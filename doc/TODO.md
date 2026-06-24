@@ -1140,25 +1140,25 @@ feat: 增加 IVideoFrameSink 最小接口
 
 **任务清单**：
 
-- [ ] 明确 `MultiViewRenderer` 接一路帧的入口。
-- [ ] 明确 slot 0 的 current frame / texture 状态。
-- [ ] 明确 `PresentFrame(streamId, frame)` 是否需要带 `StreamId`。
-- [ ] 明确 `StreamId` 不进入 `MediaPipeline` 的适配方式。
-- [ ] 明确 OpenGL 上传必须在 `MultiViewRenderer` 上下文线程执行。
-- [ ] 明确 seek / stop / remove stream 时的 `ClearFrame` / `DetachStream` 调用。
-- [ ] 明确先接一路，不接多路。
+- [x] 明确 `MultiViewRenderer` 接一路帧的入口。
+- [x] 明确 slot 0 的 current frame / texture 状态。
+- [x] 明确 `PresentFrame(streamId, frame)` 是否需要带 `StreamId`。
+- [x] 明确 `StreamId` 不进入 `MediaPipeline` 的适配方式。
+- [x] 明确 OpenGL 上传必须在 `MultiViewRenderer` 上下文线程执行。
+- [x] 明确 seek / stop / remove stream 时的 `ClearFrame` / `DetachStream` 调用。
+- [x] 明确先接一路，不接多路。
 
 **验收标准**：
 
-- [ ] 能说明单路真实帧从 pipeline 到 `MultiViewRenderer` 的完整路径。
-- [ ] 能说明 `StreamId` 如何在 Manager / Controller / 渲染适配层保持边界。
-- [ ] 能说明一路接入的回退方案。
-- [ ] 能说明真实实现前还需要改哪些文件。
+- [x] 能说明单路真实帧从 pipeline 到 `MultiViewRenderer` 的完整路径。
+- [x] 能说明 `StreamId` 如何在 Manager / Controller / 渲染适配层保持边界。
+- [x] 能说明一路接入的回退方案。
+- [x] 能说明真实实现前还需要改哪些文件。
 
 **测试流程**：
 
-- [ ] 本任务为计划文档，不运行程序。
-- [ ] 静态检查：`git diff --check -- doc\Phase3_7_MultiViewRenderer单路真实帧接入计划.md doc\TODO.md`
+- [x] 本任务为计划文档，不运行程序。
+- [x] 静态检查：`git diff --check -- doc\Phase3_7_MultiViewRenderer单路真实帧接入计划.md doc\TODO.md`
 
 **Commit message**：
 
