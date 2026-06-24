@@ -7,6 +7,12 @@
 #include <QRect>
 #include <QVector>
 
+extern "C" {
+#include <libavutil/frame.h>
+#include <libavutil/pixfmt.h>
+#include <libavutil/rational.h>
+}
+
 class QMouseEvent;
 
 /**
@@ -52,6 +58,11 @@ public:
      * @param parent Qt 父控件
      */
     explicit MultiViewRenderer(QWidget* parent = nullptr);
+
+    /**
+     * @brief MultiViewRenderer 析构函数，释放当前持有的视频帧状态
+     */
+    ~MultiViewRenderer() override;
 
     /**
      * @brief SetLayout 设置当前多画面布局
@@ -108,6 +119,29 @@ public:
      */
     Viewport ViewportForSlot(int slotIndex) const;
 
+    /**
+     * @brief PresentFrame 接收指定 stream 的可显示视频帧
+     * @details 调用后 frame 所有权转移给 MultiViewRenderer。当前阶段只接管
+     *          和保存 current frame，不做 OpenGL 纹理上传。
+     * @param streamId 目标 StreamId
+     * @param frame 已经过调度判断、允许显示的视频帧
+     */
+    void PresentFrame(StreamId streamId, AVFrame* frame);
+
+    /**
+     * @brief ClearFrame 清理指定 stream 当前显示帧
+     * @details 保留 stream 渲染状态，不移除 slot 绑定。
+     * @param streamId 目标 StreamId
+     */
+    void ClearFrame(StreamId streamId);
+
+    /**
+     * @brief DetachStream 移除指定 stream 的渲染状态
+     * @details 释放当前帧并移除 stream 渲染状态，不隐式修改 slot 绑定。
+     * @param streamId 目标 StreamId
+     */
+    void DetachStream(StreamId streamId);
+
 signals:
     /**
      * @brief StreamClicked 点击已绑定 view slot 时发出的信号
@@ -133,6 +167,25 @@ protected:
     void mousePressEvent(QMouseEvent* event) override;
 
 private:
+    /**
+     * @brief StreamRenderState 单路渲染状态
+     */
+    struct StreamRenderState {
+        AVFrame* currentFrame = nullptr;
+        int videoWidth = 0;
+        int videoHeight = 0;
+        AVRational sampleAspectRatio = {1, 1};
+        AVPixelFormat pixelFormat = AV_PIX_FMT_NONE;
+        bool textureDirty = false;
+        bool hasFrame = false;
+    };
+
+    /**
+     * @brief ReleaseCurrentFrame 释放单路状态当前帧并重置帧元数据
+     * @param state 单路渲染状态
+     */
+    void ReleaseCurrentFrame(StreamRenderState& state);
+
     /**
      * @brief IsLogicalSlotIndex 判断是否为合法逻辑 slot
      * @param slotIndex slot 索引
@@ -179,6 +232,7 @@ private:
 
     Layout layout_ = Layout::Single;
     QMap<int, StreamId> viewSlots_;
+    QMap<StreamId, StreamRenderState> renderStates_;
     StreamId activeStreamId_ = InvalidStreamId;
 };
 

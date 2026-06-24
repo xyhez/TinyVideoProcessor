@@ -53,6 +53,8 @@ set(PROJECT_SOURCES
         src/infrastructure/videorender.cpp
         src/infrastructure/multiviewrenderer.h
         src/infrastructure/multiviewrenderer.cpp
+        src/infrastructure/singlestreamframesinkadapter.h
+        src/infrastructure/singlestreamframesinkadapter.cpp
         src/infrastructure/audioplayer.h
         src/infrastructure/audioplayer.cpp
         src/infrastructure/CameraDeviceEnumerator.h

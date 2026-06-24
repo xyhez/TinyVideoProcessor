@@ -158,26 +158,26 @@ docs: 设计 MultiViewRenderer 帧状态模型
 
 **任务清单**：
 
-- [ ] 新增 `SingleStreamFrameSinkAdapter` 类。
-- [ ] 继承 `IVideoFrameSink`。
-- [ ] 持有 `QPointer<MultiViewRenderer>` 或等价弱引用。
-- [ ] 持有 `MultiViewRenderer::StreamId`。
-- [ ] 实现 `PresentFrame(AVFrame* frame)` 空壳转发策略。
-- [ ] 实现 `ClearFrame()` 空壳转发策略。
-- [ ] 明确 renderer 为空或已销毁时释放 frame。
-- [ ] 暂不接 `MediaPipeline`。
+- [x] 新增 `SingleStreamFrameSinkAdapter` 类。
+- [x] 继承 `IVideoFrameSink`。
+- [x] 持有 `QPointer<MultiViewRenderer>` 或等价弱引用。
+- [x] 持有 `MultiViewRenderer::StreamId`。
+- [x] 实现 `PresentFrame(AVFrame* frame)` 空壳转发策略。
+- [x] 实现 `ClearFrame()` 空壳转发策略。
+- [x] 明确 renderer 为空或已销毁时释放 frame。
+- [x] 暂不接 `MediaPipeline`。
 
 **验收标准**：
 
-- [ ] adapter 可以表达单路 sink 到多路 renderer 的边界。
-- [ ] adapter 不让 `StreamId` 进入 `MediaPipeline`。
-- [ ] adapter 不创建 OpenGL 资源。
-- [ ] adapter 不访问 `VFrame_` 或 `SyncManager`。
-- [ ] 暂不改变当前播放路径。
+- [x] adapter 可以表达单路 sink 到多路 renderer 的边界。
+- [x] adapter 不让 `StreamId` 进入 `MediaPipeline`。
+- [x] adapter 不创建 OpenGL 资源。
+- [x] adapter 不访问 `VFrame_` 或 `SyncManager`。
+- [x] 暂不改变当前播放路径。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\singlestreamframesinkadapter.h src\infrastructure\singlestreamframesinkadapter.cpp CMakeLists.txt doc\Phase3_8TODO.md`
+- [x] 静态检查：`git diff --check -- src\infrastructure\singlestreamframesinkadapter.h src\infrastructure\singlestreamframesinkadapter.cpp CMakeLists.txt doc\Phase3_8TODO.md`
 - [ ] 人工运行建议：当前默认 `VideoRender` 播放路径不变。
 
 **Commit message**：
@@ -205,27 +205,27 @@ feat: 增加单路帧 sink 适配器空壳
 
 **任务清单**：
 
-- [ ] 增加 `PresentFrame(StreamId streamId, AVFrame* frame)`。
-- [ ] 增加 `ClearFrame(StreamId streamId)`。
-- [ ] 增加 `DetachStream(StreamId streamId)`。
-- [ ] 建立 `streamId -> currentFrame` 最小状态。
-- [ ] `PresentFrame` 替换旧帧并接管新帧所有权。
-- [ ] `ClearFrame` 清理当前帧但保留 stream 状态。
-- [ ] `DetachStream` 清理当前帧并移除 stream 状态。
-- [ ] 调用 `update()` 刷新空壳画面。
-- [ ] 暂不上传纹理。
+- [x] 增加 `PresentFrame(StreamId streamId, AVFrame* frame)`。
+- [x] 增加 `ClearFrame(StreamId streamId)`。
+- [x] 增加 `DetachStream(StreamId streamId)`。
+- [x] 建立 `streamId -> currentFrame` 最小状态。
+- [x] `PresentFrame` 替换旧帧并接管新帧所有权。
+- [x] `ClearFrame` 清理当前帧但保留 stream 状态。
+- [x] `DetachStream` 清理当前帧并移除 stream 状态。
+- [x] 调用 `update()` 刷新空壳画面。
+- [x] 暂不上传纹理。
 
 **验收标准**：
 
-- [ ] `MultiViewRenderer` 可以安全接管和释放一路 `AVFrame*`。
-- [ ] `PresentFrame(streamId, frame)` 所有权语义清晰。
-- [ ] `ClearFrame` 与 `DetachStream` 职责不同。
-- [ ] 未修改 `MediaPipeline`。
-- [ ] 未接真实播放路径。
+- [x] `MultiViewRenderer` 可以安全接管和释放一路 `AVFrame*`。
+- [x] `PresentFrame(streamId, frame)` 所有权语义清晰。
+- [x] `ClearFrame` 与 `DetachStream` 职责不同。
+- [x] 未修改 `MediaPipeline`。
+- [x] 未接真实播放路径。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\multiviewrenderer.h src\infrastructure\multiviewrenderer.cpp doc\Phase3_8TODO.md`
+- [x] 静态检查：`git diff --check -- src\infrastructure\multiviewrenderer.h src\infrastructure\multiviewrenderer.cpp doc\Phase3_8TODO.md`
 - [ ] 人工运行建议：当前多画面空壳显示和点击行为不变。
 
 **Commit message**：

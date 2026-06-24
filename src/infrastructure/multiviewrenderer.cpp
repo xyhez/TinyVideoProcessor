@@ -32,6 +32,13 @@ MultiViewRenderer::MultiViewRenderer(QWidget* parent)
     setMinimumSize(320, 240);
 }
 
+MultiViewRenderer::~MultiViewRenderer() {
+    for (auto it = renderStates_.begin(); it != renderStates_.end(); ++it) {
+        ReleaseCurrentFrame(it.value());
+    }
+    renderStates_.clear();
+}
+
 bool MultiViewRenderer::Viewport::IsBound() const {
     return streamId != InvalidStreamId;
 }
@@ -119,6 +126,46 @@ MultiViewRenderer::Viewport MultiViewRenderer::ViewportForSlot(int slotIndex) co
     };
 }
 
+void MultiViewRenderer::PresentFrame(StreamId streamId, AVFrame* frame) {
+    if (streamId == InvalidStreamId || !frame) {
+        av_frame_free(&frame);
+        return;
+    }
+
+    StreamRenderState& state = renderStates_[streamId];
+    ReleaseCurrentFrame(state);
+    state.currentFrame = frame;
+    state.videoWidth = frame->width;
+    state.videoHeight = frame->height;
+    state.sampleAspectRatio = frame->sample_aspect_ratio;
+    state.pixelFormat = static_cast<AVPixelFormat>(frame->format);
+    state.textureDirty = true;
+    state.hasFrame = true;
+
+    update();
+}
+
+void MultiViewRenderer::ClearFrame(StreamId streamId) {
+    auto it = renderStates_.find(streamId);
+    if (it == renderStates_.end()) {
+        return;
+    }
+
+    ReleaseCurrentFrame(it.value());
+    update();
+}
+
+void MultiViewRenderer::DetachStream(StreamId streamId) {
+    auto it = renderStates_.find(streamId);
+    if (it == renderStates_.end()) {
+        return;
+    }
+
+    ReleaseCurrentFrame(it.value());
+    renderStates_.erase(it);
+    update();
+}
+
 void MultiViewRenderer::initializeGL() {
     initializeOpenGLFunctions();
     glDisable(GL_DEPTH_TEST);
@@ -158,6 +205,16 @@ void MultiViewRenderer::mousePressEvent(QMouseEvent* event) {
     }
 
     QOpenGLWidget::mousePressEvent(event);
+}
+
+void MultiViewRenderer::ReleaseCurrentFrame(StreamRenderState& state) {
+    av_frame_free(&state.currentFrame);
+    state.videoWidth = 0;
+    state.videoHeight = 0;
+    state.sampleAspectRatio = {1, 1};
+    state.pixelFormat = AV_PIX_FMT_NONE;
+    state.textureDirty = false;
+    state.hasFrame = false;
 }
 
 bool MultiViewRenderer::IsLogicalSlotIndex(int slotIndex) const {
