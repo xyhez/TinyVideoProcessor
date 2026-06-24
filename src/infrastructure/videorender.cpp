@@ -111,73 +111,136 @@ void VideoRender::SetSpeed(double speed)
 
 void VideoRender::RenderFrame()
 {
-    if (!m_running || !m_frameQueue || !m_syncManager) return;
+    if (!CanRenderFrame()) return;
 
     const double speedSnapshot = m_speed.load();
-    const int scaledInterval = qMax(1, qRound(m_frameIntervalMs / speedSnapshot));
+    const int scaledInterval = CalculateScaledFrameInterval(speedSnapshot);
 
     // 帧调度阶段：先查看队首帧，不弹出队列，避免过早接管 AVFrame 所有权。
     AVFrame* nextFrame = nullptr;
-    if (!m_frameQueue->Front(nextFrame) || !nextFrame) {
+    if (!PeekNextFrame(nextFrame)) {
         ScheduleNextFrame(scaledInterval);
         return;
     }
 
     // 同步判断阶段：AUDIO sync 下以音频时钟为主时钟，判断视频帧早晚。
     const SYNCTYPE syncType = m_syncManager->SyncType();
-    if (syncType == SYNCTYPE::AUDIO) {
-        double videoPts = nextFrame->pts * m_videoTimeBase * 1000.0;
-        double audioPts = m_syncManager->GetClock() - 20;
-        double diff = videoPts - audioPts;
-
-        // 帧来得太早：不弹出队列，只延迟后重新判断同一队首帧。
-        if (diff > SYNC_THRESHOLD_MS) {
-            int waitMs = qMin(qRound(diff), 30);
-            ScheduleNextFrame(waitMs);
-            return;
-        }
-
+    int waitMs = 0;
+    const FrameTimingDecision timingDecision = EvaluateFrameTiming(nextFrame, syncType, waitMs);
+    if (timingDecision == FrameTimingDecision::Wait) {
+        ScheduleNextFrame(waitMs);
+        return;
+    }
+    if (timingDecision == FrameTimingDecision::Drop) {
         // 帧来得太晚：弹出并释放该帧，立即调度下一轮追赶主时钟。
-        if (diff < -SYNC_THRESHOLD_MS) {
-            AVFrame* drop = nullptr;
-            if (m_frameQueue->TryPop(drop) && drop) {
-                av_frame_free(&drop);
-                m_dropped++;
-            }
-            ScheduleNextFrame(0);
-            return;
-        }
+        DropLateFrame();
+        ScheduleNextFrame(0);
+        return;
     }
 
     // 显示帧接管阶段：只有同步窗口内的帧才从队列弹出并交给 m_displayFrame。
     AVFrame* newFrame = nullptr;
-    if (!m_frameQueue->TryPop(newFrame) || !newFrame) {
+    if (!PopDisplayableFrame(newFrame)) {
         ScheduleNextFrame(scaledInterval);
         return;
     }
 
+    PresentFrame(newFrame);
+    RefreshVideoClockIfNeeded(newFrame, syncType);
+
+    // 下一轮调度阶段：保持自调度模型，由 Qt 事件循环再次进入 RenderFrame。
+    ScheduleNextFrame(scaledInterval);
+}
+
+bool VideoRender::CanRenderFrame() const
+{
+    return m_running && m_frameQueue && m_syncManager;
+}
+
+int VideoRender::CalculateScaledFrameInterval(double speed) const
+{
+    return qMax(1, qRound(m_frameIntervalMs / speed));
+}
+
+bool VideoRender::PeekNextFrame(AVFrame*& frame)
+{
+    frame = nullptr;
+    return m_frameQueue && m_frameQueue->Front(frame) && frame;
+}
+
+VideoRender::FrameTimingDecision VideoRender::EvaluateFrameTiming(const AVFrame* frame,
+                                                                  SYNCTYPE syncType,
+                                                                  int& waitMs) const
+{
+    waitMs = 0;
+    if (!frame || syncType != SYNCTYPE::AUDIO) {
+        return FrameTimingDecision::Display;
+    }
+
+    const double videoPts = frame->pts * m_videoTimeBase * 1000.0;
+    const double audioPts = m_syncManager->GetClock() - 20;
+    const double diff = videoPts - audioPts;
+
+    // 帧来得太早：不弹出队列，只延迟后重新判断同一队首帧。
+    if (diff > SYNC_THRESHOLD_MS) {
+        waitMs = qMin(qRound(diff), 30);
+        return FrameTimingDecision::Wait;
+    }
+
+    if (diff < -SYNC_THRESHOLD_MS) {
+        return FrameTimingDecision::Drop;
+    }
+
+    return FrameTimingDecision::Display;
+}
+
+bool VideoRender::DropLateFrame()
+{
+    AVFrame* drop = nullptr;
+    if (!m_frameQueue || !m_frameQueue->TryPop(drop) || !drop) {
+        return false;
+    }
+
+    av_frame_free(&drop);
+    m_dropped++;
+    return true;
+}
+
+bool VideoRender::PopDisplayableFrame(AVFrame*& frame)
+{
+    frame = nullptr;
+    return m_frameQueue && m_frameQueue->TryPop(frame) && frame;
+}
+
+void VideoRender::PresentFrame(AVFrame* frame)
+{
+    if (!frame) {
+        return;
+    }
+
     m_frameMutex.lock();
-    // m_displayFrame 持有当前显示帧；替换时释放旧帧，接管 newFrame 所有权。
+    // m_displayFrame 持有当前显示帧；替换时释放旧帧，接管 frame 所有权。
     av_frame_free(&m_displayFrame);
-    m_displayFrame = newFrame;
-    m_videoW = newFrame->width;
-    m_videoH = newFrame->height;
-    m_sar = newFrame->sample_aspect_ratio;
+    m_displayFrame = frame;
+    m_videoW = frame->width;
+    m_videoH = frame->height;
+    m_sar = frame->sample_aspect_ratio;
     m_hasFrame = true;
     m_frameMutex.unlock();
 
     m_rendered++;
     update();
+}
 
+void VideoRender::RefreshVideoClockIfNeeded(const AVFrame* frame, SYNCTYPE syncType)
+{
     if (syncType == SYNCTYPE::VIDEO &&
-        newFrame->pts != AV_NOPTS_VALUE &&
+        frame &&
+        frame->pts != AV_NOPTS_VALUE &&
         m_videoTimeBase > 0.0) {
-        const double videoPts = newFrame->pts * m_videoTimeBase * 1000.0;
+        const double videoPts = frame->pts * m_videoTimeBase * 1000.0;
         m_syncManager->RefreshClock(videoPts);
     }
-
-    // 下一轮调度阶段：保持自调度模型，由 Qt 事件循环再次进入 RenderFrame。
-    ScheduleNextFrame(scaledInterval);
 }
 
 void VideoRender::ScheduleNextFrame(int delayMs)

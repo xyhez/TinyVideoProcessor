@@ -106,6 +106,75 @@ protected:
 
 private:
     /**
+     * @brief FrameTimingDecision 表示当前队首帧的调度判断结果
+     */
+    enum class FrameTimingDecision {
+        Display,
+        Wait,
+        Drop
+    };
+
+    /**
+     * @brief CanRenderFrame 判断当前是否具备渲染调度条件
+     * @return true 可以继续调度
+     * @return false 当前缺少运行状态、帧队列或同步管理器
+     */
+    bool CanRenderFrame() const;
+
+    /**
+     * @brief CalculateScaledFrameInterval 计算播放速度修正后的帧间隔
+     * @param speed 当前播放速度快照
+     * @return 修正后的帧间隔，单位毫秒
+     */
+    int CalculateScaledFrameInterval(double speed) const;
+
+    /**
+     * @brief PeekNextFrame 查看队首帧但不弹出队列
+     * @param frame 输出队首帧指针
+     * @return true 成功取得队首帧
+     * @return false 队列为空或队首帧无效
+     */
+    bool PeekNextFrame(AVFrame*& frame);
+
+    /**
+     * @brief EvaluateFrameTiming 根据同步时钟判断队首帧应显示、等待或丢弃
+     * @param frame 队首帧
+     * @param syncType 当前同步类型
+     * @param waitMs 输出等待时间，只有返回 Wait 时有效
+     * @return 当前帧调度结果
+     */
+    FrameTimingDecision EvaluateFrameTiming(const AVFrame* frame, SYNCTYPE syncType, int& waitMs) const;
+
+    /**
+     * @brief DropLateFrame 弹出并释放过晚帧
+     * @return true 成功弹出并释放过晚帧
+     * @return false 队列中没有可丢弃帧
+     */
+    bool DropLateFrame();
+
+    /**
+     * @brief PopDisplayableFrame 弹出可显示帧并转交给调用方
+     * @param frame 输出可显示帧指针
+     * @return true 成功弹出可显示帧
+     * @return false 没有可显示帧
+     */
+    bool PopDisplayableFrame(AVFrame*& frame);
+
+    /**
+     * @brief PresentFrame 接管可显示帧并请求重绘
+     * @details 调用后 frame 所有权转移给 VideoRender 的当前显示帧。
+     * @param frame 可显示帧
+     */
+    void PresentFrame(AVFrame* frame);
+
+    /**
+     * @brief RefreshVideoClockIfNeeded 在 VIDEO sync 模式下刷新视频主时钟
+     * @param frame 当前已显示帧
+     * @param syncType 当前同步类型
+     */
+    void RefreshVideoClockIfNeeded(const AVFrame* frame, SYNCTYPE syncType);
+
+    /**
      * @brief UploadTexture 上传 AVFrame 的 YUV 数据到纹理
      * @details OpenGL 绘制职责，只负责把当前可显示帧上传到纹理，
      *          不负责取帧、同步判断或帧释放。

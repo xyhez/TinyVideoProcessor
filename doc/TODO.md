@@ -1005,23 +1005,23 @@ docs: 设计视频帧所有权与清理协议
 
 **任务清单**：
 
-- [ ] 设计 `VideoRender` 如何保留当前 QWidget / OpenGL 绘制职责。
-- [ ] 设计帧调度职责从 `VideoRender` 内部逐步拆出的顺序。
-- [ ] 设计第一版是否先使用内部私有类或私有方法过渡。
-- [ ] 设计 `VideoRender` 如何作为默认 sink。
-- [ ] 设计如何保持 `MediaPipeline::Initialize(mediaSource, rendererContainer)` 暂时不变。
-- [ ] 设计如何验证单路、多路文件和摄像头路径不退化。
+- [x] 设计 `VideoRender` 如何保留当前 QWidget / OpenGL 绘制职责。
+- [x] 设计帧调度职责从 `VideoRender` 内部逐步拆出的顺序。
+- [x] 设计第一版是否先使用内部私有类或私有方法过渡。
+- [x] 设计 `VideoRender` 如何作为默认 sink。
+- [x] 设计如何保持 `MediaPipeline::Initialize(mediaSource, rendererContainer)` 暂时不变。
+- [x] 设计如何验证单路、多路文件和摄像头路径不退化。
 
 **验收标准**：
 
-- [ ] 能说明第一步代码实现应改哪些文件。
-- [ ] 能说明哪些接口暂时不能动。
-- [ ] 能说明如何保留当前 `VideoRender` 稳定回退路径。
+- [x] 能说明第一步代码实现应改哪些文件。
+- [x] 能说明哪些接口暂时不能动。
+- [x] 能说明如何保留当前 `VideoRender` 稳定回退路径。
 
 **测试流程**：
 
-- [ ] 本任务为方案文档，不运行程序。
-- [ ] 静态检查：`git diff --check -- doc\Phase3_7_VideoRender适配方案.md doc\TODO.md`
+- [x] 本任务为方案文档，不运行程序。
+- [x] 静态检查：`git diff --check -- doc\Phase3_7_VideoRender适配方案.md doc\TODO.md`
 
 **Commit message**：
 
@@ -1047,26 +1047,26 @@ docs: 设计 VideoRender 适配帧输出边界方案
 
 **任务清单**：
 
-- [ ] 将 `RenderFrame()` 内部逻辑拆成小函数。
-- [ ] 保留 `RenderFrame()` 作为自调度入口。
-- [ ] 拆出取帧与同步判断逻辑。
-- [ ] 拆出显示帧替换逻辑。
-- [ ] 保持 `UploadTexture()` / `DrawFrame()` 行为不变。
-- [ ] 不新增 `IVideoFrameSink`。
-- [ ] 不修改 `MediaPipeline`。
-- [ ] 不修改 `MultiViewRenderer`。
+- [x] 将 `RenderFrame()` 内部逻辑拆成小函数。
+- [x] 保留 `RenderFrame()` 作为自调度入口。
+- [x] 拆出取帧与同步判断逻辑。
+- [x] 拆出显示帧替换逻辑。
+- [x] 保持 `UploadTexture()` / `DrawFrame()` 行为不变。
+- [x] 不新增 `IVideoFrameSink`。
+- [x] 不修改 `MediaPipeline`。
+- [x] 不修改 `MultiViewRenderer`。
 
 **验收标准**：
 
-- [ ] 播放行为不变。
-- [ ] 音视频同步不退化。
-- [ ] seek 不退化。
-- [ ] stop / shutdown 不退化。
-- [ ] 代码中能清晰区分调度和绘制职责。
+- [x] 播放行为不变。
+- [x] 音视频同步不退化。
+- [x] seek 不退化。
+- [x] stop / shutdown 不退化。
+- [x] 代码中能清晰区分调度和绘制职责。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\videorender.h src\infrastructure\videorender.cpp doc\TODO.md`
+- [x] 静态检查：`git diff --check -- src\infrastructure\videorender.h src\infrastructure\videorender.cpp doc\TODO.md`
 - [ ] 人工运行建议：普通 MP4 播放、seek、pause、stop、关闭程序。
 - [ ] 人工运行建议：无音频视频播放和关闭程序。
 - [ ] 人工运行建议：多路 2x2 播放、切 active stream、关闭程序。
