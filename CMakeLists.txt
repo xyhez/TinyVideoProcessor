@@ -49,6 +49,8 @@ set(PROJECT_SOURCES
         src/infrastructure/syncmanager.h
         src/infrastructure/syncmanager.cpp
         src/infrastructure/ivideoframesink.h
+        src/infrastructure/videoframescheduler.h
+        src/infrastructure/videoframescheduler.cpp
         src/infrastructure/videorender.h
         src/infrastructure/videorender.cpp
         src/infrastructure/multiviewrenderer.h

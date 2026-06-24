@@ -9,6 +9,7 @@
   - Phase 3.9 已完成 `MultiViewRenderer` 多 slot 真实帧扩展。
   - 外部 sink 路径下旧 `VideoRender` widget 的可见职责已收口。
   - `VideoFrameScheduler` 抽取方案已完成。
+  - `VideoFrameScheduler` 空壳类已新增并接入构建文件。
 - 未完成：
   - `VideoRender` 仍持有 `VFrame_`、`syncmanager`、播放速度和自调度循环。
   - `MediaPipeline` 仍通过创建 `VideoRender` 间接获得视频帧调度能力。
@@ -168,24 +169,24 @@ docs: 设计 VideoFrameScheduler 抽取方案
 
 **任务清单**：
 
-- [ ] 新增 `VideoFrameScheduler` 类。
-- [ ] 让 scheduler 使用 `QObject`，便于沿用 Qt 自调度模型。
-- [ ] 增加 `Initialize(...)` 接收 frame queue、sync manager、frameRate、videoTimeBase。
-- [ ] 增加 `SetFrameSink(IVideoFrameSink*)`。
-- [ ] 增加 `Start()`、`Stop()`、`Pause()`、`SetSpeed()`。
-- [ ] 增加空实现或最小保护实现，不改变现有播放路径。
-- [ ] 加入 CMake 构建文件。
+- [x] 新增 `VideoFrameScheduler` 类。
+- [x] 让 scheduler 使用 `QObject`，便于沿用 Qt 自调度模型。
+- [x] 增加 `Initialize(...)` 接收 frame queue、sync manager、frameRate、videoTimeBase。
+- [x] 增加 `SetFrameSink(IVideoFrameSink*)`。
+- [x] 增加 `Start()`、`Stop()`、`Pause()`、`SetSpeed()`。
+- [x] 增加空实现或最小保护实现，不改变现有播放路径。
+- [x] 加入 CMake 构建文件。
 
 **验收标准**：
 
-- [ ] 新类职责只包含调度，不包含 OpenGL 绘制。
-- [ ] 新类不持有 `StreamId`。
-- [ ] 现有 `VideoRender` 播放路径不变。
-- [ ] CMake 能找到新增源文件。
+- [x] 新类职责只包含调度，不包含 OpenGL 绘制。
+- [x] 新类不持有 `StreamId`。
+- [x] 现有 `VideoRender` 播放路径不变。
+- [x] CMake 能找到新增源文件。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\videoframescheduler.h src\infrastructure\videoframescheduler.cpp CMakeLists.txt doc\Phase3_10TODO.md`
+- [x] 静态检查：`git diff --check -- src\infrastructure\videoframescheduler.h src\infrastructure\videoframescheduler.cpp CMakeLists.txt doc\Phase3_10TODO.md`
 - [ ] 人工运行建议：普通文件播放、暂停、关闭程序。
 
 **Commit message**：
