@@ -122,24 +122,24 @@ docs: 拆分 Phase 3.11 UI 全面转向 MultiViewRenderer 任务
 
 **任务清单**：
 
-- [ ] 定义主窗口可用逻辑 slot 数量，第一版仍保持 4 个。
-- [ ] 将 `FirstAvailableVideoContainerIndex()` 迁移为基于逻辑 slot 的查找。
-- [ ] 将 `streamContainerIndexes_` 的语义迁移为 `StreamId -> slotIndex`。
-- [ ] 将 `BindStreamToVideoContainer()` 迁移为绑定逻辑 slot。
-- [ ] 将 `ContainerIndexForStream()` / `StreamIdForVideoContainerIndex()` 迁移为 slot 语义。
-- [ ] 多路文件和摄像头添加时根据逻辑 slot 判断容量。
-- [ ] 暂时保留旧 `VideoContainers()`，只作为后续清理对象，不再作为容量判断依据。
+- [x] 定义主窗口可用逻辑 slot 数量，第一版仍保持 4 个。
+- [x] 将 `FirstAvailableVideoContainerIndex()` 迁移为基于逻辑 slot 的查找。
+- [x] 将 `streamContainerIndexes_` 的语义迁移为 `StreamId -> slotIndex`。
+- [x] 将 `BindStreamToVideoContainer()` 迁移为绑定逻辑 slot。
+- [x] 将 `ContainerIndexForStream()` / `StreamIdForVideoContainerIndex()` 迁移为 slot 语义。
+- [x] 多路文件和摄像头添加时根据逻辑 slot 判断容量。
+- [x] 暂时保留旧 `VideoContainers()`，只作为后续清理对象，不再作为容量判断依据。
 
 **验收标准**：
 
-- [ ] 添加多路时容量判断不依赖旧 QWidget 数量。
-- [ ] stream 和 slot 的映射不依赖旧容器指针。
-- [ ] `StreamId` 仍只停留在 Controller / Manager 外层和 UI 映射层，不进入 `MediaPipeline`。
-- [ ] 旧容器仍未删除，降低本步回归范围。
+- [x] 添加多路时容量判断不依赖旧 QWidget 数量。
+- [x] stream 和 slot 的映射不依赖旧容器指针。
+- [x] `StreamId` 仍只停留在 Controller / Manager 外层和 UI 映射层，不进入 `MediaPipeline`。
+- [x] 旧容器仍未删除，降低本步回归范围。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\ui\mainwindow.h src\ui\mainwindow.cpp doc\Phase3_11TODO.md`
+- [x] 静态检查：`git diff --check -- src\ui\mainwindow.h src\ui\mainwindow.cpp doc\Phase3_11TODO.md`
 - [ ] 人工运行建议：添加 1 路、2 路、4 路文件，确认容量限制和 active stream 选择不退化。
 
 **Commit message**：

@@ -118,6 +118,8 @@ private slots:
     void on_pushButton_pause_clicked();
 
 private:
+    static constexpr int kVideoSlotCount = 4;
+
     enum class MultiViewLayout {
         Single,
         Grid2x2
@@ -235,10 +237,16 @@ private:
     int MaxVisibleStreams() const;
 
     /**
+     * @brief MaxVideoSlots 获取主窗口可用逻辑视频 slot 数量
+     * @return 可用逻辑 slot 数量
+     */
+    int MaxVideoSlots() const;
+
+    /**
      * @brief VideoContainers 获取当前 UI 中的多路视频容器
      * @return 视频容器指针数组
      */
-    std::array<QWidget*, 4> VideoContainers() const;
+    std::array<QWidget*, kVideoSlotCount> VideoContainers() const;
 
     /**
      * @brief PrimaryVideoContainer 获取兼容当前单路播放的主视频容器
@@ -254,38 +262,46 @@ private:
     QWidget* VideoContainerAt(int index) const;
 
     /**
-     * @brief FirstAvailableVideoContainerIndex 获取第一个空闲视频容器索引
-     * @return 空闲容器索引，无空闲容器时返回 -1
+     * @brief FirstAvailableVideoSlotIndex 获取第一个空闲逻辑视频 slot
+     * @return 空闲 slot 索引，无空闲 slot 时返回 -1
      */
-    int FirstAvailableVideoContainerIndex() const;
+    int FirstAvailableVideoSlotIndex() const;
 
     /**
-     * @brief BindStreamToVideoContainer 绑定流和视频容器
+     * @brief BindStreamToVideoSlot 绑定流和逻辑视频 slot
      * @param streamId 流 ID
-     * @param containerIndex 容器索引
+     * @param slotIndex slot 索引
      */
-    void BindStreamToVideoContainer(MediaPlayController::StreamId streamId,
-                                    int containerIndex);
+    void BindStreamToVideoSlot(MediaPlayController::StreamId streamId,
+                               int slotIndex);
 
     /**
-     * @brief ReleaseVideoContainerForStream 释放流占用的视频容器
+     * @brief ReleaseVideoSlotForStream 释放流占用的逻辑视频 slot
      * @param streamId 流 ID
      */
-    void ReleaseVideoContainerForStream(MediaPlayController::StreamId streamId);
+    void ReleaseVideoSlotForStream(MediaPlayController::StreamId streamId);
 
     /**
-     * @brief ContainerIndexForStream 获取流绑定的视频容器索引
+     * @brief SlotIndexForStream 获取流绑定的逻辑视频 slot 索引
      * @param streamId 流 ID
-     * @return 容器索引，未绑定时返回 -1
+     * @return slot 索引，未绑定时返回 -1
      */
-    int ContainerIndexForStream(MediaPlayController::StreamId streamId) const;
+    int SlotIndexForStream(MediaPlayController::StreamId streamId) const;
 
     /**
-     * @brief StreamIdForVideoContainerIndex 获取容器绑定的流 ID
-     * @param containerIndex 容器索引
+     * @brief StreamIdForVideoSlotIndex 获取逻辑视频 slot 绑定的流 ID
+     * @param slotIndex slot 索引
      * @return 流 ID，未绑定时返回 InvalidStreamId
      */
-    MediaPlayController::StreamId StreamIdForVideoContainerIndex(int containerIndex) const;
+    MediaPlayController::StreamId StreamIdForVideoSlotIndex(int slotIndex) const;
+
+    /**
+     * @brief IsValidVideoSlotIndex 判断逻辑视频 slot 索引是否有效
+     * @param slotIndex slot 索引
+     * @return true 有效
+     * @return false 无效
+     */
+    bool IsValidVideoSlotIndex(int slotIndex) const;
 
     /**
      * @brief VideoContainerIndexForWidget 获取控件所属的视频容器索引
@@ -304,7 +320,7 @@ private:
 
     /**
      * @brief ActivateStreamFromVideoContainer 根据视频容器切换活动流
-     * @param containerIndex 容器索引
+     * @param containerIndex 容器索引，过渡期等同于逻辑 slot 索引
      * @return true 切换成功
      */
     bool ActivateStreamFromVideoContainer(int containerIndex);
@@ -459,7 +475,7 @@ private:
     bool isCursorHidden_ = false;
     MultiViewLayout multiViewLayout_ = MultiViewLayout::Single;
     QMap<MediaPlayController::StreamId, QString> streamDisplayNames_;
-    QMap<MediaPlayController::StreamId, int> streamContainerIndexes_;
+    QMap<MediaPlayController::StreamId, int> streamSlotIndexes_;
 
     /**
      * @brief formatTime 将秒数格式化为 UI 时间字符串

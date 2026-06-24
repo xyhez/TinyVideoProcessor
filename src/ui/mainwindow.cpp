@@ -118,7 +118,7 @@ void MainWindow::CreateConnects() {
                 if (multiViewRenderer_) {
                     multiViewRenderer_->DetachStream(id);
                 }
-                ReleaseVideoContainerForStream(id);
+                ReleaseVideoSlotForStream(id);
                 RefreshStreamView();
             });
 
@@ -543,7 +543,7 @@ MediaPlayController::FrameSinkFactory MainWindow::CreateMultiViewFrameSinkFactor
 
 QMap<int, MediaPlayController::StreamId> MainWindow::MultiViewRendererViewSlots() const {
     QMap<int, MediaPlayController::StreamId> viewSlots;
-    for (auto it = streamContainerIndexes_.cbegin(); it != streamContainerIndexes_.cend(); ++it) {
+    for (auto it = streamSlotIndexes_.cbegin(); it != streamSlotIndexes_.cend(); ++it) {
         viewSlots.insert(it.value(), it.key());
     }
 
@@ -580,7 +580,11 @@ int MainWindow::MaxVisibleStreams() const {
     return MaxVisibleStreamsForLayout(CurrentMultiViewLayout());
 }
 
-std::array<QWidget*, 4> MainWindow::VideoContainers() const {
+int MainWindow::MaxVideoSlots() const {
+    return kVideoSlotCount;
+}
+
+std::array<QWidget*, MainWindow::kVideoSlotCount> MainWindow::VideoContainers() const {
     return {ui->video_widget, ui->video_widget_1, ui->video_widget_2, ui->video_widget_3};
 }
 
@@ -589,7 +593,7 @@ QWidget* MainWindow::PrimaryVideoContainer() const {
 }
 
 QWidget* MainWindow::VideoContainerAt(int index) const {
-    const std::array<QWidget*, 4> containers = VideoContainers();
+    const std::array<QWidget*, kVideoSlotCount> containers = VideoContainers();
     if (index < 0 || index >= static_cast<int>(containers.size())) {
         return nullptr;
     }
@@ -597,14 +601,9 @@ QWidget* MainWindow::VideoContainerAt(int index) const {
     return containers.at(index);
 }
 
-int MainWindow::FirstAvailableVideoContainerIndex() const {
-    const std::array<QWidget*, 4> containers = VideoContainers();
-    for (int index = 0; index < static_cast<int>(containers.size()); ++index) {
-        if (!containers.at(index)) {
-            continue;
-        }
-
-        if (!streamContainerIndexes_.values().contains(index)) {
+int MainWindow::FirstAvailableVideoSlotIndex() const {
+    for (int index = 0; index < MaxVideoSlots(); ++index) {
+        if (!streamSlotIndexes_.values().contains(index)) {
             return index;
         }
     }
@@ -612,26 +611,34 @@ int MainWindow::FirstAvailableVideoContainerIndex() const {
     return -1;
 }
 
-void MainWindow::BindStreamToVideoContainer(MediaPlayController::StreamId streamId,
-                                            int containerIndex) {
-    if (streamId == MediaPlayController::InvalidStreamId || !VideoContainerAt(containerIndex)) {
+void MainWindow::BindStreamToVideoSlot(MediaPlayController::StreamId streamId,
+                                       int slotIndex) {
+    if (streamId == MediaPlayController::InvalidStreamId || !IsValidVideoSlotIndex(slotIndex)) {
         return;
     }
 
-    streamContainerIndexes_.insert(streamId, containerIndex);
+    for (auto it = streamSlotIndexes_.begin(); it != streamSlotIndexes_.end();) {
+        if (it.key() != streamId && it.value() == slotIndex) {
+            it = streamSlotIndexes_.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    streamSlotIndexes_.insert(streamId, slotIndex);
 }
 
-void MainWindow::ReleaseVideoContainerForStream(MediaPlayController::StreamId streamId) {
-    streamContainerIndexes_.remove(streamId);
+void MainWindow::ReleaseVideoSlotForStream(MediaPlayController::StreamId streamId) {
+    streamSlotIndexes_.remove(streamId);
 }
 
-int MainWindow::ContainerIndexForStream(MediaPlayController::StreamId streamId) const {
-    return streamContainerIndexes_.value(streamId, -1);
+int MainWindow::SlotIndexForStream(MediaPlayController::StreamId streamId) const {
+    return streamSlotIndexes_.value(streamId, -1);
 }
 
-MediaPlayController::StreamId MainWindow::StreamIdForVideoContainerIndex(int containerIndex) const {
-    for (auto it = streamContainerIndexes_.cbegin(); it != streamContainerIndexes_.cend(); ++it) {
-        if (it.value() == containerIndex) {
+MediaPlayController::StreamId MainWindow::StreamIdForVideoSlotIndex(int slotIndex) const {
+    for (auto it = streamSlotIndexes_.cbegin(); it != streamSlotIndexes_.cend(); ++it) {
+        if (it.value() == slotIndex) {
             return it.key();
         }
     }
@@ -639,12 +646,16 @@ MediaPlayController::StreamId MainWindow::StreamIdForVideoContainerIndex(int con
     return MediaPlayController::InvalidStreamId;
 }
 
+bool MainWindow::IsValidVideoSlotIndex(int slotIndex) const {
+    return slotIndex >= 0 && slotIndex < MaxVideoSlots();
+}
+
 int MainWindow::VideoContainerIndexForWidget(QWidget* widget) const {
     if (!widget) {
         return -1;
     }
 
-    const std::array<QWidget*, 4> containers = VideoContainers();
+    const std::array<QWidget*, kVideoSlotCount> containers = VideoContainers();
     for (int index = 0; index < static_cast<int>(containers.size()); ++index) {
         QWidget* container = containers.at(index);
         if (!container) {
@@ -679,7 +690,7 @@ bool MainWindow::HandleVideoContainerClick(QObject* watched, QEvent* event) {
 }
 
 bool MainWindow::ActivateStreamFromVideoContainer(int containerIndex) {
-    const MediaPlayController::StreamId streamId = StreamIdForVideoContainerIndex(containerIndex);
+    const MediaPlayController::StreamId streamId = StreamIdForVideoSlotIndex(containerIndex);
     if (streamId == MediaPlayController::InvalidStreamId) {
         return false;
     }
@@ -710,8 +721,8 @@ bool MainWindow::ActivateStreamFromView(MediaPlayController::StreamId streamId) 
 }
 
 void MainWindow::RefreshMultiViewLayout() {
-    const std::array<QWidget*, 4> containers = VideoContainers();
-    int singleVisibleIndex = ContainerIndexForStream(mediaPlayController_->ActiveStream());
+    const std::array<QWidget*, kVideoSlotCount> containers = VideoContainers();
+    int singleVisibleIndex = SlotIndexForStream(mediaPlayController_->ActiveStream());
     if (singleVisibleIndex < 0) {
         singleVisibleIndex = 0;
     }
@@ -732,8 +743,8 @@ void MainWindow::RefreshMultiViewLayout() {
 }
 
 void MainWindow::UpdateVideoContainerStyles() {
-    const int activeContainerIndex = ContainerIndexForStream(mediaPlayController_->ActiveStream());
-    const std::array<QWidget*, 4> containers = VideoContainers();
+    const int activeContainerIndex = SlotIndexForStream(mediaPlayController_->ActiveStream());
+    const std::array<QWidget*, kVideoSlotCount> containers = VideoContainers();
     for (int index = 0; index < static_cast<int>(containers.size()); ++index) {
         QWidget* container = containers.at(index);
         if (!container) {
@@ -927,9 +938,9 @@ void MainWindow::RefreshStreamView() {
 
         const QString displayName = streamDisplayNames_.value(id, QString("Stream %1").arg(id));
         QString text = QString("#%1 %2").arg(id).arg(displayName);
-        const int containerIndex = ContainerIndexForStream(id);
-        if (containerIndex >= 0) {
-            text += QString(" [Slot %1]").arg(containerIndex + 1);
+        const int slotIndex = SlotIndexForStream(id);
+        if (slotIndex >= 0) {
+            text += QString(" [Slot %1]").arg(slotIndex + 1);
         }
         if (!marks.isEmpty()) {
             text += QString(" [%1]").arg(marks.join(", "));
@@ -949,10 +960,10 @@ void MainWindow::RefreshStreamView() {
 void MainWindow::UpdateStreamControls() {
     const bool hasStream = !mediaPlayController_->StreamIds().isEmpty();
     const bool hasSelectedStream = SelectedStreamId() != MediaPlayController::InvalidStreamId;
-    const bool hasAvailableContainer = FirstAvailableVideoContainerIndex() >= 0;
+    const bool hasAvailableSlot = FirstAvailableVideoSlotIndex() >= 0;
 
-    ui->pushButton_addStream->setEnabled(hasAvailableContainer);
-    ui->pushButton_addCamera->setEnabled(hasAvailableContainer);
+    ui->pushButton_addStream->setEnabled(hasAvailableSlot);
+    ui->pushButton_addCamera->setEnabled(hasAvailableSlot);
     ui->pushButton_removeStream->setEnabled(hasSelectedStream);
     ui->pushButton_activeStream->setEnabled(hasSelectedStream);
     ui->pushButton_activeAudio->setEnabled(hasSelectedStream);
@@ -969,10 +980,15 @@ void MainWindow::AddMultiStreamFiles() {
         "Video Files (*.mp4 *.mkv *.avi *.mov *.flv);;All Files (*.*)");
 
     for (const QString& filePath : filePaths) {
-        const int containerIndex = FirstAvailableVideoContainerIndex();
-        QWidget* container = VideoContainerAt(containerIndex);
+        const int slotIndex = FirstAvailableVideoSlotIndex();
+        if (slotIndex < 0) {
+            APP_LOG_WARN_STREAM() << "Add stream failed: no available video slot";
+            break;
+        }
+
+        QWidget* container = VideoContainerAt(slotIndex);
         if (!container) {
-            APP_LOG_WARN_STREAM() << "Add stream failed: no available video container";
+            APP_LOG_WARN_STREAM() << "Add stream failed: fallback video container missing";
             break;
         }
 
@@ -993,7 +1009,7 @@ void MainWindow::AddMultiStreamFiles() {
             continue;
         }
 
-        BindStreamToVideoContainer(streamId, containerIndex);
+        BindStreamToVideoSlot(streamId, slotIndex);
         streamDisplayNames_.insert(streamId, QFileInfo(filePath).fileName());
         InstallVideoContainerEventFilters();
     }
@@ -1017,11 +1033,16 @@ void MainWindow::AddCameraStream() {
 
     APP_LOG_DEBUG_STREAM() << "MainWindow::AddCameraStream() - 添加摄像头:" << options.Description();
 
-    // 查找可用的视频容器
-    const int containerIndex = FirstAvailableVideoContainerIndex();
-    QWidget* container = VideoContainerAt(containerIndex);
+    // 查找可用的逻辑视频 slot，旧容器仅作为当前 fallback renderer container。
+    const int slotIndex = FirstAvailableVideoSlotIndex();
+    if (slotIndex < 0) {
+        APP_LOG_WARN_STREAM() << "Add camera failed: no available video slot";
+        return;
+    }
+
+    QWidget* container = VideoContainerAt(slotIndex);
     if (!container) {
-        APP_LOG_WARN_STREAM() << "Add camera failed: no available video container";
+        APP_LOG_WARN_STREAM() << "Add camera failed: fallback video container missing";
         return;
     }
 
@@ -1045,8 +1066,7 @@ void MainWindow::AddCameraStream() {
         return;
     }
 
-    // 绑定到视频容器
-    BindStreamToVideoContainer(streamId, containerIndex);
+    BindStreamToVideoSlot(streamId, slotIndex);
     streamDisplayNames_.insert(streamId, QString("%1 (%2x%3@%4fps)")
         .arg(options.deviceName)
         .arg(options.width)
@@ -1142,7 +1162,7 @@ bool MainWindow::SwitchToPlaylistIndex(int index, bool autoStart) {
     playlistManager_->SetCurrentIndex(index);
     const MediaPlayController::StreamId activeStreamId = mediaPlayController_->ActiveStream();
     if (activeStreamId != MediaPlayController::InvalidStreamId) {
-        BindStreamToVideoContainer(activeStreamId, 0);
+        BindStreamToVideoSlot(activeStreamId, 0);
         streamDisplayNames_.insert(activeStreamId, item.displayName);
         InstallVideoContainerEventFilters();
         RefreshStreamView();
