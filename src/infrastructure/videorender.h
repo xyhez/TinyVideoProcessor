@@ -80,6 +80,9 @@ public:
 private slots:
     /**
      * @brief RenderFrame 自调度渲染循环入口
+     * @details 当前同时承担帧调度职责：查看队首帧、按 syncmanager 判断早晚、
+     *          丢弃过晚帧、接管可显示帧所有权，并触发下一次调度。
+     *          后续拆分帧输出边界时，应优先从该函数切出调度逻辑。
      */
     void RenderFrame();
 
@@ -104,6 +107,8 @@ protected:
 private:
     /**
      * @brief UploadTexture 上传 AVFrame 的 YUV 数据到纹理
+     * @details OpenGL 绘制职责，只负责把当前可显示帧上传到纹理，
+     *          不负责取帧、同步判断或帧释放。
      * @param frame 待上传的视频帧
      */
     void UploadTexture(AVFrame* frame);
@@ -125,6 +130,7 @@ private:
 
     /**
      * @brief DrawFrame 绘制当前纹理帧
+     * @details OpenGL 绘制职责，只负责使用当前纹理和显示矩形完成绘制。
      */
     void DrawFrame();
 
@@ -144,6 +150,7 @@ private:
 
     /**
      * @brief ScheduleNextFrame 安排下一次渲染调度
+     * @details 帧调度职责，当前使用 Qt 事件循环自调度下一次 RenderFrame。
      * @param delayMs 延迟时间，单位毫秒
      */
     void ScheduleNextFrame(int delayMs);
@@ -155,6 +162,8 @@ private:
     QOpenGLTexture *m_texY = nullptr, *m_texU = nullptr, *m_texV = nullptr;
     bool m_glInited = false;
 
+    // 当前显示帧所有权由 VideoRender 接管：从队列弹出后赋值给该指针，
+    // 替换显示帧或析构时由 VideoRender 调用 av_frame_free() 释放。
     AVFrame* m_displayFrame = nullptr;
     QMutex m_frameMutex;
 

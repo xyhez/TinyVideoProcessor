@@ -833,24 +833,24 @@ docs: 预研视频帧输出边界
 
 **任务清单**：
 
-- [ ] 标注 `RenderFrame()` 中的取帧、同步判断、丢帧、显示、调度阶段。
-- [ ] 标注 `m_displayFrame` 的所有权语义。
-- [ ] 标注 `UploadTexture()` / `DrawFrame()` 属于 OpenGL 绘制职责。
-- [ ] 标注 `ScheduleNextFrame()` 属于帧调度职责。
-- [ ] 不新增类。
-- [ ] 不改变函数调用顺序。
-- [ ] 不改变 `VideoRender` 对外接口。
+- [x] 标注 `RenderFrame()` 中的取帧、同步判断、丢帧、显示、调度阶段。
+- [x] 标注 `m_displayFrame` 的所有权语义。
+- [x] 标注 `UploadTexture()` / `DrawFrame()` 属于 OpenGL 绘制职责。
+- [x] 标注 `ScheduleNextFrame()` 属于帧调度职责。
+- [x] 不新增类。
+- [x] 不改变函数调用顺序。
+- [x] 不改变 `VideoRender` 对外接口。
 
 **验收标准**：
 
-- [ ] `VideoRender` 当前职责可以从代码注释中直接读清。
-- [ ] 代码行为不变。
-- [ ] 当前播放路径不受影响。
-- [ ] 不涉及 `MediaPipeline` 签名变化。
+- [x] `VideoRender` 当前职责可以从代码注释中直接读清。
+- [x] 代码行为不变。
+- [x] 当前播放路径不受影响。
+- [x] 不涉及 `MediaPipeline` 签名变化。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\videorender.h src\infrastructure\videorender.cpp doc\TODO.md`
+- [x] 静态检查：`git diff --check -- src\infrastructure\videorender.h src\infrastructure\videorender.cpp doc\TODO.md`
 - [ ] 人工运行建议：普通 MP4 播放、暂停、停止、seek、关闭程序。
 
 **Commit message**：
@@ -875,24 +875,24 @@ docs: 标注 VideoRender 职责边界
 
 **任务清单**：
 
-- [ ] 梳理当前 `RenderFrame()` 的调度状态机。
-- [ ] 定义帧调度器输入：`VFrame_`、`syncmanager`、frameRate、videoTimeBase、playbackSpeed。
-- [ ] 定义帧调度器输出：可显示帧、丢帧、等待时长、停止状态。
-- [ ] 明确 AUDIO sync 和 VIDEO sync 的职责归属。
-- [ ] 明确调度器不做 OpenGL 上传。
-- [ ] 明确调度器不持有 QWidget。
-- [ ] 明确调度器与 sink 的调用关系。
+- [x] 梳理当前 `RenderFrame()` 的调度状态机。
+- [x] 定义帧调度器输入：`VFrame_`、`syncmanager`、frameRate、videoTimeBase、playbackSpeed。
+- [x] 定义帧调度器输出：可显示帧、丢帧、等待时长、停止状态。
+- [x] 明确 AUDIO sync 和 VIDEO sync 的职责归属。
+- [x] 明确调度器不做 OpenGL 上传。
+- [x] 明确调度器不持有 QWidget。
+- [x] 明确调度器与 sink 的调用关系。
 
 **验收标准**：
 
-- [ ] 能说明 `RenderFrame()` 后续如何拆成调度和绘制两部分。
-- [ ] 能说明同步时钟仍靠近单路 pipeline。
-- [ ] 能说明调度器为什么不进入 `MultiViewRenderer`。
+- [x] 能说明 `RenderFrame()` 后续如何拆成调度和绘制两部分。
+- [x] 能说明同步时钟仍靠近单路 pipeline。
+- [x] 能说明调度器为什么不进入 `MultiViewRenderer`。
 
 **测试流程**：
 
-- [ ] 本任务为设计文档，不运行程序。
-- [ ] 静态检查：`git diff --check -- doc\Phase3_7_视频帧调度边界设计.md doc\TODO.md`
+- [x] 本任务为设计文档，不运行程序。
+- [x] 静态检查：`git diff --check -- doc\Phase3_7_视频帧调度边界设计.md doc\TODO.md`
 
 **Commit message**：
 

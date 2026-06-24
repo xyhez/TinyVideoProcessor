@@ -116,27 +116,28 @@ void VideoRender::RenderFrame()
     const double speedSnapshot = m_speed.load();
     const int scaledInterval = qMax(1, qRound(m_frameIntervalMs / speedSnapshot));
 
-    // 1. 查看队首帧
+    // 帧调度阶段：先查看队首帧，不弹出队列，避免过早接管 AVFrame 所有权。
     AVFrame* nextFrame = nullptr;
     if (!m_frameQueue->Front(nextFrame) || !nextFrame) {
         ScheduleNextFrame(scaledInterval);
         return;
     }
 
+    // 同步判断阶段：AUDIO sync 下以音频时钟为主时钟，判断视频帧早晚。
     const SYNCTYPE syncType = m_syncManager->SyncType();
     if (syncType == SYNCTYPE::AUDIO) {
         double videoPts = nextFrame->pts * m_videoTimeBase * 1000.0;
         double audioPts = m_syncManager->GetClock() - 20;
         double diff = videoPts - audioPts;
 
-        // 2. 帧来得太早 → 精确等待后重判
+        // 帧来得太早：不弹出队列，只延迟后重新判断同一队首帧。
         if (diff > SYNC_THRESHOLD_MS) {
             int waitMs = qMin(qRound(diff), 30);
             ScheduleNextFrame(waitMs);
             return;
         }
 
-        // 3. 帧来得太晚 → 丢帧追赶，立即判下一帧
+        // 帧来得太晚：弹出并释放该帧，立即调度下一轮追赶主时钟。
         if (diff < -SYNC_THRESHOLD_MS) {
             AVFrame* drop = nullptr;
             if (m_frameQueue->TryPop(drop) && drop) {
@@ -148,7 +149,7 @@ void VideoRender::RenderFrame()
         }
     }
 
-    // 4. 在同步窗口内 → 渲染
+    // 显示帧接管阶段：只有同步窗口内的帧才从队列弹出并交给 m_displayFrame。
     AVFrame* newFrame = nullptr;
     if (!m_frameQueue->TryPop(newFrame) || !newFrame) {
         ScheduleNextFrame(scaledInterval);
@@ -156,6 +157,7 @@ void VideoRender::RenderFrame()
     }
 
     m_frameMutex.lock();
+    // m_displayFrame 持有当前显示帧；替换时释放旧帧，接管 newFrame 所有权。
     av_frame_free(&m_displayFrame);
     m_displayFrame = newFrame;
     m_videoW = newFrame->width;
@@ -174,12 +176,13 @@ void VideoRender::RenderFrame()
         m_syncManager->RefreshClock(videoPts);
     }
 
-    // 5. 调度下一次：按帧间隔
+    // 下一轮调度阶段：保持自调度模型，由 Qt 事件循环再次进入 RenderFrame。
     ScheduleNextFrame(scaledInterval);
 }
 
 void VideoRender::ScheduleNextFrame(int delayMs)
 {
+    // 帧调度职责：这里只安排下一次调度，不做取帧、同步判断或 OpenGL 绘制。
     QTimer::singleShot(delayMs, this, &VideoRender::RenderFrame);
 }
 
@@ -258,6 +261,7 @@ void VideoRender::paintGL()
 
 void VideoRender::UploadTexture(AVFrame* f)
 {
+    // OpenGL 上传职责：只消费当前显示帧的数据，不接管或释放 AVFrame。
     if (m_texY && (m_texY->width() != f->width || m_texY->height() != f->height)) {
         FreeTextures();
     }
@@ -350,6 +354,7 @@ void VideoRender::LogFrameFormatIfNeeded(const AVFrame* frame, bool supported)
 
 void VideoRender::DrawFrame()
 {
+    // OpenGL 绘制职责：只绘制已上传纹理，不参与同步调度和 AVFrame 生命周期管理。
     if (!m_glInited) return;
 
     m_shader.bind();
