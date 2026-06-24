@@ -164,24 +164,24 @@ docs: 设计 MultiViewRenderer 多 slot 绘制方案
 
 **任务清单**：
 
-- [ ] 找出当前只给 `containerIndex == 0` 或 slot 0 创建 sink 的代码。
-- [ ] 提取 UI 层创建 frame sink 的小型辅助函数。
-- [ ] 多路文件新增时，为每一路创建对应 `StreamId` 的 adapter。
-- [ ] 摄像头新增时，为每一路创建对应 `StreamId` 的 adapter。
-- [ ] 播放列表切换时，保持当前 slot 的 adapter 语义一致。
-- [ ] 不修改 `MediaPipeline` 的职责。
-- [ ] 不改变 active audio 策略。
+- [x] 找出当前只给 `containerIndex == 0` 或 slot 0 创建 sink 的代码。
+- [x] 提取 UI 层创建 frame sink 的小型辅助函数。
+- [x] 多路文件新增时，为每一路创建对应 `StreamId` 的 adapter。
+- [x] 摄像头新增时，为每一路创建对应 `StreamId` 的 adapter。
+- [x] 播放列表切换时，保持当前 slot 的 adapter 语义一致。
+- [x] 不修改 `MediaPipeline` 的职责。
+- [x] 不改变 active audio 策略。
 
 **验收标准**：
 
-- [ ] 第二路及后续路也能获得指向 `MultiViewRenderer` 的 frame sink。
-- [ ] `StreamId` 仍只存在于 manager / controller / UI / render adapter 边界。
-- [ ] 默认回退路径仍能在未提供 sink 时走 `VideoRender`。
-- [ ] UI 层没有散落重复的 slot 0 特判。
+- [x] 第二路及后续路也能获得指向 `MultiViewRenderer` 的 frame sink。
+- [x] `StreamId` 仍只存在于 manager / controller / UI / render adapter 边界。
+- [x] 默认回退路径仍能在未提供 sink 时走 `VideoRender`。
+- [x] UI 层没有散落重复的 slot 0 特判。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\ui\mainwindow.h src\ui\mainwindow.cpp doc\Phase3_9TODO.md`
+- [x] 静态检查：`git diff --check -- src\ui\mainwindow.h src\ui\mainwindow.cpp doc\Phase3_9TODO.md`
 - [ ] 人工运行建议：添加两个文件，确认两路都进入统一渲染区域。
 - [ ] 人工运行建议：添加一个文件和一个摄像头，确认两路都进入统一渲染区域。
 - [ ] 人工运行建议：切换播放列表文件，确认当前 slot 仍显示正确流。

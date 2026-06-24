@@ -526,6 +526,21 @@ void MainWindow::RefreshMultiViewRenderer() {
     multiViewRenderer_->SetActiveStream(mediaPlayController_->ActiveStream());
 }
 
+MediaPlayController::FrameSinkFactory MainWindow::CreateMultiViewFrameSinkFactory() const {
+    if (!multiViewRenderer_) {
+        return {};
+    }
+
+    return [this](MediaPlayController::StreamId id) {
+        if (!multiViewRenderer_) {
+            return std::unique_ptr<IVideoFrameSink>();
+        }
+
+        return std::unique_ptr<IVideoFrameSink>(
+            new SingleStreamFrameSinkAdapter(multiViewRenderer_, id));
+    };
+}
+
 QMap<int, MediaPlayController::StreamId> MainWindow::MultiViewRendererViewSlots() const {
     QMap<int, MediaPlayController::StreamId> viewSlots;
     for (auto it = streamContainerIndexes_.cbegin(); it != streamContainerIndexes_.cend(); ++it) {
@@ -963,14 +978,13 @@ void MainWindow::AddMultiStreamFiles() {
 
         std::shared_ptr<IMediaSource> mediaSource = std::make_shared<FileMediaSource>(filePath);
         MediaPlayController::StreamId streamId = MediaPlayController::InvalidStreamId;
-        if (containerIndex == 0 && multiViewRenderer_) {
+        const MediaPlayController::FrameSinkFactory frameSinkFactory =
+            CreateMultiViewFrameSinkFactory();
+        if (frameSinkFactory) {
             streamId = mediaPlayController_->AddStreamWithFrameSinkFactory(
                 mediaSource,
                 container,
-                [this](MediaPlayController::StreamId id) {
-                    return std::unique_ptr<IVideoFrameSink>(
-                        new SingleStreamFrameSinkAdapter(multiViewRenderer_, id));
-                });
+                frameSinkFactory);
         } else {
             streamId = mediaPlayController_->AddStream(mediaSource, container);
         }
@@ -1015,14 +1029,13 @@ void MainWindow::AddCameraStream() {
     auto cameraSource = std::make_shared<CameraMediaSource>(options);
 
     MediaPlayController::StreamId streamId = MediaPlayController::InvalidStreamId;
-    if (containerIndex == 0 && multiViewRenderer_) {
+    const MediaPlayController::FrameSinkFactory frameSinkFactory =
+        CreateMultiViewFrameSinkFactory();
+    if (frameSinkFactory) {
         streamId = mediaPlayController_->AddStreamWithFrameSinkFactory(
             cameraSource,
             container,
-            [this](MediaPlayController::StreamId id) {
-                return std::unique_ptr<IVideoFrameSink>(
-                    new SingleStreamFrameSinkAdapter(multiViewRenderer_, id));
-            });
+            frameSinkFactory);
     } else {
         streamId = mediaPlayController_->AddStream(cameraSource, container);
     }
@@ -1109,15 +1122,14 @@ bool MainWindow::SwitchToPlaylistIndex(int index, bool autoStart) {
     const int previousIndex = playlistManager_->CurrentIndex();
     const PlaylistItem item = items.at(index);
     std::shared_ptr<IMediaSource> mediaSource = std::make_shared<FileMediaSource>(item.filePath);
-    const bool switched = multiViewRenderer_
+    const MediaPlayController::FrameSinkFactory frameSinkFactory =
+        CreateMultiViewFrameSinkFactory();
+    const bool switched = frameSinkFactory
         ? mediaPlayController_->SwitchSourceWithFrameSinkFactory(
               mediaSource,
               PrimaryVideoContainer(),
               autoStart,
-              [this](MediaPlayController::StreamId id) {
-                  return std::unique_ptr<IVideoFrameSink>(
-                      new SingleStreamFrameSinkAdapter(multiViewRenderer_, id));
-              })
+              frameSinkFactory)
         : mediaPlayController_->SwitchSource(mediaSource, PrimaryVideoContainer(), autoStart);
     if (!switched) {
         APP_LOG_WARN_STREAM() << "Switch playlist item failed:" << item.filePath;

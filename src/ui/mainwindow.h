@@ -198,6 +198,12 @@ private:
     void RefreshMultiViewRenderer();
 
     /**
+     * @brief CreateMultiViewFrameSinkFactory 创建统一渲染器帧 sink 工厂
+     * @return 可用时返回按 StreamId 创建 adapter 的工厂，否则返回空工厂
+     */
+    MediaPlayController::FrameSinkFactory CreateMultiViewFrameSinkFactory() const;
+
+    /**
      * @brief MultiViewRendererViewSlots 获取统一渲染器 slot 与 stream 的绑定关系
      * @return slot 索引到 StreamId 的映射
      */
