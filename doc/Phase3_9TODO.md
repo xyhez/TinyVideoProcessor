@@ -211,26 +211,26 @@ feat: 取消统一渲染接入的 slot 0 限制
 
 **任务清单**：
 
-- [ ] 检查 `paintGL()` 中当前 slot 0 特判。
-- [ ] 按 slot 遍历 viewport。
-- [ ] 根据 slot 找到绑定的 `StreamId`。
-- [ ] 根据 `StreamId` 找到 `StreamRenderState`。
-- [ ] 有有效纹理时绘制真实帧。
-- [ ] 无有效帧时绘制空 slot 背景。
-- [ ] stream detach 或 slot remap 后清理旧纹理和旧帧。
-- [ ] 保留不支持像素格式的保护逻辑。
+- [x] 检查 `paintGL()` 中当前 slot 0 特判。
+- [x] 按 slot 遍历 viewport。
+- [x] 根据 slot 找到绑定的 `StreamId`。
+- [x] 根据 `StreamId` 找到 `StreamRenderState`。
+- [x] 有有效纹理时绘制真实帧。
+- [x] 无有效帧时绘制空 slot 背景。
+- [x] stream detach 或 slot remap 后清理旧纹理和旧帧。
+- [x] 保留不支持像素格式的保护逻辑。
 
 **验收标准**：
 
-- [ ] 多个 slot 可以同时显示不同 stream 的真实帧。
-- [ ] 空 slot 仍显示空背景。
-- [ ] remove stream 后对应 slot 不残留最后一帧。
-- [ ] layout 切换后 viewport 正确，不拉伸到错误区域。
-- [ ] OpenGL 纹理释放不跨错误线程。
+- [x] 多个 slot 可以同时显示不同 stream 的真实帧。
+- [x] 空 slot 仍显示空背景。
+- [x] remove stream 后对应 slot 不残留最后一帧。
+- [x] layout 切换后 viewport 正确，不拉伸到错误区域。
+- [x] OpenGL 纹理释放不跨错误线程。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\multiviewrenderer.h src\infrastructure\multiviewrenderer.cpp doc\Phase3_9TODO.md`
+- [x] 静态检查：`git diff --check -- src\infrastructure\multiviewrenderer.h src\infrastructure\multiviewrenderer.cpp doc\Phase3_9TODO.md`
 - [ ] 人工运行建议：两路文件同时播放。
 - [ ] 人工运行建议：三路或四路文件同时播放。
 - [ ] 人工运行建议：删除其中一路后继续播放。

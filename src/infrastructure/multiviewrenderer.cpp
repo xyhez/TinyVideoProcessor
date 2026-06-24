@@ -363,7 +363,7 @@ void MultiViewRenderer::DrawViewport(const Viewport& viewport) {
         FillOpenGLRect(viewport.glViewportRect, kEmptySlotRed, kEmptySlotGreen, kEmptySlotBlue, 1.0f);
     }
 
-    if (viewport.slotIndex == 0 && viewport.IsBound()) {
+    if (viewport.IsBound()) {
         QMutexLocker locker(&renderStateMutex_);
         auto it = renderStates_.find(viewport.streamId);
         if (it != renderStates_.end()) {

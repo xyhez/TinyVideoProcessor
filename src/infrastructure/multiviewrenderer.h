@@ -280,7 +280,7 @@ private:
     QRect ToOpenGLViewportRect(const QRect& qtRect) const;
 
     /**
-     * @brief DrawViewport 绘制单个空 viewport 区域
+     * @brief DrawViewport 绘制单个 viewport 的背景、视频帧和边框
      * @param viewport 待绘制 viewport
      */
     void DrawViewport(const Viewport& viewport);
