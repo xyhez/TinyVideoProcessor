@@ -986,23 +986,23 @@ void MainWindow::AddMultiStreamFiles() {
             break;
         }
 
-        QWidget* container = VideoContainerAt(slotIndex);
-        if (!container) {
-            APP_LOG_WARN_STREAM() << "Add stream failed: fallback video container missing";
-            break;
-        }
-
         std::shared_ptr<IMediaSource> mediaSource = std::make_shared<FileMediaSource>(filePath);
         MediaPlayController::StreamId streamId = MediaPlayController::InvalidStreamId;
         const MediaPlayController::FrameSinkFactory frameSinkFactory =
             CreateMultiViewFrameSinkFactory();
+        QWidget* fallbackRendererContainer = frameSinkFactory ? nullptr : VideoContainerAt(slotIndex);
+        if (!frameSinkFactory && !fallbackRendererContainer) {
+            APP_LOG_WARN_STREAM() << "Add stream failed: fallback video container missing";
+            break;
+        }
+
         if (frameSinkFactory) {
             streamId = mediaPlayController_->AddStreamWithFrameSinkFactory(
                 mediaSource,
-                container,
+                fallbackRendererContainer,
                 frameSinkFactory);
         } else {
-            streamId = mediaPlayController_->AddStream(mediaSource, container);
+            streamId = mediaPlayController_->AddStream(mediaSource, fallbackRendererContainer);
         }
         if (streamId == MediaPlayController::InvalidStreamId) {
             APP_LOG_WARN_STREAM() << "Add stream failed:" << filePath;
@@ -1040,25 +1040,25 @@ void MainWindow::AddCameraStream() {
         return;
     }
 
-    QWidget* container = VideoContainerAt(slotIndex);
-    if (!container) {
-        APP_LOG_WARN_STREAM() << "Add camera failed: fallback video container missing";
-        return;
-    }
-
     // 创建摄像头媒体源
     auto cameraSource = std::make_shared<CameraMediaSource>(options);
 
     MediaPlayController::StreamId streamId = MediaPlayController::InvalidStreamId;
     const MediaPlayController::FrameSinkFactory frameSinkFactory =
         CreateMultiViewFrameSinkFactory();
+    QWidget* fallbackRendererContainer = frameSinkFactory ? nullptr : VideoContainerAt(slotIndex);
+    if (!frameSinkFactory && !fallbackRendererContainer) {
+        APP_LOG_WARN_STREAM() << "Add camera failed: fallback video container missing";
+        return;
+    }
+
     if (frameSinkFactory) {
         streamId = mediaPlayController_->AddStreamWithFrameSinkFactory(
             cameraSource,
-            container,
+            fallbackRendererContainer,
             frameSinkFactory);
     } else {
-        streamId = mediaPlayController_->AddStream(cameraSource, container);
+        streamId = mediaPlayController_->AddStream(cameraSource, fallbackRendererContainer);
     }
 
     if (streamId == MediaPlayController::InvalidStreamId) {
@@ -1144,13 +1144,14 @@ bool MainWindow::SwitchToPlaylistIndex(int index, bool autoStart) {
     std::shared_ptr<IMediaSource> mediaSource = std::make_shared<FileMediaSource>(item.filePath);
     const MediaPlayController::FrameSinkFactory frameSinkFactory =
         CreateMultiViewFrameSinkFactory();
+    QWidget* fallbackRendererContainer = frameSinkFactory ? nullptr : PrimaryVideoContainer();
     const bool switched = frameSinkFactory
         ? mediaPlayController_->SwitchSourceWithFrameSinkFactory(
               mediaSource,
-              PrimaryVideoContainer(),
+              fallbackRendererContainer,
               autoStart,
               frameSinkFactory)
-        : mediaPlayController_->SwitchSource(mediaSource, PrimaryVideoContainer(), autoStart);
+        : mediaPlayController_->SwitchSource(mediaSource, fallbackRendererContainer, autoStart);
     if (!switched) {
         APP_LOG_WARN_STREAM() << "Switch playlist item failed:" << item.filePath;
         if (previousIndex >= 0 && previousIndex < playlistManager_->Count()) {

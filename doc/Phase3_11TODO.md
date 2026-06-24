@@ -165,22 +165,22 @@ refactor: 将 MainWindow 多路绑定迁移为逻辑 slot
 
 **任务清单**：
 
-- [ ] 梳理 `SwitchToPlaylistIndex()` 的 `PrimaryVideoContainer()` 依赖。
-- [ ] 梳理 `AddMultiStreamFiles()` 的 `VideoContainerAt()` 依赖。
-- [ ] 梳理 `AddCameraStream()` 的 `VideoContainerAt()` 依赖。
-- [ ] 在存在 frame sink factory 时，向 Controller 传入空默认容器或新的兼容入口。
-- [ ] 仅在没有外部 sink factory 的回退路径下使用默认 renderer container。
-- [ ] 确认默认 `VideoRender` 回退路径仍可保留。
+- [x] 梳理 `SwitchToPlaylistIndex()` 的 `PrimaryVideoContainer()` 依赖。
+- [x] 梳理 `AddMultiStreamFiles()` 的 `VideoContainerAt()` 依赖。
+- [x] 梳理 `AddCameraStream()` 的 `VideoContainerAt()` 依赖。
+- [x] 在存在 frame sink factory 时，向 Controller 传入空默认容器或新的兼容入口。
+- [x] 仅在没有外部 sink factory 的回退路径下使用默认 renderer container。
+- [x] 确认默认 `VideoRender` 回退路径仍可保留。
 
 **验收标准**：
 
-- [ ] `MultiViewRenderer` 正常路径不需要旧 `video_widget*` 作为 renderer container。
-- [ ] 默认 `VideoRender` fallback 仍有明确入口。
-- [ ] `MediaPipeline` 不需要感知 UI slot 或 `StreamId`。
+- [x] `MultiViewRenderer` 正常路径不需要旧 `video_widget*` 作为 renderer container。
+- [x] 默认 `VideoRender` fallback 仍有明确入口。
+- [x] `MediaPipeline` 不需要感知 UI slot 或 `StreamId`。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\ui\mainwindow.cpp doc\Phase3_11TODO.md`
+- [x] 静态检查：`git diff --check -- src\ui\mainwindow.cpp doc\Phase3_11TODO.md`
 - [ ] 人工运行建议：播放列表切换、多路文件添加、摄像头源添加均能进入统一渲染区域。
 
 **Commit message**：
