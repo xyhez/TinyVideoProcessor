@@ -15,20 +15,20 @@ enum class MediaSourceType {
 };
 
 struct Fileinfo {
-    QString filepath_ = "NON";
-    bool hasVideo_ = false;
-    bool hasAudio_ = false;
-    int videoStreamIndex_ = -1;
-    int audioStreamIndex_ = -1;
-    int width_ = 0;
-    int height_ = 0;
-    AVCodecID CodecId_ = AV_CODEC_ID_NONE;
-    AVCodecID videoCodecId_ = AV_CODEC_ID_NONE;
-    AVCodecID audioCodecId_ = AV_CODEC_ID_NONE;
-    int duration_ = 0;          ///< 秒
-    double FrameRate = 30.0;
-    double A_timeBase = 0.0;
-    double V_timeBase = 0.0;
+    QString filepath_ = "NON";	///< 媒体文件路径
+    bool hasVideo_ = false;	///< 是否包含视频流
+    bool hasAudio_ = false;	///< 是否包含音频流
+    int videoStreamIndex_ = -1;	///< 视频流索引
+    int audioStreamIndex_ = -1;	///< 音频流索引
+    int width_ = 0;	///< 视频宽度
+    int height_ = 0;	///< 视频高度
+    AVCodecID CodecId_ = AV_CODEC_ID_NONE;	///< 兼容保留的编码器 ID
+    AVCodecID videoCodecId_ = AV_CODEC_ID_NONE;	///< 视频编码器 ID
+    AVCodecID audioCodecId_ = AV_CODEC_ID_NONE;	///< 音频编码器 ID
+    int duration_ = 0;	///< 媒体时长，单位秒
+    double FrameRate = 30.0;	///< 视频帧率
+    double A_timeBase = 0.0;	///< 音频时间基
+    double V_timeBase = 0.0;	///< 视频时间基
 
     /**
      * @brief Fileinfo 默认构造函数

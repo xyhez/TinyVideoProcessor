@@ -32,7 +32,7 @@ public:
     };
 
     using StreamId = int;
-    static constexpr StreamId InvalidStreamId = -1;
+    static constexpr StreamId InvalidStreamId = -1;	///< 无效流 ID
     using FrameSinkFactory = std::function<std::unique_ptr<IVideoFrameSink>(StreamId)>;
 
     /**
@@ -400,12 +400,12 @@ signals:
     void StreamMuteChanged(MediaPlayController::StreamId id, bool muted);
 
 private:
-    std::unique_ptr<MultiStreamManager> multiStreamManager_;
+    std::unique_ptr<MultiStreamManager> multiStreamManager_;	///< 多路播放管理器
 
-    PlaybackState state_ = PlaybackState::Stopped;
-    double playbackSpeed_ = 1.0;
-    double volume_ = 1.0;
-    bool muted_ = false;
+    PlaybackState state_ = PlaybackState::Stopped;	///< 当前播放状态
+    double playbackSpeed_ = 1.0;	///< 当前播放速度
+    double volume_ = 1.0;	///< 当前音量
+    bool muted_ = false;	///< 当前静音状态
 
     /**
      * @brief ConnectManagerSignals 创建 Controller 与 MultiStreamManager 的信号转发连接

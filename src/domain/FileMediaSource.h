@@ -90,8 +90,8 @@ public:
     bool IsRealtime() const override;
 
 private:
-    AVFormatContext* ic = nullptr;
-    struct Fileinfo FileInfo_;
+    AVFormatContext* ic = nullptr;	///< FFmpeg 格式上下文
+    struct Fileinfo FileInfo_;	///< 文件媒体信息
 };
 
 

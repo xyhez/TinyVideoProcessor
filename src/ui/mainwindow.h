@@ -116,7 +116,7 @@ private slots:
     void on_pushButton_pause_clicked();
 
 private:
-    static constexpr int kVideoSlotCount = 4;
+    static constexpr int kVideoSlotCount = 4;	///< 当前可用逻辑视频 slot 数
 
     enum class MultiViewLayout {
         Single,
@@ -125,12 +125,12 @@ private:
         Grid4x4
     };
 
-    Ui::MainWindow *ui;
+    Ui::MainWindow *ui;	///< UI 对象
 
-    std::unique_ptr<MediaPlayController> mediaPlayController_ = nullptr;
-    std::unique_ptr<PlaylistManager> playlistManager_ = nullptr;
-    std::unique_ptr<QTimer> cursorHideTimer_ = nullptr;
-    MultiViewRenderer* multiViewRenderer_ = nullptr;
+    std::unique_ptr<MediaPlayController> mediaPlayController_ = nullptr;	///< 播放控制器
+    std::unique_ptr<PlaylistManager> playlistManager_ = nullptr;	///< 播放列表管理器
+    std::unique_ptr<QTimer> cursorHideTimer_ = nullptr;	///< 全屏鼠标隐藏定时器
+    MultiViewRenderer* multiViewRenderer_ = nullptr;	///< 统一多画面渲染器
 
     /**
      * @brief UpdatePlaybackControls 根据播放状态更新按钮可用状态
@@ -435,13 +435,13 @@ private:
      */
     bool SwitchToPlaylistIndex(int index, bool autoStart);
 
-    bool isSliderDragging_ = false;
-    bool isFullScreenMode_ = false;
-    bool isCursorHidden_ = false;
-    MultiViewLayout multiViewLayout_ = MultiViewLayout::Single;
-    MediaPlayController::StreamId focusedStreamId_ = MediaPlayController::InvalidStreamId;
-    QMap<MediaPlayController::StreamId, QString> streamDisplayNames_;
-    QMap<MediaPlayController::StreamId, int> streamSlotIndexes_;
+    bool isSliderDragging_ = false;	///< 是否正在拖动进度条
+    bool isFullScreenMode_ = false;	///< 是否处于全屏模式
+    bool isCursorHidden_ = false;	///< 鼠标是否已隐藏
+    MultiViewLayout multiViewLayout_ = MultiViewLayout::Single;	///< 当前多画面布局
+    MediaPlayController::StreamId focusedStreamId_ = MediaPlayController::InvalidStreamId;	///< 当前聚焦流 ID
+    QMap<MediaPlayController::StreamId, QString> streamDisplayNames_;	///< 流显示名称表
+    QMap<MediaPlayController::StreamId, int> streamSlotIndexes_;	///< 流到 slot 的绑定表
 
     /**
      * @brief formatTime 将秒数格式化为 UI 时间字符串

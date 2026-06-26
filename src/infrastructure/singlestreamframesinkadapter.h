@@ -48,8 +48,8 @@ public:
     MultiViewRenderer::StreamId StreamIdValue() const;
 
 private:
-    QPointer<MultiViewRenderer> renderer_;
-    MultiViewRenderer::StreamId streamId_ = MultiViewRenderer::InvalidStreamId;
+    QPointer<MultiViewRenderer> renderer_;	///< 目标统一渲染器
+    MultiViewRenderer::StreamId streamId_ = MultiViewRenderer::InvalidStreamId;	///< 绑定的流 ID
 };
 
 #endif // SINGLESTREAMFRAMESINKADAPTER_H

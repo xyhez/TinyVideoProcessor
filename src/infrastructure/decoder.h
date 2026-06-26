@@ -148,43 +148,43 @@ private:
      */
     bool IsSuspendRequested() const;
 
-    std::shared_ptr<SyncQueue<AVPacket*>> m_PacketVec;        ///< 包队列
-    std::shared_ptr<SyncQueue<AVFrame*>>  m_FrameVec;         ///< 帧队列
+    std::shared_ptr<SyncQueue<AVPacket*>> m_PacketVec;	///< 包队列
+    std::shared_ptr<SyncQueue<AVFrame*>>  m_FrameVec;	///< 帧队列
 
 
-    AVCodecContext *Ctx = nullptr;                          ///< 解码器实例
+    AVCodecContext *Ctx = nullptr;	///< 解码器上下文
 
-    AVCodecParameters *par = nullptr;                       ///< 解码器参数---蓝图
+    AVCodecParameters *par = nullptr;	///< 解码器参数
 
-    const AVCodec *codec = nullptr;                         ///< 解码器配置
+    const AVCodec *codec = nullptr;	///< 解码器
 
-    AVStream m_stream;                                      ///< 设置stream
+    AVStream m_stream;	///< 流信息副本
 
-    bool pause_flag = false;                                ///< 暂停标志
+    bool pause_flag = false;	///< 暂停标志
 
-    bool stop_flag = false;                                 ///< 停止标志
+    bool stop_flag = false;	///< 停止标志
 
-    bool suspend_requested_ = false;                        ///< 管线挂起请求
-    bool suspended_ = false;                                ///< 已到达管线挂起安全点
-    QWaitCondition suspendCondition_;                       ///< 管线挂起条件变量
+    bool suspend_requested_ = false;	///< 管线挂起请求
+    bool suspended_ = false;	///< 已到达管线挂起安全点
+    QWaitCondition suspendCondition_;	///< 管线挂起条件变量
 
-    mutable QMutex mutex;                                   ///< 互斥锁
+    mutable QMutex mutex;	///< 互斥锁
 
-    QString decoder_type = "";                              ///< 解码器类型
+    QString decoder_type = "";	///< 解码器类型
 
-    AVFrame *frame = nullptr;                               ///< 管理解码后的帧
+    AVFrame *frame = nullptr;	///< 当前解码帧
 
-    AVRational m_time_base;                                 ///< 时间基础
+    AVRational m_time_base;	///< 流时间基
 
-    bool m_discardBeforeEnabled = false;                    ///< 是否丢弃指定时间前的输出帧
-    double m_discardBeforeSeconds = 0.0;                    ///< 输出帧丢弃边界，单位秒
+    bool m_discardBeforeEnabled = false;	///< 是否启用输出帧丢弃边界
+    double m_discardBeforeSeconds = 0.0;	///< 输出帧丢弃边界，单位秒
 
     // 硬解码相关
-    bool m_isHWDecoder = false;                             ///< 是否使用硬件解码
-    AVBufferRef *m_hwDeviceCtx = nullptr;                   ///< 硬件设备上下文
-    enum AVPixelFormat m_hwPixFmt = AV_PIX_FMT_NONE;        ///< 硬件像素格式
-    enum AVPixelFormat m_swPixFmt = AV_PIX_FMT_NONE;        ///< 软件像素格式
-    SwsContext *m_swsCtx = nullptr;                         ///< 硬解帧格式转换上下文
+    bool m_isHWDecoder = false;	///< 是否使用硬件解码
+    AVBufferRef *m_hwDeviceCtx = nullptr;	///< 硬件设备上下文
+    enum AVPixelFormat m_hwPixFmt = AV_PIX_FMT_NONE;	///< 硬件像素格式
+    enum AVPixelFormat m_swPixFmt = AV_PIX_FMT_NONE;	///< 软件像素格式
+    SwsContext *m_swsCtx = nullptr;	///< 硬解帧格式转换上下文
 };
 
 #endif // DECODER_H

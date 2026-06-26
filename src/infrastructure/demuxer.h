@@ -168,21 +168,21 @@ signals:
 
 
 private:
-    std::shared_ptr<IMediaSource> m_mediaSource;        ///< 媒体源
-    std::shared_ptr<SyncQueue<AVPacket*>> m_APacket;   ///< 音频包队列
-    std::shared_ptr<SyncQueue<AVPacket*>> m_VPacket;   ///< 视频包队列
-    std::shared_ptr<SyncQueue<AVFrame*>>  m_AFrame;    ///< 音频帧队列
-    std::shared_ptr<SyncQueue<AVFrame*>>  m_VFrame;    ///< 视频帧队列
+    std::shared_ptr<IMediaSource> m_mediaSource;	///< 媒体源
+    std::shared_ptr<SyncQueue<AVPacket*>> m_APacket;	///< 音频包队列
+    std::shared_ptr<SyncQueue<AVPacket*>> m_VPacket;	///< 视频包队列
+    std::shared_ptr<SyncQueue<AVFrame*>>  m_AFrame;	///< 音频帧队列
+    std::shared_ptr<SyncQueue<AVFrame*>>  m_VFrame;	///< 视频帧队列
 
-    bool pause_flag = false;                            ///< 暂停标志
+    bool pause_flag = false;	///< 暂停标志
 
-    bool stop_flag = false;                             ///< 停止标志
+    bool stop_flag = false;	///< 停止标志
 
-    bool suspend_requested_ = false;                    ///< 管线挂起请求
-    bool suspended_ = false;                            ///< 已到达管线挂起安全点
-    QWaitCondition suspendCondition_;                   ///< 管线挂起条件变量
+    bool suspend_requested_ = false;	///< 管线挂起请求
+    bool suspended_ = false;	///< 已到达管线挂起安全点
+    QWaitCondition suspendCondition_;	///< 管线挂起条件变量
 
-    mutable QMutex mutex;                               ///< 互斥锁
+    mutable QMutex mutex;	///< 互斥锁
 
     /**
      * @brief CurrentPositionSeconds 获取当前解复用读取位置
@@ -204,21 +204,21 @@ private:
      */
     bool IsSuspendRequested() const;
 
-    AVPacket* packet = nullptr;                         ///< 存从文件中读取出来的包
+    AVPacket* packet = nullptr;	///< 当前读取包
 
-    int m_videoStreamIndex = -1;                        ///< 视频流下标，用于区分packet类型
+    int m_videoStreamIndex = -1;	///< 视频流索引
 
-    int m_audioStreamIndex = -1;                        ///< 音频流下标，用于区分packet类型
+    int m_audioStreamIndex = -1;	///< 音频流索引
 
-    AVCodecParameters* m_A_coderPar = nullptr;          ///< 音频流解码器配置
-    AVCodecParameters* m_V_coderPar = nullptr;          ///< 视频流解码器配置
+    AVCodecParameters* m_A_coderPar = nullptr;	///< 音频解码参数
+    AVCodecParameters* m_V_coderPar = nullptr;	///< 视频解码参数
 
-    AVRational m_A_time_base;                           ///< 音频流time_base
-    AVRational m_V_time_base;                           ///< 视频流time_base
+    AVRational m_A_time_base;	///< 音频时间基
+    AVRational m_V_time_base;	///< 视频时间基
 
 
-    int64_t m_AcurrentPTS = 0;                          ///< 最新的音频流的pts
-    int64_t m_VcurrentPTS = 0;                          ///< 最新的视频流的pts
+    int64_t m_AcurrentPTS = 0;	///< 最新音频 PTS
+    int64_t m_VcurrentPTS = 0;	///< 最新视频 PTS
 };
 
 #endif // DEMUXER_H

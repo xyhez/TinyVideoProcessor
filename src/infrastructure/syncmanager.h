@@ -76,11 +76,11 @@ private:
     /**
      * @brief mainclock 主时钟，单位毫秒(ms)
      */
-    double mainclock = 0.0;
+    double mainclock = 0.0;	///< 主时钟，单位毫秒
 
-    SYNCTYPE currentSYNCTYPE = SYNCTYPE::AUDIO; // 默认同步方式为 音频主时钟
+    SYNCTYPE currentSYNCTYPE = SYNCTYPE::AUDIO;	///< 当前同步模式
 
-    mutable QMutex mutex;                           ///< 互斥锁（mutable 以允许 const 方法加锁）
+    mutable QMutex mutex;	///< 互斥锁
 };
 
 #endif // SYNCMANAGER_H

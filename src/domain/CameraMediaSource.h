@@ -136,16 +136,16 @@ private:
      */
     void SetLastError(const QString& message);
 
-    AVFormatContext* formatContext_ = nullptr;
-    Fileinfo sourceInfo_;
-    QString lastError_;
-    QString deviceName_;
-    int width_ = 1280;
-    int height_ = 720;
-    int frameRate_ = 30;
-    int rtbufsize_ = 100;       ///< rtbufsize (MB)
-    QString pixelFormat_;       ///< 像素格式（可选）
-    QString codec_;             ///< 编码格式（可选）
+    AVFormatContext* formatContext_ = nullptr;	///< FFmpeg 格式上下文
+    Fileinfo sourceInfo_;	///< 摄像头媒体信息
+    QString lastError_;	///< 最近一次错误信息
+    QString deviceName_;	///< 摄像头设备名
+    int width_ = 1280;	///< 目标采集宽度
+    int height_ = 720;	///< 目标采集高度
+    int frameRate_ = 30;	///< 目标采集帧率
+    int rtbufsize_ = 100;	///< 实时缓冲区大小，单位 MB
+    QString pixelFormat_;	///< 像素格式
+    QString codec_;	///< 编码格式
 };
 
 #endif // TINYVIDEOPROCESSOR_CAMERAMEDIASOURCE_H

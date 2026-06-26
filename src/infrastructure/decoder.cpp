@@ -4,7 +4,7 @@
 #include <QMutexLocker>
 
 namespace {
-constexpr bool kEnableHardwareDecoder = false;
+constexpr bool kEnableHardwareDecoder = true;
 }
 decoder::decoder(QObject *parent)
     : QObject{parent}

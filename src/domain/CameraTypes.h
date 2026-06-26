@@ -9,12 +9,12 @@
  * 描述摄像头支持的一种输出格式（分辨率 + 帧率 + 编码格式组合）
  */
 struct CameraFormatOption {
-    int width = 0;              ///< 宽度
-    int height = 0;             ///< 高度
-    int minFrameRate = 0;       ///< 最小帧率
-    int maxFrameRate = 0;       ///< 最大帧率
-    QString pixelFormat;        ///< 像素格式（yuyv422, mjpeg, h264 等）
-    QString codec;              ///< 编码格式（对应 FFmpeg vcodec）
+    int width = 0;	///< 宽度
+    int height = 0;	///< 高度
+    int minFrameRate = 0;	///< 最小帧率
+    int maxFrameRate = 0;	///< 最大帧率
+    QString pixelFormat;	///< 像素格式
+    QString codec;	///< 编码格式
 
     /**
      * @brief FormatDescription 生成格式描述字符串
@@ -53,10 +53,10 @@ struct CameraFormatOption {
  * 描述一个摄像头设备及其支持的格式列表
  */
 struct CameraDeviceInfo {
-    QString deviceName;                     ///< 设备名称（dshow 使用的实际设备名）
-    QString friendlyName;                   ///< 友好名称（显示给用户）
-    QString description;                    ///< 设备描述
-    QList<CameraFormatOption> formats;      ///< 支持的格式列表
+    QString deviceName;	///< 设备名称
+    QString friendlyName;	///< 友好名称
+    QString description;	///< 设备描述
+    QList<CameraFormatOption> formats;	///< 支持的格式列表
 
     /**
      * @brief IsValid 检查设备信息是否有效
@@ -81,13 +81,13 @@ struct CameraDeviceInfo {
  * 封装用户选择的摄像头打开参数，传递给 CameraMediaSource
  */
 struct CameraOpenOptions {
-    QString deviceName;         ///< 设备名称（必填）
-    int width = 1280;           ///< 宽度（默认 1280）
-    int height = 720;           ///< 高度（默认 720）
-    int frameRate = 30;         ///< 帧率（默认 30）
-    QString pixelFormat;        ///< 像素格式（可选，如 "yuyv422"）
-    QString codec;              ///< 编码格式（可选，如 "h264", "mjpeg"）
-    int rtbufsize = 100;        ///< 实时缓冲区大小（MB，默认 100）
+    QString deviceName;	///< 设备名称
+    int width = 1280;	///< 打开宽度
+    int height = 720;	///< 打开高度
+    int frameRate = 30;	///< 打开帧率
+    QString pixelFormat;	///< 像素格式
+    QString codec;	///< 编码格式
+    int rtbufsize = 100;	///< 实时缓冲区大小，单位 MB
 
     /**
      * @brief IsValid 检查打开选项是否有效

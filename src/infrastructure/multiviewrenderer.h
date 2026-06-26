@@ -30,7 +30,7 @@ class MultiViewRenderer : public QOpenGLWidget, protected QOpenGLFunctions {
 
 public:
     using StreamId = int;
-    static constexpr StreamId InvalidStreamId = -1;
+    static constexpr StreamId InvalidStreamId = -1;	///< 无效流 ID
 
     /**
      * @brief Layout 多画面布局类型
@@ -46,10 +46,10 @@ public:
      * @brief Viewport 单个逻辑 slot 的显示区域
      */
     struct Viewport {
-        int slotIndex = -1;
-        StreamId streamId = InvalidStreamId;
-        QRect qtRect;
-        QRect framebufferRect;
+        int slotIndex = -1;	///< slot 索引
+        StreamId streamId = InvalidStreamId;	///< 绑定的流 ID
+        QRect qtRect;	///< Qt 逻辑坐标区域
+        QRect framebufferRect;	///< OpenGL framebuffer 坐标区域
 
         /**
          * @brief IsBound 判断当前 viewport 是否绑定有效流
@@ -189,17 +189,17 @@ private:
      * @brief StreamRenderState 单路渲染状态
      */
     struct StreamRenderState {
-        AVFrame* currentFrame = nullptr;
-        QOpenGLTexture* textureY = nullptr;
-        QOpenGLTexture* textureU = nullptr;
-        QOpenGLTexture* textureV = nullptr;
-        int videoWidth = 0;
-        int videoHeight = 0;
-        AVRational sampleAspectRatio = {1, 1};
-        AVPixelFormat pixelFormat = AV_PIX_FMT_NONE;
-        bool textureDirty = false;
-        bool hasFrame = false;
-        bool unsupportedFormatLogged = false;
+        AVFrame* currentFrame = nullptr;	///< 当前显示帧
+        QOpenGLTexture* textureY = nullptr;	///< Y 分量纹理
+        QOpenGLTexture* textureU = nullptr;	///< U 分量纹理
+        QOpenGLTexture* textureV = nullptr;	///< V 分量纹理
+        int videoWidth = 0;	///< 视频宽度
+        int videoHeight = 0;	///< 视频高度
+        AVRational sampleAspectRatio = {1, 1};	///< 像素宽高比
+        AVPixelFormat pixelFormat = AV_PIX_FMT_NONE;	///< 像素格式
+        bool textureDirty = false;	///< 纹理是否需要更新
+        bool hasFrame = false;	///< 是否持有显示帧
+        bool unsupportedFormatLogged = false;	///< 是否已输出格式不支持日志
     };
 
     /**
@@ -332,13 +332,13 @@ private:
      */
     void DrawViewportBorder(const QRect& rect, bool active);
 
-    Layout layout_ = Layout::Single;
-    QMap<int, StreamId> viewSlots_;
-    QMap<StreamId, StreamRenderState> renderStates_;
-    StreamId activeStreamId_ = InvalidStreamId;
-    QOpenGLShaderProgram frameShader_;
-    QMutex renderStateMutex_;
-    bool glInitialized_ = false;
+    Layout layout_ = Layout::Single;	///< 当前布局
+    QMap<int, StreamId> viewSlots_;	///< slot 到流 ID 的绑定表
+    QMap<StreamId, StreamRenderState> renderStates_;	///< 每路渲染状态
+    StreamId activeStreamId_ = InvalidStreamId;	///< 当前活动显示流
+    QOpenGLShaderProgram frameShader_;	///< 视频帧绘制 shader
+    QMutex renderStateMutex_;	///< 渲染状态互斥锁
+    bool glInitialized_ = false;	///< OpenGL 是否已初始化
 };
 
 #endif // MULTIVIEWRENDERER_H

@@ -163,16 +163,16 @@ private:
      */
     void ScheduleNextFrame(int delayMs);
 
-    std::shared_ptr<SyncQueue<AVFrame*>> frameQueue_;
-    std::shared_ptr<syncmanager> syncManager_;
-    IVideoFrameSink* frameSink_ = nullptr;
+    std::shared_ptr<SyncQueue<AVFrame*>> frameQueue_;	///< 视频帧队列
+    std::shared_ptr<syncmanager> syncManager_;	///< 同步时钟管理器
+    IVideoFrameSink* frameSink_ = nullptr;	///< 视频帧输出目标
 
-    double videoTimeBase_ = 0.0;
-    int frameIntervalMs_ = 33;
-    std::atomic<double> speed_{1.0};
-    std::atomic<bool> running_{false};
-    std::atomic<int> dropped_{0};
-    std::atomic<int> rendered_{0};
+    double videoTimeBase_ = 0.0;	///< 视频时间基
+    int frameIntervalMs_ = 33;	///< 默认帧间隔，单位毫秒
+    std::atomic<double> speed_{1.0};	///< 当前播放速度
+    std::atomic<bool> running_{false};	///< 是否正在调度
+    std::atomic<int> dropped_{0};	///< 丢帧计数
+    std::atomic<int> rendered_{0};	///< 显示帧计数
 };
 
 #endif // VIDEOFRAMESCHEDULER_H

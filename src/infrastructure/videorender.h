@@ -118,30 +118,31 @@ private:
      */
     void FreeTextures();
 
-    QOpenGLShaderProgram m_shader;
-    QOpenGLTexture *m_texY = nullptr, *m_texU = nullptr, *m_texV = nullptr;
-    bool m_glInited = false;
+    QOpenGLShaderProgram m_shader;	///< 视频绘制 shader
+    QOpenGLTexture *m_texY = nullptr, *m_texU = nullptr, *m_texV = nullptr;	///< YUV 分量纹理
+    bool m_glInited = false;	///< OpenGL 是否已初始化
 
     // 当前显示帧所有权由 VideoRender 接管：从队列弹出后赋值给该指针，
     // 替换显示帧或析构时由 VideoRender 调用 av_frame_free() 释放。
-    AVFrame* m_displayFrame = nullptr;
-    QMutex m_frameMutex;
+    AVFrame* m_displayFrame = nullptr;	///< 当前显示帧
 
-    bool m_hasFrame = false;
+    QMutex m_frameMutex;	///< 显示帧互斥锁
 
-    int m_videoW = 0, m_videoH = 0;
-    AVRational m_sar = {1, 1};
+    bool m_hasFrame = false;	///< 是否持有显示帧
 
-    AVPixelFormat m_lastLoggedFormat = AV_PIX_FMT_NONE;
-    int m_lastLoggedWidth = 0;
-    int m_lastLoggedHeight = 0;
-    int m_lastLoggedLinesize[4] = {0, 0, 0, 0};
-    AVColorRange m_lastLoggedColorRange = AVCOL_RANGE_UNSPECIFIED;
-    AVColorSpace m_lastLoggedColorSpace = AVCOL_SPC_UNSPECIFIED;
-    AVColorPrimaries m_lastLoggedColorPrimaries = AVCOL_PRI_UNSPECIFIED;
-    AVColorTransferCharacteristic m_lastLoggedColorTrc = AVCOL_TRC_UNSPECIFIED;
-    bool m_lastLoggedSupported = false;
-    bool m_hasLoggedFrameFormat = false;
+    int m_videoW = 0, m_videoH = 0;	///< 当前视频宽高
+    AVRational m_sar = {1, 1};	///< 像素宽高比
+
+    AVPixelFormat m_lastLoggedFormat = AV_PIX_FMT_NONE;	///< 上次记录的像素格式
+    int m_lastLoggedWidth = 0;	///< 上次记录的视频宽度
+    int m_lastLoggedHeight = 0;	///< 上次记录的视频高度
+    int m_lastLoggedLinesize[4] = {0, 0, 0, 0};	///< 上次记录的行步长
+    AVColorRange m_lastLoggedColorRange = AVCOL_RANGE_UNSPECIFIED;	///< 上次记录的色彩范围
+    AVColorSpace m_lastLoggedColorSpace = AVCOL_SPC_UNSPECIFIED;	///< 上次记录的色彩空间
+    AVColorPrimaries m_lastLoggedColorPrimaries = AVCOL_PRI_UNSPECIFIED;	///< 上次记录的色彩基色
+    AVColorTransferCharacteristic m_lastLoggedColorTrc = AVCOL_TRC_UNSPECIFIED;	///< 上次记录的传输特性
+    bool m_lastLoggedSupported = false;	///< 上次记录的格式支持状态
+    bool m_hasLoggedFrameFormat = false;	///< 是否已记录过帧格式
 };
 
 #endif // VIDEORENDER_H

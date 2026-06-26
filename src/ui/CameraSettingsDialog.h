@@ -73,13 +73,13 @@ private:
      */
     void UpdateFrameRates(int formatIndex);
 
-    QComboBox* deviceComboBox_;
-    QComboBox* formatComboBox_;
-    QComboBox* frameRateComboBox_;
-    QPushButton* refreshButton_;
-    QPushButton* okButton_;
-    QPushButton* cancelButton_;
+    QComboBox* deviceComboBox_;	///< 设备下拉框
+    QComboBox* formatComboBox_;	///< 格式下拉框
+    QComboBox* frameRateComboBox_;	///< 帧率下拉框
+    QPushButton* refreshButton_;	///< 刷新按钮
+    QPushButton* okButton_;	///< 确认按钮
+    QPushButton* cancelButton_;	///< 取消按钮
 
-    QList<CameraDeviceInfo> devices_;
-    QList<CameraFormatOption> currentFormats_;
+    QList<CameraDeviceInfo> devices_;	///< 摄像头设备列表
+    QList<CameraFormatOption> currentFormats_;	///< 当前设备格式列表
 };

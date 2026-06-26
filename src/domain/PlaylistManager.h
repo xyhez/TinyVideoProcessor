@@ -8,9 +8,9 @@
 #include <optional>
 
 struct PlaylistItem {
-    QString filePath;
-    QString displayName;
-    double durationSeconds = 0.0;
+    QString filePath;	///< 文件路径
+    QString displayName;	///< 显示名称
+    double durationSeconds = 0.0;	///< 媒体时长，单位秒
 };
 
 class PlaylistManager : public QObject {
@@ -145,8 +145,8 @@ private:
      */
     QString NormalizePath(const QString& filePath) const;
 
-    QList<PlaylistItem> items_;
-    int currentIndex_ = -1;
-    PlayMode playMode_ = PlayMode::Sequential;
+    QList<PlaylistItem> items_;	///< 播放列表条目
+    int currentIndex_ = -1;	///< 当前播放索引
+    PlayMode playMode_ = PlayMode::Sequential;	///< 当前播放模式
 };
 

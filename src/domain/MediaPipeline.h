@@ -220,28 +220,28 @@ private:
      */
     void FlushDecoders();
 
-    std::shared_ptr<SyncQueue<AVPacket*>> APacket_ = nullptr;
-    std::shared_ptr<SyncQueue<AVPacket*>> VPacket_ = nullptr;
-    std::shared_ptr<SyncQueue<AVFrame*>> AFrame_ = nullptr;
-    std::shared_ptr<SyncQueue<AVFrame*>> VFrame_ = nullptr;
+    std::shared_ptr<SyncQueue<AVPacket*>> APacket_ = nullptr;	///< 音频包队列
+    std::shared_ptr<SyncQueue<AVPacket*>> VPacket_ = nullptr;	///< 视频包队列
+    std::shared_ptr<SyncQueue<AVFrame*>> AFrame_ = nullptr;	///< 音频帧队列
+    std::shared_ptr<SyncQueue<AVFrame*>> VFrame_ = nullptr;	///< 视频帧队列
 
-    std::shared_ptr<IMediaSource> mediaSource_;
-    std::shared_ptr<syncmanager> syncManager_;
+    std::shared_ptr<IMediaSource> mediaSource_;	///< 当前媒体源
+    std::shared_ptr<syncmanager> syncManager_;	///< 同步时钟管理器
 
-    std::unique_ptr<demuxer> demuxer_;
-    std::unique_ptr<decoder> Adecoder_;
-    std::unique_ptr<decoder> Vdecoder_;
-    std::unique_ptr<AudioPlayer> audioplay_;
-    std::unique_ptr<VideoFrameScheduler> videoFrameScheduler_;
-    VideoRender* videoRender_ = nullptr;
-    IVideoFrameSink* activeVideoFrameSink_ = nullptr;
+    std::unique_ptr<demuxer> demuxer_;	///< 解复用器
+    std::unique_ptr<decoder> Adecoder_;	///< 音频解码器
+    std::unique_ptr<decoder> Vdecoder_;	///< 视频解码器
+    std::unique_ptr<AudioPlayer> audioplay_;	///< 音频播放器
+    std::unique_ptr<VideoFrameScheduler> videoFrameScheduler_;	///< 视频帧调度器
+    VideoRender* videoRender_ = nullptr;	///< 默认视频渲染器
+    IVideoFrameSink* activeVideoFrameSink_ = nullptr;	///< 当前视频帧输出目标
 
-    std::unique_ptr<QThread> demuxerTH_;
-    std::unique_ptr<QThread> AdecoderTH_;
-    std::unique_ptr<QThread> VdecoderTH_;
-    std::unique_ptr<QThread> audioplayTH_;
+    std::unique_ptr<QThread> demuxerTH_;	///< 解复用线程
+    std::unique_ptr<QThread> AdecoderTH_;	///< 音频解码线程
+    std::unique_ptr<QThread> VdecoderTH_;	///< 视频解码线程
+    std::unique_ptr<QThread> audioplayTH_;	///< 音频播放线程
 
-    std::unique_ptr<QTimer> positionTimer_;
+    std::unique_ptr<QTimer> positionTimer_;	///< 播放位置刷新定时器
 };
 
 #endif // TINYVIDEOPROCESSOR_MEDIAPIPELINE_H

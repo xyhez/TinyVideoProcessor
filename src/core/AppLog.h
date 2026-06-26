@@ -123,13 +123,13 @@ public:
     }
 
 private:
-    logging::Level level_;
-    const char* file_;
-    int line_;
-    const char* func_;
-    std::ostringstream stream_;
-    bool first_ = true;
-    bool active_ = true;
+    logging::Level level_;	///< 日志级别
+    const char* file_;	///< 源文件路径
+    int line_;	///< 源代码行号
+    const char* func_;	///< 函数名
+    std::ostringstream stream_;	///< 日志内容流
+    bool first_ = true;	///< 是否为首个参数
+    bool active_ = true;	///< 是否输出日志
 };
 
 } // namespace app::log

@@ -26,7 +26,7 @@ class MultiStreamManager : public QObject {
 
 public:
     using StreamId = int;
-    static constexpr StreamId InvalidStreamId = -1;
+    static constexpr StreamId InvalidStreamId = -1;	///< 无效流 ID
     using FrameSinkFactory = std::function<std::unique_ptr<IVideoFrameSink>(StreamId)>;
 
     /**
@@ -315,10 +315,10 @@ signals:
 
 private:
     struct StreamSlot {
-        std::shared_ptr<IMediaSource> mediaSource;
-        QWidget* rendererContainer = nullptr;
-        std::unique_ptr<IVideoFrameSink> videoFrameSink;
-        std::unique_ptr<MediaPipeline> pipeline;
+        std::shared_ptr<IMediaSource> mediaSource;	///< 媒体源
+        QWidget* rendererContainer = nullptr;	///< 默认渲染容器
+        std::unique_ptr<IVideoFrameSink> videoFrameSink;	///< 视频帧输出目标
+        std::unique_ptr<MediaPipeline> pipeline;	///< 单路播放管线
     };
 
     /**
@@ -360,12 +360,12 @@ private:
      */
     void ConnectPipelineSignals(StreamId id, MediaPipeline* pipeline);
 
-    std::map<StreamId, StreamSlot> streams_;
-    StreamId nextStreamId_ = 1;
-    StreamId activeStreamId_ = InvalidStreamId;
-    StreamId activeAudioStreamId_ = InvalidStreamId;
-    double audioVolume_ = 1.0;
-    bool audioMuted_ = false;
+    std::map<StreamId, StreamSlot> streams_;	///< 多路流表
+    StreamId nextStreamId_ = 1;	///< 下一个可分配流 ID
+    StreamId activeStreamId_ = InvalidStreamId;	///< 当前活动显示流
+    StreamId activeAudioStreamId_ = InvalidStreamId;	///< 当前活动音频流
+    double audioVolume_ = 1.0;	///< 全局音量
+    bool audioMuted_ = false;	///< 全局静音状态
 };
 
 #endif // TINYVIDEOPROCESSOR_MULTISTREAMMANAGER_H

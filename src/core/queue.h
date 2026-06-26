@@ -17,14 +17,14 @@
 template<typename T>
 class SyncQueue {
 private:
-    std::deque<T> raw_queue_;                       ///< 数据队列
-    std::mutex mutex_;                              ///< 锁
-    std::condition_variable cv_not_empty_;          ///< 空队列条件变量
-    std::condition_variable cv_not_full_;           ///< 满队列条件变量
-    size_t max_size_;                               ///< 队列最大容量
-    std::atomic<bool> stop_flag_;                   ///< 停止标志
-    std::atomic<bool> wait_interrupted_;            ///< 非终止式等待中断标志
-    std::function<void(T)> deleter_ = nullptr;      ///< 数据析构器
+    std::deque<T> raw_queue_;	///< 数据队列
+    std::mutex mutex_;	///< 互斥锁
+    std::condition_variable cv_not_empty_;	///< 非空条件变量
+    std::condition_variable cv_not_full_;	///< 未满条件变量
+    size_t max_size_;	///< 队列最大容量
+    std::atomic<bool> stop_flag_;	///< 停止标志
+    std::atomic<bool> wait_interrupted_;	///< 等待中断标志
+    std::function<void(T)> deleter_ = nullptr;	///< 元素析构器
 public:
 // 核心接口
     /**

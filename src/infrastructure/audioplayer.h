@@ -136,44 +136,44 @@ signals:
     void MuteChanged(bool muted);
 
 private:
-    std::shared_ptr<SyncQueue<AVFrame*>> m_audioFrameQueue;
-    std::shared_ptr<syncmanager> m_syncManager;
-    double m_audioTimeBase = 0.0;
-    bool m_first = true;
+    std::shared_ptr<SyncQueue<AVFrame*>> m_audioFrameQueue;	///< 音频帧队列
+    std::shared_ptr<syncmanager> m_syncManager;	///< 同步时钟管理器
+    double m_audioTimeBase = 0.0;	///< 音频时间基
+    bool m_first = true;	///< 是否为首帧音频
 
-    SwrContext *m_swr = nullptr;
-    QAudioSink *m_audioSink = nullptr;
-    QIODevice *m_ioDevice = nullptr;
+    SwrContext *m_swr = nullptr;	///< 音频重采样上下文
+    QAudioSink *m_audioSink = nullptr;	///< Qt 音频输出对象
+    QIODevice *m_ioDevice = nullptr;	///< 音频输出设备
 
-    int m_srcRate = 44100;
-    int m_srcChannels = 2;
-    int m_dstRate = 44100;
-    int m_dstChannels = 2;
-    AVSampleFormat m_dstFormat = AV_SAMPLE_FMT_S16;
-    int m_bytesPerSample = 2;
+    int m_srcRate = 44100;	///< 输入采样率
+    int m_srcChannels = 2;	///< 输入声道数
+    int m_dstRate = 44100;	///< 输出采样率
+    int m_dstChannels = 2;	///< 输出声道数
+    AVSampleFormat m_dstFormat = AV_SAMPLE_FMT_S16;	///< 输出采样格式
+    int m_bytesPerSample = 2;	///< 单采样字节数
 
-    qint64 m_totalBytesWritten = 0;
-    double m_lastHardwareLatency = 0.0;
+    qint64 m_totalBytesWritten = 0;	///< 已写入总字节数
+    double m_lastHardwareLatency = 0.0;	///< 最近硬件延迟
 
-    QElapsedTimer m_latencyUpdateTimer;
-    static constexpr double LATENCY_SMOOTH_ALPHA = 0.1;
+    QElapsedTimer m_latencyUpdateTimer;	///< 延迟更新计时器
+    static constexpr double LATENCY_SMOOTH_ALPHA = 0.1;	///< 延迟平滑系数
 
-    AVFrame* m_frame = nullptr;
-    QByteArray m_pcmBuffer;
-    QByteArray m_speedPcmBuffer;
+    AVFrame* m_frame = nullptr;	///< 当前音频帧
+    QByteArray m_pcmBuffer;	///< PCM 缓冲区
+    QByteArray m_speedPcmBuffer;	///< 变速 PCM 缓冲区
 
-    qint64 m_bytesWrittenTotal = 0;
-    QElapsedTimer m_statusTimer;
+    qint64 m_bytesWrittenTotal = 0;	///< 累计写入字节数
+    QElapsedTimer m_statusTimer;	///< 状态输出计时器
 
-    bool m_stopFlag = false;
-    bool m_pauseFlag = false;
-    QMutex m_mutex;
-    QWaitCondition m_queueNotEmpty;
+    bool m_stopFlag = false;	///< 停止标志
+    bool m_pauseFlag = false;	///< 暂停标志
+    QMutex m_mutex;	///< 播放互斥锁
+    QWaitCondition m_queueNotEmpty;	///< 音频队列非空条件
 
-    qreal m_volume = 1.0;
-    bool m_muted = false;
-    mutable QMutex m_volumeMutex;
-    std::atomic<double> m_speed {1.0};
+    qreal m_volume = 1.0;	///< 用户音量
+    bool m_muted = false;	///< 静音状态
+    mutable QMutex m_volumeMutex;	///< 音量互斥锁
+    std::atomic<double> m_speed {1.0};	///< 播放速度
 
 private:
     /**
