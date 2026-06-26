@@ -95,103 +95,141 @@ TinyVideoProcessor 是一个渐进式演进的视频处理框架，遵循清晰�
 
 ### 分层架构
 
-```mermaid
-flowchart TB
-    subgraph UI["Presentation Layer / UI 层"]
-        MainWindow["MainWindow\n播放控制 / 文件列表 / 摄像头设置\n逻辑 slot 分配 / 布局切换 / active stream 交互"]
-        PlaylistUI["Playlist UI\n文件列表 / 上一个 / 下一个 / 循环模式"]
-        CameraDialog["CameraSettingsDialog\n摄像头设备 / 分辨率 / 帧率选择"]
-    end
-
-    subgraph APP["Application Layer / 应用层"]
-        Controller["MediaPlayController\n统一播放控制入口\n转发多路控制 / 维护 UI 状态语义"]
-    end
-
-    subgraph DOMAIN["Domain Layer / 领域层"]
-        Source["IMediaSource\n媒体源抽象"]
-        FileSource["FileMediaSource\n本地文件源"]
-        CameraSource["CameraMediaSource\nUSB 摄像头源"]
-        PlaylistManager["PlaylistManager\n播放列表状态"]
-        Manager["MultiStreamManager\nStreamId 分配\nactive stream / active audio stream\n多路 MediaPipeline 生命周期"]
-        Pipeline1["MediaPipeline #1\n单路播放管线"]
-        PipelineN["MediaPipeline #N\n单路播放管线"]
-    end
-
-    subgraph INFRA["Infrastructure Layer / 基础设施层"]
-        Demuxer["Demuxer\n解复用 / packet 队列输入"]
-        VideoDecoder["Video Decoder\n视频解码 / frame 队列输出"]
-        AudioDecoder["Audio Decoder\n音频解码 / PCM 输出"]
-        AudioPlayer["AudioPlayer\n音频播放 / 音量 / 静音"]
-        SyncManager["SyncManager\n音频时钟 / 视频时钟 / 同步基准"]
-        Scheduler["VideoFrameScheduler\n取帧 / 同步判断 / 丢帧追赶 / 调度"]
-        Sink["IVideoFrameSink\n可显示帧消费接口"]
-        Adapter["SingleStreamFrameSinkAdapter\nStreamId 绑定 / 帧投递适配"]
-        MultiRenderer["MultiViewRenderer\n统一 OpenGL 多画面渲染\nSingle / 2x2 / 3x3 / 4x4 / 聚焦"]
-        Fallback["VideoRender fallback\n旧单路渲染回退路径"]
-        CameraEnum["CameraDeviceEnumerator\n摄像头设备枚举"]
-        Queue["SyncQueue\n线程安全 packet/frame 队列"]
-        Log["AppLog / TinyLogLibrary\n日志输出"]
-    end
-
-    MainWindow --> Controller
-    PlaylistUI --> MainWindow
-    CameraDialog --> MainWindow
-    MainWindow --> PlaylistManager
-
-    Controller --> Manager
-    Controller --> PlaylistManager
-
-    FileSource -->|"implements"| Source
-    CameraSource -->|"implements"| Source
-    CameraDialog --> CameraEnum
-    Manager --> Pipeline1
-    Manager --> PipelineN
-    Pipeline1 --> Source
-    PipelineN --> Source
-
-    Pipeline1 --> Demuxer
-    PipelineN --> Demuxer
-    Demuxer --> Queue
-    Queue --> VideoDecoder
-    Queue --> AudioDecoder
-
-    AudioDecoder --> AudioPlayer
-    AudioPlayer --> SyncManager
-
-    VideoDecoder --> Scheduler
-    Scheduler --> SyncManager
-    Scheduler --> Sink
-    Sink --> Adapter
-    Sink -.-> Fallback
-    Adapter --> MultiRenderer
-
-    Controller -->|"stream 状态信号"| MainWindow
-    MainWindow -->|"SetViewSlots / SetLayout / SetActiveStream"| MultiRenderer
-    MultiRenderer -->|"StreamClicked / StreamDoubleClicked"| MainWindow
-
-    Demuxer --> Log
-    VideoDecoder --> Log
-    Scheduler --> Log
-    MultiRenderer --> Log
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                        Presentation Layer (UI 层)                            │
+│                                                                              │
+│  ┌──────────────────────────── MainWindow ────────────────────────────────┐  │
+│  │ - 播放控制、进度条、音量、速度、全屏                                    │  │
+│  │ - 文件列表、摄像头设置入口                                              │  │
+│  │ - 多路逻辑 slot 分配、布局切换、active stream 交互                      │  │
+│  │ - 接收 MultiViewRenderer 点击/双击信号并转发给 Controller               │  │
+│  └────────────────────────────────────────────────────────────────────────┘  │
+│                                                                              │
+│  ┌──────────────────────┐        ┌──────────────────────────────┐            │
+│  │ Playlist UI          │        │ CameraSettingsDialog          │            │
+│  │ 文件列表/上下切换     │        │ 设备/分辨率/帧率选择           │            │
+│  └──────────────────────┘        └──────────────────────────────┘            │
+└──────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                       Application Layer (应用层)                              │
+│                                                                              │
+│  ┌──────────────────────── MediaPlayController ───────────────────────────┐  │
+│  │ - 对 UI 暴露统一播放控制入口                                             │  │
+│  │ - Start / Pause / Stop / Seek / Speed / Volume / Mute                  │  │
+│  │ - 转发单路和多路播放控制                                                 │  │
+│  │ - 维护 UI 需要的播放位置、时长、音量、静音和状态语义                      │  │
+│  └────────────────────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                          Domain Layer (领域层)                               │
+│                                                                              │
+│  ┌──────────────────────┐        ┌──────────────────────────────────────┐    │
+│  │ IMediaSource          │        │ PlaylistManager                      │    │
+│  │ 媒体源抽象接口         │        │ 播放列表状态与播放顺序                 │    │
+│  └──────────┬───────────┘        └──────────────────────────────────────┘    │
+│             │                                                                │
+│      ┌──────┴─────────────┐                                                  │
+│      │                    │                                                  │
+│  ┌───▼───────────┐   ┌────▼────────────┐                                     │
+│  │ FileMediaSource│   │ CameraMediaSource│                                    │
+│  │ 本地文件源      │   │ USB 摄像头源      │                                    │
+│  └───────────────┘   └─────────────────┘                                     │
+│                                                                              │
+│  ┌──────────────────────── MultiStreamManager ────────────────────────────┐  │
+│  │ - 分配和管理 StreamId                                                   │  │
+│  │ - 管理 active stream / active audio stream                              │  │
+│  │ - 管理多个 MediaPipeline 生命周期                                        │  │
+│  │ - 保证多路场景最多一路输出音频                                           │  │
+│  └───────────────┬───────────────────────────┬────────────────────────────┘  │
+│                  │                           │                               │
+│        ┌─────────▼──────────┐      ┌─────────▼──────────┐                    │
+│        │ MediaPipeline #1    │      │ MediaPipeline #N    │                    │
+│        │ 单路播放管线         │      │ 单路播放管线         │                    │
+│        │ 不感知 StreamId      │      │ 不感知 StreamId      │                    │
+│        └────────────────────┘      └────────────────────┘                    │
+└──────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                     Infrastructure Layer (基础设施层)                         │
+│                                                                              │
+│  ┌──────────┐   packet    ┌──────────────┐   frame    ┌──────────────────┐   │
+│  │ Demuxer  ├────────────►│ Decoder      ├───────────►│ VideoFrameQueue  │   │
+│  │ 解复用    │             │ 音/视频解码   │            │ 视频帧队列         │   │
+│  └──────────┘             └──────┬───────┘            └────────┬─────────┘   │
+│                                  │                             │             │
+│                                  │ audio frame                 ▼             │
+│                                  │                 ┌──────────────────────┐  │
+│                                  ▼                 │ VideoFrameScheduler   │  │
+│                         ┌────────────────┐         │ 取帧/同步/丢帧/调度    │  │
+│                         │ AudioPlayer    │         └──────────┬───────────┘  │
+│                         │ 音频播放/音量   │                    │ 可显示帧       │
+│                         └────────┬───────┘                    ▼             │
+│                                  │ 音频时钟            ┌──────────────────┐  │
+│                                  ▼                    │ IVideoFrameSink   │  │
+│                         ┌────────────────┐            │ 可显示帧消费接口   │  │
+│                         │ SyncManager    │            └────────┬─────────┘  │
+│                         │ 音视频同步基准  │                     │            │
+│                         └────────────────┘                     ▼            │
+│                                                     ┌─────────────────────┐  │
+│                                                     │ SingleStreamFrame   │  │
+│                                                     │ SinkAdapter         │  │
+│                                                     │ StreamId 绑定适配    │  │
+│                                                     └──────────┬──────────┘  │
+│                                                                ▼             │
+│                                                     ┌─────────────────────┐  │
+│                                                     │ MultiViewRenderer   │  │
+│                                                     │ 统一 OpenGL 多画面   │  │
+│                                                     │ Single/2x2/3x3/4x4  │  │
+│                                                     └─────────────────────┘  │
+│                                                                              │
+│  CameraDeviceEnumerator / VideoRender fallback / SyncQueue / AppLog          │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### 核心数据流
 
-```mermaid
-flowchart LR
-    MediaSource["IMediaSource\nFile / Camera"] --> Demuxer["Demuxer"]
-    Demuxer --> PacketQueue["Packet Queue"]
-    PacketQueue --> VideoDecoder["Video Decoder"]
-    PacketQueue --> AudioDecoder["Audio Decoder"]
-    VideoDecoder --> FrameQueue["Video Frame Queue"]
-    FrameQueue --> Scheduler["VideoFrameScheduler"]
-    Scheduler -->|"可显示帧"| Sink["IVideoFrameSink"]
-    Sink --> Adapter["SingleStreamFrameSinkAdapter"]
-    Adapter --> MultiRenderer["MultiViewRenderer"]
+```text
+控制流：
 
-    AudioDecoder --> AudioPlayer["AudioPlayer"]
-    AudioPlayer -->|"音频时钟"| SyncManager["SyncManager"]
-    SyncManager -->|"同步判断"| Scheduler
+MainWindow
+  -> MediaPlayController
+    -> MultiStreamManager
+      -> MediaPipeline #1
+      -> MediaPipeline #2
+      -> MediaPipeline #N
+
+视频帧流：
+
+IMediaSource
+  -> Demuxer
+    -> PacketQueue
+      -> VideoDecoder
+        -> VideoFrameQueue
+          -> VideoFrameScheduler
+            -> IVideoFrameSink
+              -> SingleStreamFrameSinkAdapter
+                -> MultiViewRenderer
+
+音频与同步流：
+
+AudioDecoder
+  -> AudioPlayer
+    -> SyncManager
+      -> VideoFrameScheduler
+
+交互回流：
+
+MultiViewRenderer
+  -> StreamClicked / StreamDoubleClicked
+    -> MainWindow
+      -> MediaPlayController
+        -> MultiStreamManager
 ```
 
 ### 职责边界
