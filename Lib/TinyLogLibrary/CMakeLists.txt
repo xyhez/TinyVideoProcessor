@@ -2,12 +2,12 @@ cmake_minimum_required(VERSION 3.16)
 
 project(TinyLogLibrary VERSION 0.1.0 LANGUAGES CXX)
 
-add_library(tiny_log STATIC
-    src/Logger.cpp
-    src/ThreadPool.cpp
-    src/AsyncLogger.cpp
-    include/tiny_log/src/Registry.cpp
+file(GLOB_RECURSE TINY_LOG_SOURCES
+    src/*.cpp
+    include/tiny_log/src/*.cpp
 )
+
+add_library(tiny_log STATIC ${TINY_LOG_SOURCES})
 
 set_target_properties(tiny_log PROPERTIES
     AUTOMOC OFF

@@ -34,15 +34,19 @@ TinyVideoProcessor 是一个渐进式演进的视频处理框架，遵循清晰�
 
 ## ✨ 特性
 
-### 当前版本 (Phase 0 - 基础播放器)
+### 当前版本
 
-- ✅ 视频播放（本地文件）
-- ✅ 音视频同步
-- ✅ 硬件加速解码（NVDEC/DXVA2）
-- ✅ OpenGL 渲染
-- ✅ 播放/暂停控制
-- ✅ 音量调节
-- ✅ 多线程架构
+- ✅ 本地文件播放、播放列表、上一个/下一个、循环模式
+- ✅ 播放、暂停、停止、Seek、快进/快退、播放速度控制
+- ✅ 音量调节、静音控制、无音频流视频兼容
+- ✅ `IMediaSource` 媒体源抽象，已支持文件源和摄像头源基础接入
+- ✅ 单路 `MediaPipeline` 播放管线，解耦 UI 与底层解码播放链路
+- ✅ `MultiStreamManager` 多路播放管理，支持 active stream / active audio stream
+- ✅ `VideoFrameScheduler` 视频帧调度，负责取帧、同步判断、丢帧和调度
+- ✅ `MultiViewRenderer` 统一 OpenGL 多画面渲染，支持 `Single` / `2x2` / `3x3` / `4x4`
+- ✅ 多路文件/摄像头混合预览基础能力
+- ✅ 双击单路聚焦与恢复
+- ✅ 多线程解码、音视频同步、硬件解码基础支持
 
 ### 规划中的功能
 
@@ -55,16 +59,22 @@ TinyVideoProcessor 是一个渐进式演进的视频处理框架，遵循清晰�
 - [ ] 配置持久化
 
 #### Phase 2: 摄像头支持
-- [ ] USB 摄像头采集
-- [ ] 设备枚举与选择
-- [ ] 分辨率/帧率设置
-- [ ] 实时预览
+- [x] USB 摄像头采集 MVP
+- [x] 设备枚举与选择
+- [x] 分辨率/帧率设置
+- [x] 实时预览基础链路
+- [ ] 摄像头参数持久化
+- [ ] 摄像头截图功能
 
 #### Phase 3: 多路视频
-- [ ] 多路同时播放
-- [ ] 灵活布局（2x2, 3x3, 4x4, 1+5）
-- [ ] 独立控制
-- [ ] 单路全屏
+- [x] 多路播放管理
+- [x] 统一 `MultiViewRenderer` 多画面渲染
+- [x] 灵活布局（Single, 2x2, 3x3, 4x4）
+- [x] active stream / active audio stream 策略
+- [x] 单路聚焦与恢复
+- [ ] 非 YUV420P / 4K MKV 显示质量完善
+- [ ] 多路渲染性能优化
+- [ ] 9/16 路真实播放扩容
 
 #### Phase 4: 网络流
 - [ ] RTSP 流播放
@@ -86,24 +96,62 @@ TinyVideoProcessor 是一个渐进式演进的视频处理框架，遵循清晰�
 ### 分层架构
 
 ```
-┌─────────────────────────────────────────────────┐
-│         Presentation Layer (UI 层)              │
-│              MainWindow                         │
-├─────────────────────────────────────────────────┤
-│       Application Layer (应用层)                │
-│         MediaPlayerController                   │
-├─────────────────────────────────────────────────┤
-│          Domain Layer (领域层)                  │
-│  ┌──────────────┐  ┌──────────────┐           │
-│  │ IMediaSource │  │MediaPipeline │           │
-│  │  (抽象接口)   │  │  (播放管线)   │           │
-│  └──────────────┘  └──────────────┘           │
-├─────────────────────────────────────────────────┤
-│     Infrastructure Layer (基础设施层)           │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐          │
-│  │ Demuxer │ │ Decoder │ │ Renderer│          │
-│  └─────────┘ └─────────┘ └─────────┘          │
-└─────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                         Presentation Layer (UI 层)                           │
+│                                                                              │
+│  MainWindow                                                                  │
+│  ├─ 播放控制 / 文件列表 / 摄像头设置                                           │
+│  ├─ 多路逻辑 slot 分配与布局选择                                               │
+│  └─ active stream 交互转发                                                     │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                         Application Layer (应用层)                            │
+│                                                                              │
+│  MediaPlayController                                                          │
+│  ├─ 对 UI 暴露统一播放控制入口                                                  │
+│  ├─ 转发单路和多路播放控制                                                      │
+│  └─ 维护应用层音量、静音、进度和状态语义                                         │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                           Domain Layer (领域层)                               │
+│                                                                              │
+│  IMediaSource                    MultiStreamManager                           │
+│  ├─ FileMediaSource              ├─ StreamId / active stream                  │
+│  └─ CameraMediaSource            ├─ active audio stream                       │
+│                                  └─ 多个 MediaPipeline 生命周期               │
+│                                                                              │
+│  MediaPipeline                                                               │
+│  └─ 单路播放管线，不感知 StreamId，不负责多路布局                              │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                       Infrastructure Layer (基础设施层)                        │
+│                                                                              │
+│  Demuxer -> Decoder -> AudioPlayer                                            │
+│                    -> SyncManager                                             │
+│                    -> VideoFrameScheduler -> IVideoFrameSink                  │
+│                                             └─ SingleStreamFrameSinkAdapter   │
+│                                                    -> MultiViewRenderer       │
+│                                                                              │
+│  CameraDeviceEnumerator / VideoRender fallback / SyncQueue / AppLog           │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 核心播放链路
+
+```text
+MainWindow
+    -> MediaPlayController
+        -> MultiStreamManager
+            -> MediaPipeline #1
+            -> MediaPipeline #2
+            -> MediaPipeline #N
+
+MediaPipeline
+    -> IMediaSource
+    -> Demuxer
+    -> Decoder
+    -> AudioPlayer / SyncManager
+    -> VideoFrameScheduler
+    -> IVideoFrameSink
+    -> SingleStreamFrameSinkAdapter
+    -> MultiViewRenderer
 ```
 
 ### 核心设计模式
@@ -111,29 +159,47 @@ TinyVideoProcessor 是一个渐进式演进的视频处理框架，遵循清晰�
 **1. 策略模式 - 媒体源抽象**
 ```cpp
 class IMediaSource {
-    virtual bool open() = 0;
-    virtual AVFormatContext* getFormatContext() = 0;
+    virtual bool Open() = 0;
+    virtual bool Close() = 0;
+    // 提供 FFmpeg 格式上下文、媒体信息和源类型
 };
 
 // 不同的媒体源实现
 class FileMediaSource : public IMediaSource { };
 class CameraMediaSource : public IMediaSource { };
-class NetworkMediaSource : public IMediaSource { };
+// NetworkMediaSource 预留给后续网络流阶段
 ```
 
-**2. 管道模式 - 处理流程**
+**2. 管道模式 - 单路播放流程**
 ```cpp
 class MediaPipeline {
-    IMediaSource → Demuxer → Decoder → Renderer
+    IMediaSource -> Demuxer -> Decoder -> VideoFrameScheduler -> IVideoFrameSink;
 };
 ```
 
-**3. 观察者模式 - 事件通知**
+**3. 管理器模式 - 多路播放**
+```cpp
+class MultiStreamManager {
+    StreamId -> MediaPipeline;
+    ActiveStream;
+    ActiveAudioStream;
+};
+```
+
+**4. 适配器模式 - 统一渲染接入**
+```cpp
+class SingleStreamFrameSinkAdapter : public IVideoFrameSink {
+    // 将单路可显示帧投递到 MultiViewRenderer 的指定 stream/slot
+};
+```
+
+**5. 观察者模式 - 事件通知**
 ```cpp
 // 使用 Qt 信号槽机制
 signals:
-    void frameReady(AVFrame *frame);
-    void error(QString msg);
+    void StreamPositionChanged(StreamId id, double seconds);
+    void StreamPlaybackFinished(StreamId id);
+    void StreamErrorOccurred(StreamId id, QString message);
 ```
 
 详细架构设计请参考：[架构指导.md](doc/架构指导.md)
@@ -210,34 +276,53 @@ TinyVideoProcessor/
 ├── README.md                     # 项目说明
 ├── CMakeLists.txt                # CMake 构建配置
 ├── Lib/
-│   └── ffmpeg/                   # 随项目发布的 FFmpeg 依赖
+│   ├── ffmpeg/                   # 随项目发布的 FFmpeg 依赖
+│   └── TinyLogLibrary/           # 日志库
 ├── doc/
 │   ├── 架构指导.md               # 总体架构路线
 │   ├── TODO.md                   # 当前阶段任务清单
 │   ├── Phase1_*.md               # 播放器完善阶段文档
+│   ├── Phase2*.md                # 摄像头输入阶段文档
 │   ├── Phase3_0_*.md             # 无音频流支持文档
 │   ├── Phase3_1_*.md             # 单路 MediaPipeline 抽取文档
-│   └── Phase3_2_*.md             # 多路管理设计文档
+│   ├── Phase3_2_*.md             # 多路管理设计文档
+│   ├── Phase3_7_*.md             # 视频帧输出边界文档
+│   ├── Phase3_10*.md             # VideoFrameScheduler 抽取文档
+│   ├── Phase3_11*.md             # UI 转向 MultiViewRenderer 文档
+│   ├── Phase3_12*.md             # MultiViewRenderer 布局与交互文档
+│   ├── Phase3_13TODO.md          # 渲染输入格式与显示质量计划
+│   ├── Phase3_14TODO.md          # 多路性能优化计划
+│   └── Phase3_15TODO.md          # 9/16 路真实播放扩容计划
 └── src/
     ├── ui/
     │   ├── main.cpp              # 程序入口
     │   ├── mainwindow.h/cpp      # 主窗口
-    │   └── mainwindow.ui         # UI 设计文件
+    │   ├── mainwindow.ui         # UI 设计文件
+    │   └── CameraSettingsDialog.h/cpp
     ├── application/
-    │   └── MediaPlayController.h/cpp
+    │   └── MediaPlayController.h/cpp # 应用层播放控制入口
     ├── domain/
     │   ├── IMediaSource.h        # 媒体源抽象接口
     │   ├── FileMediaSource.h/cpp # 文件媒体源
+    │   ├── CameraMediaSource.h/cpp # 摄像头媒体源
+    │   ├── CameraTypes.h         # 摄像头设备与参数类型
     │   ├── MediaPipeline.h/cpp   # 单路播放管线
+    │   ├── MultiStreamManager.h/cpp # 多路播放管理
     │   └── PlaylistManager.h/cpp # 播放列表管理
     ├── infrastructure/
     │   ├── demuxer.h/cpp         # 解复用器
     │   ├── decoder.h/cpp         # 解码器
     │   ├── audioplayer.h/cpp     # 音频播放
-    │   ├── videorender.h/cpp     # 视频渲染
-    │   └── syncmanager.h/cpp     # 音视频同步
+    │   ├── syncmanager.h/cpp     # 音视频同步
+    │   ├── videoframescheduler.h/cpp # 视频帧调度
+    │   ├── ivideoframesink.h     # 可显示帧消费接口
+    │   ├── singlestreamframesinkadapter.h/cpp # 单路帧 sink 适配器
+    │   ├── multiviewrenderer.h/cpp # 统一多画面 OpenGL 渲染器
+    │   ├── videorender.h/cpp     # 旧单路渲染 fallback
+    │   └── CameraDeviceEnumerator.h/cpp # 摄像头设备枚举
     └── core/
-        └── queue.h               # 线程安全队列
+        ├── queue.h               # 线程安全队列
+        └── AppLog.h              # 应用日志封装
 ```
 
 ---
@@ -246,10 +331,13 @@ TinyVideoProcessor/
 
 | Phase | 状态 | 功能 | 预计时间 |
 |-------|------|------|---------|
-| Phase 0 | 🚧 进行中 | 架构重构 + 基础播放器 | 1 周 |
-| Phase 1 | 📋 计划中 | 完善播放器功能 | 2 周 |
-| Phase 2 | 📋 计划中 | 摄像头支持 | 1.5 周 |
-| Phase 3 | 📋 计划中 | 多路视频 | 2 周 |
+| Phase 0 | ✅ 已完成 | 架构重构 + 基础播放器 | 已完成 |
+| Phase 1 | ✅ 已完成 | 播放控制、播放列表、音量、UI 完善 | 已完成 |
+| Phase 2 | ✅ 阶段性完成 | 摄像头源接入、设备枚举、实时预览基础链路 | 已完成 |
+| Phase 3.1-3.12 | ✅ 已完成 | 多路管理、统一渲染、布局与聚焦交互 | 已完成 |
+| Phase 3.13 | 📋 计划中 | 非 YUV420P / 4K MKV 显示质量完善 | 待开发 |
+| Phase 3.14 | 📋 计划中 | 多路渲染性能优化 | 待开发 |
+| Phase 3.15 | 📋 计划中 | 9/16 路真实播放扩容 | 待开发 |
 | Phase 4 | 📋 计划中 | 网络流支持 | 1 周 |
 | Phase 5 | 📋 计划中 | 图像处理基础 | 2 周 |
 | Phase 6 | 📋 计划中 | 高级图像分析 | 2 周 |
@@ -284,16 +372,19 @@ TinyVideoProcessor/
 ### 当前版本
 
 - **视频解码**: 1080P@30fps
-- **CPU 占用**: < 15%（硬解）
-- **内存占用**: < 150MB
-- **音视频同步**: < 50ms
+- **播放能力**: 本地文件、无音频流视频、USB 摄像头基础预览
+- **多路显示**: 当前以 4 路真实播放为稳定基线，`3x3` / `4x4` 已具备布局显示能力
+- **统一渲染**: 单个 `MultiViewRenderer` 承载多路画面
+- **同步链路**: `VideoFrameScheduler` 负责视频帧同步调度，`SyncManager` 维护音视频时钟
+- **已知限制**: 非 `YUV420P` / 4K MKV 显示质量、多路性能和 9/16 路真实播放仍在后续阶段完善
 
-### 目标性能（Phase 3 完成后）
+### 目标性能
 
 - **多路播放**: 4 路 1080P@30fps
 - **CPU 占用**: < 30%
 - **内存占用**: < 500MB
 - **渲染延迟**: < 100ms
+- **后续目标**: 在 Phase 3.14 完成性能基线后，再评估 9/16 路真实播放能力
 
 ---
 
@@ -320,10 +411,22 @@ TinyVideoProcessor/
 
 ## 📝 开发日志
 
+### 2026-06-26
+- ✅ 完成主框架稳定化：`MainWindow -> MediaPlayController -> MultiStreamManager -> MediaPipeline`
+- ✅ 完成 `VideoFrameScheduler` 抽取，明确视频帧同步调度边界
+- ✅ 完成主显示区域迁移到 `MultiViewRenderer`
+- ✅ 完成 `Single` / `2x2` / `3x3` / `4x4` 布局与单路聚焦交互
+- 📋 拆分 Phase 3.13 / 3.14 / 3.15 后续任务
+
+### 2026-06
+- ✅ 完成 Phase 1 播放器基础功能完善
+- ✅ 完成 Phase 2 摄像头输入阶段性接入
+- ✅ 完成 Phase 3 多路播放管理和统一渲染主线
+
 ### 2026-05-30
 - ✅ 创建项目架构指导文档
 - ✅ 确定项目名称：TinyVideoProcessor
-- 🚧 开始 Phase 0 架构重构
+- ✅ 开始 Phase 0 架构重构
 
 ### 历史版本
 - **v0.1** (2026-01): 初始版本，基础播放功能

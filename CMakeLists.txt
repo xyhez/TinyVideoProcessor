@@ -35,54 +35,10 @@ set(FFMPEG_LIBS
     ${FFMPEG_LIB_DIR}/avdevice.lib
 )
 
-set(PROJECT_SOURCES
-        src/ui/main.cpp
-        src/ui/mainwindow.cpp
-        src/ui/mainwindow.h
-        src/ui/mainwindow.ui
-        src/ui/CameraSettingsDialog.cpp
-        src/ui/CameraSettingsDialog.h
-        src/infrastructure/decoder.h
-        src/infrastructure/decoder.cpp
-        src/infrastructure/demuxer.h
-        src/infrastructure/demuxer.cpp
-        src/infrastructure/syncmanager.h
-        src/infrastructure/syncmanager.cpp
-        src/infrastructure/ivideoframesink.h
-        src/infrastructure/videoframescheduler.h
-        src/infrastructure/videoframescheduler.cpp
-        src/infrastructure/videorender.h
-        src/infrastructure/videorender.cpp
-        src/infrastructure/multiviewrenderer.h
-        src/infrastructure/multiviewrenderer.cpp
-        src/infrastructure/singlestreamframesinkadapter.h
-        src/infrastructure/singlestreamframesinkadapter.cpp
-        src/infrastructure/audioplayer.h
-        src/infrastructure/audioplayer.cpp
-        src/infrastructure/CameraDeviceEnumerator.h
-        src/infrastructure/CameraDeviceEnumerator.cpp
-        src/core/queue.h
-        src/core/AppLog.h
-        doc/架构指导.md
-        doc/Phase0_重构计划.md
-        src/domain/IMediaSource.h
-        src/domain/FileMediaSource.cpp
-        src/domain/FileMediaSource.h
-        src/domain/CameraMediaSource.cpp
-        src/domain/CameraMediaSource.h
-        src/domain/CameraTypes.h
-        src/domain/MediaPipeline.cpp
-        src/domain/MediaPipeline.h
-        src/application/MediaPlayController.h
-        src/application/MediaPlayController.cpp
-        src/domain/PlaylistManager.cpp
-        src/domain/PlaylistManager.h
-        src/domain/MultiStreamManager.cpp
-        src/domain/MultiStreamManager.h
-        Lib/TinyLogLibrary/src/Logger.cpp
-        Lib/TinyLogLibrary/src/ThreadPool.cpp
-        Lib/TinyLogLibrary/src/AsyncLogger.cpp
-        Lib/TinyLogLibrary/include/tiny_log/src/Registry.cpp
+file(GLOB_RECURSE PROJECT_SOURCES
+    src/*.cpp src/*.h src/*.ui doc/*.md
+    Lib/TinyLogLibrary/src/*.cpp
+    Lib/TinyLogLibrary/include/tiny_log/src/*.cpp
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
