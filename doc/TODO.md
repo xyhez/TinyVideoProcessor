@@ -1312,3 +1312,20 @@ docs: 规划 MultiViewRenderer 单路真实帧接入
 - 不把 `StreamId` 放进 `VideoFrameScheduler`。
 - 不让 `MultiViewRenderer` 决定 stream 与 slot 的绑定关系。
 - 先验证 9 路，再评估 16 路。
+
+## 基础设施重构：队列 RAII 所有权模型
+
+**目标**：将当前 `SyncQueue<T>` 中依赖裸指针和手动 deleter 的 FFmpeg 包/帧队列，逐步迁移到 `unique_ptr + 自定义 deleter` 的 RAII 所有权模型。
+
+**独立 TODO**：
+
+- `doc/TODO-队列RAII重构.md`
+
+**阶段原则**：
+
+- 不使用 `shared_ptr` 作为默认队列所有权模型。
+- 先迁移 packet 队列，再迁移 frame 队列。
+- 不改变 `MediaPipeline` 单路职责。
+- 不改变 `VideoFrameScheduler` 的同步判断职责。
+- 不让 `MultiViewRenderer` 访问队列或 `SyncManager`。
+- 重构必须保持播放、seek、stop、shutdown、多路和无音频流场景不退化。
