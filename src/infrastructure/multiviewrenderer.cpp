@@ -45,6 +45,26 @@ QString PixelFormatName(AVPixelFormat format) {
     const char* name = av_get_pix_fmt_name(format);
     return name ? QString::fromUtf8(name) : QString("unknown(%1)").arg(static_cast<int>(format));
 }
+
+QString ColorRangeName(AVColorRange range) {
+    const char* name = av_color_range_name(range);
+    return name ? QString::fromUtf8(name) : QString("unknown(%1)").arg(static_cast<int>(range));
+}
+
+QString ColorSpaceName(AVColorSpace colorSpace) {
+    const char* name = av_color_space_name(colorSpace);
+    return name ? QString::fromUtf8(name) : QString("unknown(%1)").arg(static_cast<int>(colorSpace));
+}
+
+QString ColorPrimariesName(AVColorPrimaries primaries) {
+    const char* name = av_color_primaries_name(primaries);
+    return name ? QString::fromUtf8(name) : QString("unknown(%1)").arg(static_cast<int>(primaries));
+}
+
+QString ColorTransferName(AVColorTransferCharacteristic transfer) {
+    const char* name = av_color_transfer_name(transfer);
+    return name ? QString::fromUtf8(name) : QString("unknown(%1)").arg(static_cast<int>(transfer));
+}
 }
 
 MultiViewRenderer::MultiViewRenderer(QWidget* parent)
@@ -280,7 +300,7 @@ void MultiViewRenderer::ReleaseCurrentFrame(StreamRenderState& state) {
     state.pixelFormat = AV_PIX_FMT_NONE;
     state.textureDirty = false;
     state.hasFrame = false;
-    state.unsupportedFormatLogged = false;
+    state.hasLoggedFrameFormat = false;
 }
 
 void MultiViewRenderer::ReleaseStreamResources(StreamRenderState& state) {
@@ -431,8 +451,9 @@ bool MultiViewRenderer::DrawStreamFrame(const Viewport& viewport, StreamRenderSt
         return false;
     }
 
-    if (!UploadTexturesIfNeeded(state)) {
-        LogUnsupportedFrameIfNeeded(viewport.streamId, state);
+    const bool supported = IsSupportedFrameFormat(state);
+    LogFrameFormatIfNeeded(viewport.streamId, state, supported);
+    if (!supported || !UploadTexturesIfNeeded(state)) {
         return false;
     }
 
@@ -480,7 +501,6 @@ bool MultiViewRenderer::UploadTexturesIfNeeded(StreamRenderState& state) {
         return false;
     }
 
-    state.unsupportedFormatLogged = false;
     if (!state.textureDirty && state.textureY && state.textureU && state.textureV) {
         return true;
     }
@@ -560,17 +580,65 @@ void MultiViewRenderer::CalcFrameRect(const Viewport& viewport,
     y = -h / 2.0f;
 }
 
-void MultiViewRenderer::LogUnsupportedFrameIfNeeded(StreamId streamId, StreamRenderState& state) {
-    if (state.unsupportedFormatLogged || IsSupportedFrameFormat(state)) {
+void MultiViewRenderer::LogFrameFormatIfNeeded(StreamId streamId,
+                                               StreamRenderState& state,
+                                               bool supported) {
+    AVFrame* frame = state.currentFrame.get();
+    if (!frame) {
         return;
     }
 
-    state.unsupportedFormatLogged = true;
-    APP_LOG_WARN_STREAM().noquote()
-        << "MultiViewRenderer unsupported frame format:"
+    const bool changed = !state.hasLoggedFrameFormat
+        || state.lastLoggedFormat != static_cast<AVPixelFormat>(frame->format)
+        || state.lastLoggedWidth != frame->width
+        || state.lastLoggedHeight != frame->height
+        || state.lastLoggedLinesize[0] != frame->linesize[0]
+        || state.lastLoggedLinesize[1] != frame->linesize[1]
+        || state.lastLoggedLinesize[2] != frame->linesize[2]
+        || state.lastLoggedLinesize[3] != frame->linesize[3]
+        || state.lastLoggedColorRange != frame->color_range
+        || state.lastLoggedColorSpace != frame->colorspace
+        || state.lastLoggedColorPrimaries != frame->color_primaries
+        || state.lastLoggedColorTrc != frame->color_trc
+        || state.lastLoggedSampleAspectRatio.num != frame->sample_aspect_ratio.num
+        || state.lastLoggedSampleAspectRatio.den != frame->sample_aspect_ratio.den
+        || state.lastLoggedSupported != supported;
+    if (!changed) {
+        return;
+    }
+
+    state.hasLoggedFrameFormat = true;
+    state.lastLoggedFormat = static_cast<AVPixelFormat>(frame->format);
+    state.lastLoggedWidth = frame->width;
+    state.lastLoggedHeight = frame->height;
+    for (int index = 0; index < 4; ++index) {
+        state.lastLoggedLinesize[index] = frame->linesize[index];
+    }
+    state.lastLoggedColorRange = frame->color_range;
+    state.lastLoggedColorSpace = frame->colorspace;
+    state.lastLoggedColorPrimaries = frame->color_primaries;
+    state.lastLoggedColorTrc = frame->color_trc;
+    state.lastLoggedSampleAspectRatio = frame->sample_aspect_ratio;
+    state.lastLoggedSupported = supported;
+
+    const QString prefix = supported
+        ? "MultiViewRenderer accepted frame format:"
+        : "MultiViewRenderer unsupported frame format:";
+    APP_LOG_INFO_STREAM().noquote()
+        << prefix
         << QString("streamId=%1").arg(streamId)
-        << QString("pix_fmt=%1").arg(PixelFormatName(state.pixelFormat))
-        << QString("size=%1x%2").arg(state.videoWidth).arg(state.videoHeight);
+        << QString("pix_fmt=%1").arg(PixelFormatName(static_cast<AVPixelFormat>(frame->format)))
+        << QString("size=%1x%2").arg(frame->width).arg(frame->height)
+        << QString("linesize=[%1,%2,%3,%4]")
+              .arg(frame->linesize[0])
+              .arg(frame->linesize[1])
+              .arg(frame->linesize[2])
+              .arg(frame->linesize[3])
+        << QString("sar=%1/%2").arg(frame->sample_aspect_ratio.num).arg(frame->sample_aspect_ratio.den)
+        << QString("color_range=%1").arg(ColorRangeName(frame->color_range))
+        << QString("colorspace=%1").arg(ColorSpaceName(frame->colorspace))
+        << QString("color_primaries=%1").arg(ColorPrimariesName(frame->color_primaries))
+        << QString("color_trc=%1").arg(ColorTransferName(frame->color_trc));
 }
 
 void MultiViewRenderer::FillOpenGLRect(const QRect& rect,

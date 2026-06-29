@@ -6,7 +6,10 @@
   - Phase 3.11 已将主窗口常规视频显示区域统一到 `MultiViewRenderer`。
   - Phase 3.12 已完成 `Single` / `2x2` / `3x3` / `4x4` 布局与双击聚焦交互。
   - 当前 `MultiViewRenderer` 已能绘制基础 `YUV420P` 帧。
+  - Phase 3.13.1 已为 `MultiViewRenderer` 补充格式签名诊断日志，并形成静态诊断报告。
+  - Phase 3.13.3 已修正硬解 transfer 后固定按 `NV12` 转换的问题，改为按实际软件帧格式转换。
 - 未完成：
+  - 真实异常样本日志尚未收集，需要人工运行非 `YUV420P` / 4K MKV 样本后补充。
   - 非 `YUV420P` 视频帧的稳定显示。
   - 4K MKV 颜色异常和画面只显示局部的问题。
   - 色彩范围、色彩空间、像素格式和显示矩形的系统性处理。
@@ -73,6 +76,8 @@ MediaPipeline
 
 **预计修改文件**：
 
+- `src/infrastructure/multiviewrenderer.h`
+- `src/infrastructure/multiviewrenderer.cpp`
 - `doc/Phase3_13TODO.md`
 - 可选：`doc/Phase3_13_渲染格式诊断报告.md`
 
@@ -83,7 +88,8 @@ MediaPipeline
 - [ ] 记录视频 codec、pix_fmt、width、height、linesize、color_range、color_space、color_primaries、color_trc。
 - [ ] 记录 SAR/DAR 信息。
 - [ ] 记录是否为硬解输出帧、是否经过硬解转系统内存。
-- [ ] 明确当前 `MultiViewRenderer` 支持格式范围。
+- [x] 为 `MultiViewRenderer` 增加格式签名变化诊断日志。
+- [x] 明确当前 `MultiViewRenderer` 支持格式范围。
 - [ ] 明确异常属于黑屏、颜色错误、比例错误、裁切错误还是局部显示。
 
 **验收标准**：
@@ -95,7 +101,7 @@ MediaPipeline
 **测试流程**：
 
 - [ ] 本任务主要为诊断和文档，不要求编译。
-- [ ] 静态检查：`git diff --check -- doc\Phase3_13TODO.md doc\Phase3_13_渲染格式诊断报告.md`
+- [x] 静态检查：`git diff --check -- src\infrastructure\multiviewrenderer.h src\infrastructure\multiviewrenderer.cpp doc\Phase3_13TODO.md doc\Phase3_13_渲染格式诊断报告.md`
 - [ ] 人工验证建议：运行异常样本，记录控制台帧格式日志。
 
 **Commit message**：
@@ -103,7 +109,8 @@ MediaPipeline
 ```text
 docs: 梳理渲染格式异常样本
 
-- 收集非 YUV420P 和 4K MKV 显示异常样本信息
+- 为 MultiViewRenderer 增加格式诊断日志
+- 梳理非 YUV420P 和 4K MKV 显示异常样本信息
 - 记录帧像素格式、色彩信息、linesize 和 SAR/DAR
 - 区分格式不支持、色彩错误和显示矩形错误
 - 为后续渲染格式适配提供诊断依据
@@ -160,6 +167,7 @@ docs: 设计渲染输入格式适配方案
 
 - `src/infrastructure/multiviewrenderer.h`
 - `src/infrastructure/multiviewrenderer.cpp`
+- `src/infrastructure/decoder.cpp`
 - 可选：`src/infrastructure/videoframeconverter.h`
 - 可选：`src/infrastructure/videoframeconverter.cpp`
 - `CMakeLists.txt`
@@ -168,6 +176,9 @@ docs: 设计渲染输入格式适配方案
 **任务清单**：
 
 - [ ] 新增或收口可显示帧格式转换入口。
+- [x] 修正硬解 transfer 后误把实际软件帧格式固定当作 `NV12` 的问题。
+- [x] 硬解转换路径使用 `AVFrame::format` 作为 `sws_getCachedContext()` 输入格式。
+- [x] 硬解转换输出帧复制原帧时间戳、SAR 和色彩元数据。
 - [ ] 支持 `YUV420P` 原样通过。
 - [ ] 支持 `YUVJ420P` 按 full range 处理或转换。
 - [ ] 支持常见非 `YUV420P` 格式转换到当前 renderer 可绘制格式。
@@ -185,7 +196,7 @@ docs: 设计渲染输入格式适配方案
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\multiviewrenderer.h src\infrastructure\multiviewrenderer.cpp src\infrastructure\videoframeconverter.h src\infrastructure\videoframeconverter.cpp CMakeLists.txt doc\Phase3_13TODO.md`
+- [x] 静态检查：`git diff --check -- src\infrastructure\decoder.cpp src\infrastructure\multiviewrenderer.h src\infrastructure\multiviewrenderer.cpp doc\Phase3_13TODO.md`
 - [ ] 定向搜索：`rg -n "sws_|AV_PIX_FMT|color_range|linesize|VideoFrameConverter|PresentFrame" src\infrastructure doc\Phase3_13TODO.md`
 - [ ] 人工运行建议：普通 MP4、非 `YUV420P` 视频、4K MKV、无音频视频。
 

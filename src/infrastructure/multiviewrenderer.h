@@ -203,7 +203,17 @@ private:
         AVPixelFormat pixelFormat = AV_PIX_FMT_NONE;	///< 像素格式
         bool textureDirty = false;	///< 纹理是否需要更新
         bool hasFrame = false;	///< 是否持有显示帧
-        bool unsupportedFormatLogged = false;	///< 是否已输出格式不支持日志
+        AVPixelFormat lastLoggedFormat = AV_PIX_FMT_NONE;	///< 上次记录的像素格式
+        int lastLoggedWidth = 0;	///< 上次记录的视频宽度
+        int lastLoggedHeight = 0;	///< 上次记录的视频高度
+        int lastLoggedLinesize[4] = {0, 0, 0, 0};	///< 上次记录的行步长
+        AVColorRange lastLoggedColorRange = AVCOL_RANGE_UNSPECIFIED;	///< 上次记录的色彩范围
+        AVColorSpace lastLoggedColorSpace = AVCOL_SPC_UNSPECIFIED;	///< 上次记录的色彩空间
+        AVColorPrimaries lastLoggedColorPrimaries = AVCOL_PRI_UNSPECIFIED;	///< 上次记录的色彩基色
+        AVColorTransferCharacteristic lastLoggedColorTrc = AVCOL_TRC_UNSPECIFIED;	///< 上次记录的传输特性
+        AVRational lastLoggedSampleAspectRatio = {0, 1};	///< 上次记录的像素宽高比
+        bool lastLoggedSupported = false;	///< 上次记录的格式支持状态
+        bool hasLoggedFrameFormat = false;	///< 是否已记录过帧格式
     };
 
     /**
@@ -271,11 +281,12 @@ private:
                        float& h) const;
 
     /**
-     * @brief LogUnsupportedFrameIfNeeded 输出不支持帧格式诊断日志
+     * @brief LogFrameFormatIfNeeded 在格式签名变化时输出诊断日志
      * @param streamId 目标 StreamId
      * @param state 单路渲染状态
+     * @param supported 是否为受支持格式
      */
-    void LogUnsupportedFrameIfNeeded(StreamId streamId, StreamRenderState& state);
+    void LogFrameFormatIfNeeded(StreamId streamId, StreamRenderState& state, bool supported);
 
     /**
      * @brief IsLogicalSlotIndex 判断是否为合法逻辑 slot

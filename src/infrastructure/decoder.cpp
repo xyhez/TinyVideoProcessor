@@ -89,7 +89,7 @@ bool decoder::InitHWDecoder()
                 Ctx->hw_device_ctx = av_buffer_ref(m_hwDeviceCtx);
                 m_hwPixFmt = config->pix_fmt;
 
-                m_swPixFmt = AV_PIX_FMT_NV12;
+                m_swPixFmt = AV_PIX_FMT_NONE;
 
 
                 m_isHWDecoder = true;
@@ -114,13 +114,13 @@ AVFramePtr decoder::TransferHWFrame(AVFrame *hwFrame)
     }
 
 
-    AVFramePtr nv12Frame = MakeAVFrame();
-    if (!nv12Frame) {
-        APP_LOG_DEBUG_STREAM() << "Allocate NV12 frame failed";
+    AVFramePtr softwareFrame = MakeAVFrame();
+    if (!softwareFrame) {
+        APP_LOG_DEBUG_STREAM() << "Allocate hardware transfer frame failed";
         return {};
     }
 
-    int ret = av_hwframe_transfer_data(nv12Frame.get(), hwFrame, 0);
+    int ret = av_hwframe_transfer_data(softwareFrame.get(), hwFrame, 0);
     if (ret < 0) {
         char errBuf[256];
         av_strerror(ret, errBuf, sizeof(errBuf));
@@ -129,43 +129,33 @@ AVFramePtr decoder::TransferHWFrame(AVFrame *hwFrame)
     }
 
     // 澶嶅埗鎵€鏈夊睘鎬э紙鍖呮嫭pts, time_base绛夛級
-    av_frame_copy_props(nv12Frame.get(), hwFrame);
+    av_frame_copy_props(softwareFrame.get(), hwFrame);
 
     // 纭繚time_base涔熻璁剧疆锛堟湁浜涚‖浠惰В鐮佸櫒鍙兘涓嶈缃繖涓級
     if (hwFrame->time_base.den > 0) {
-        nv12Frame->time_base = hwFrame->time_base;
+        softwareFrame->time_base = hwFrame->time_base;
     } else if (m_time_base.den > 0) {
-        nv12Frame->time_base = m_time_base;
+        softwareFrame->time_base = m_time_base;
     }
 
-    // 楠岃瘉鏍煎紡
-    if (nv12Frame->format != AV_PIX_FMT_NV12) {
-        APP_LOG_DEBUG_STREAM() << "Hardware decoder output is not NV12, format:"
-                 << av_get_pix_fmt_name((AVPixelFormat)nv12Frame->format);
-        // 濡傛灉宸茬粡鏄?YUV420P锛岀洿鎺ヨ繑鍥烇紙浣嗚纭繚灞炴€ф纭級
-        if (nv12Frame->format == AV_PIX_FMT_YUV420P) {
-            APP_LOG_DEBUG_STREAM() << "Frame is already YUV420P, returning directly, pts=" << nv12Frame->pts;
-            return nv12Frame;
-        }
+    const AVPixelFormat sourceFormat = static_cast<AVPixelFormat>(softwareFrame->format);
+    if (sourceFormat == AV_PIX_FMT_YUV420P) {
+        APP_LOG_DEBUG_STREAM() << "Hardware transfer frame is already YUV420P, pts="
+                               << softwareFrame->pts;
+        return softwareFrame;
     }
 
-    // 绗簩姝ワ細NV12 -> YUV420P 杞崲
+    APP_LOG_DEBUG_STREAM() << "Hardware transfer frame format:"
+                           << av_get_pix_fmt_name(sourceFormat);
+
     AVFramePtr yuv420pFrame = MakeAVFrame();
     if (!yuv420pFrame) {
         return {};
     }
 
     yuv420pFrame->format = AV_PIX_FMT_YUV420P;
-    yuv420pFrame->width = nv12Frame->width;
-    yuv420pFrame->height = nv12Frame->height;
-
-    // ========== 鍏抽敭锛氬繀椤诲鍒舵墍鏈夋椂闂存埑鐩稿叧瀛楁 ==========
-    yuv420pFrame->pts = nv12Frame->pts;
-    yuv420pFrame->pkt_dts = nv12Frame->pkt_dts;
-    yuv420pFrame->time_base = nv12Frame->time_base;
-    yuv420pFrame->flags = nv12Frame->flags;
-    yuv420pFrame->best_effort_timestamp = nv12Frame->best_effort_timestamp;
-    yuv420pFrame->duration = nv12Frame->duration;
+    yuv420pFrame->width = softwareFrame->width;
+    yuv420pFrame->height = softwareFrame->height;
 
     // 鍒嗛厤缂撳啿鍖?
     ret = av_frame_get_buffer(yuv420pFrame.get(), 32);
@@ -174,9 +164,14 @@ AVFramePtr decoder::TransferHWFrame(AVFrame *hwFrame)
         return {};
     }
 
+    av_frame_copy_props(yuv420pFrame.get(), softwareFrame.get());
+    if (yuv420pFrame->time_base.den <= 0 && m_time_base.den > 0) {
+        yuv420pFrame->time_base = m_time_base;
+    }
+
     m_swsCtx = sws_getCachedContext(m_swsCtx,
-                                   nv12Frame->width, nv12Frame->height,
-                                   AV_PIX_FMT_NV12,
+                                   softwareFrame->width, softwareFrame->height,
+                                   sourceFormat,
                                    yuv420pFrame->width, yuv420pFrame->height,
                                    AV_PIX_FMT_YUV420P,
                                    SWS_BILINEAR, nullptr, nullptr, nullptr);
@@ -187,14 +182,19 @@ AVFramePtr decoder::TransferHWFrame(AVFrame *hwFrame)
     }
 
 
-    sws_scale(m_swsCtx,
-              nv12Frame->data, nv12Frame->linesize,
-              0, nv12Frame->height,
-              yuv420pFrame->data, yuv420pFrame->linesize);
+    ret = sws_scale(m_swsCtx,
+                    softwareFrame->data, softwareFrame->linesize,
+                    0, softwareFrame->height,
+                    yuv420pFrame->data, yuv420pFrame->linesize);
+    if (ret <= 0) {
+        APP_LOG_DEBUG_STREAM() << "Hardware frame format conversion failed";
+        return {};
+    }
 
-    yuv420pFrame->pts = nv12Frame->pts;
-    yuv420pFrame->time_base = nv12Frame->time_base;
-    yuv420pFrame->best_effort_timestamp = nv12Frame->best_effort_timestamp;
+    APP_LOG_DEBUG_STREAM() << "Hardware frame format conversion:"
+                           << av_get_pix_fmt_name(sourceFormat)
+                           << "->" << av_get_pix_fmt_name(AV_PIX_FMT_YUV420P)
+                           << "size=" << yuv420pFrame->width << "x" << yuv420pFrame->height;
 
     return yuv420pFrame;
 }
