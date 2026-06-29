@@ -8,11 +8,11 @@
   - `MultiViewRenderer` 已支持多 slot 绘制、布局切换和聚焦交互。
   - Phase 3.14.1 已完成多路性能指标定义。
   - Phase 3.14.2 已完成 MultiViewRenderer 轻量性能观测实现。
+  - Phase 3.14.3 已完成纹理资源复用与上传路径静态实现，待人工运行验收。
 - 前置要求：
   - Phase 3.13 应先解决非 `YUV420P` 和 4K MKV 显示正确性问题。
   - 性能优化必须建立在显示正确的基础上。
 - 未完成：
-  - 纹理资源复用策略。
   - 多路刷新频率控制。
   - 4 路以上扩容前的性能基线。
 - 本阶段范围：
@@ -155,25 +155,25 @@ feat: 增加 MultiViewRenderer 性能观测
 
 **任务清单**：
 
-- [ ] 确认每路纹理只在尺寸或格式变化时重建。
-- [ ] 当前帧尺寸不变时复用已有纹理对象。
-- [ ] 仅当 `textureDirty` 时上传纹理。
-- [ ] stream detach 时释放该路纹理资源。
-- [ ] 布局切换不重建纹理。
-- [ ] active stream 切换不重建纹理。
-- [ ] 避免在 paint 路径中做不必要内存分配。
+- [x] 确认每路纹理只在尺寸或格式变化时重建。
+- [x] 当前帧尺寸不变时复用已有纹理对象。
+- [x] 仅当 `textureDirty` 时上传纹理。
+- [x] stream detach 时释放该路纹理资源。
+- [x] 布局切换不重建纹理。
+- [x] active stream 切换不重建纹理。
+- [x] 避免在 paint 路径中做不必要内存分配。
 
 **验收标准**：
 
-- [ ] 同一路同尺寸播放时纹理不会反复创建。
-- [ ] 布局切换不会导致所有纹理重建。
-- [ ] 移除 stream 后对应纹理释放。
+- [x] 同一路同尺寸播放时纹理不会反复创建。
+- [x] 布局切换不会导致所有纹理重建。
+- [x] 移除 stream 后对应纹理释放。
 - [ ] 4 路播放时 CPU 占用和卡顿不增加。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\multiviewrenderer.h src\infrastructure\multiviewrenderer.cpp doc\Phase3_14TODO.md`
-- [ ] 定向搜索：`rg -n "textureDirty|FreeTextures|QOpenGLTexture|UploadTexturesIfNeeded|DetachStream|SetLayout" src\infrastructure\multiviewrenderer.* doc\Phase3_14TODO.md`
+- [x] 静态检查：`git diff --check -- src\infrastructure\multiviewrenderer.h src\infrastructure\multiviewrenderer.cpp doc\Phase3_14TODO.md`
+- [x] 定向搜索：`rg -n "textureDirty|FreeTextures|QOpenGLTexture|UploadTexturesIfNeeded|DetachStream|SetLayout|TextureSignatureMatches|UpdateTextureSignature|CreateYuvTexture" src\infrastructure\multiviewrenderer.h src\infrastructure\multiviewrenderer.cpp doc\Phase3_14TODO.md`
 - [ ] 人工运行建议：4 路播放、布局切换、移除一路、重新添加一路。
 
 **Commit message**：

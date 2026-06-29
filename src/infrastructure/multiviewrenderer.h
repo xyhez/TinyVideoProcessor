@@ -199,6 +199,9 @@ private:
         QOpenGLTexture* textureY = nullptr;	///< Y 分量纹理
         QOpenGLTexture* textureU = nullptr;	///< U 分量纹理
         QOpenGLTexture* textureV = nullptr;	///< V 分量纹理
+        AVPixelFormat texturePixelFormat = AV_PIX_FMT_NONE;	///< 当前纹理对应的像素格式
+        int texturePlaneWidths[3] = {0, 0, 0};	///< 当前纹理各平面宽度
+        int texturePlaneHeights[3] = {0, 0, 0};	///< 当前纹理各平面高度
         int videoWidth = 0;	///< 视频宽度
         int videoHeight = 0;	///< 视频高度
         AVRational sampleAspectRatio = {1, 1};	///< 像素宽高比
@@ -263,6 +266,28 @@ private:
      * @return false 当前帧格式不支持或纹理不可用
      */
     bool UploadTexturesIfNeeded(StreamRenderState& state);
+
+    /**
+     * @brief TextureSignatureMatches 判断当前纹理签名是否匹配待上传帧
+     * @param state 单路渲染状态
+     * @param planeWidths YUV 平面宽度
+     * @param planeHeights YUV 平面高度
+     * @return true 当前纹理可复用
+     * @return false 需要重建纹理
+     */
+    bool TextureSignatureMatches(const StreamRenderState& state,
+                                 const int (&planeWidths)[3],
+                                 const int (&planeHeights)[3]) const;
+
+    /**
+     * @brief UpdateTextureSignature 记录当前纹理对应的格式和平面尺寸
+     * @param state 单路渲染状态
+     * @param planeWidths YUV 平面宽度
+     * @param planeHeights YUV 平面高度
+     */
+    void UpdateTextureSignature(StreamRenderState& state,
+                                const int (&planeWidths)[3],
+                                const int (&planeHeights)[3]);
 
     /**
      * @brief IsSupportedFrameFormat 判断 MultiViewRenderer 当前是否支持该帧格式

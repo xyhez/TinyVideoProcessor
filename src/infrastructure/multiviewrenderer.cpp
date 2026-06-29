@@ -101,6 +101,16 @@ bool TextureMatches(const QOpenGLTexture* texture, const YuvPlaneUpload& plane) 
     return texture && texture->width() == plane.width && texture->height() == plane.height;
 }
 
+QOpenGLTexture* CreateYuvTexture(int width, int height) {
+    auto* texture = new QOpenGLTexture(QOpenGLTexture::Target2D);
+    texture->setSize(width, height);
+    texture->setFormat(QOpenGLTexture::R8_UNorm);
+    texture->setMinMagFilters(QOpenGLTexture::Linear, QOpenGLTexture::Linear);
+    texture->setWrapMode(QOpenGLTexture::ClampToEdge);
+    texture->allocateStorage();
+    return texture;
+}
+
 double SampleAspectRatioValue(AVRational sampleAspectRatio) {
     if (sampleAspectRatio.num <= 0 || sampleAspectRatio.den <= 0) {
         return 1.0;
@@ -312,8 +322,9 @@ void MultiViewRenderer::paintGL() {
     glClear(GL_COLOR_BUFFER_BIT);
 
     glEnable(GL_SCISSOR_TEST);
-    for (const Viewport& viewport : Viewports()) {
-        DrawViewport(viewport);
+    const int visibleSlotCount = MaxVisibleSlots();
+    for (int slotIndex = 0; slotIndex < visibleSlotCount; ++slotIndex) {
+        DrawViewport(ViewportForSlot(slotIndex));
     }
     glDisable(GL_SCISSOR_TEST);
 
@@ -382,6 +393,11 @@ void MultiViewRenderer::FreeTextures(StreamRenderState& state) {
     state.textureY = nullptr;
     state.textureU = nullptr;
     state.textureV = nullptr;
+    state.texturePixelFormat = AV_PIX_FMT_NONE;
+    for (int index = 0; index < 3; ++index) {
+        state.texturePlaneWidths[index] = 0;
+        state.texturePlaneHeights[index] = 0;
+    }
 }
 
 void MultiViewRenderer::InitializeFrameShader() {
@@ -577,8 +593,11 @@ bool MultiViewRenderer::UploadTexturesIfNeeded(StreamRenderState& state) {
         return true;
     }
 
+    const int planeWidths[3] = {planes[0].width, planes[1].width, planes[2].width};
+    const int planeHeights[3] = {planes[0].height, planes[1].height, planes[2].height};
     const bool hasExistingTexture = state.textureY || state.textureU || state.textureV;
-    if (!TextureMatches(state.textureY, planes[0])
+    if (!TextureSignatureMatches(state, planeWidths, planeHeights)
+        || !TextureMatches(state.textureY, planes[0])
         || !TextureMatches(state.textureU, planes[1])
         || !TextureMatches(state.textureV, planes[2])) {
         FreeTextures(state);
@@ -588,19 +607,10 @@ bool MultiViewRenderer::UploadTexturesIfNeeded(StreamRenderState& state) {
     }
 
     if (!state.textureY) {
-        auto createTexture = [](int width, int height) -> QOpenGLTexture* {
-            auto* texture = new QOpenGLTexture(QOpenGLTexture::Target2D);
-            texture->setSize(width, height);
-            texture->setFormat(QOpenGLTexture::R8_UNorm);
-            texture->setMinMagFilters(QOpenGLTexture::Linear, QOpenGLTexture::Linear);
-            texture->setWrapMode(QOpenGLTexture::ClampToEdge);
-            texture->allocateStorage();
-            return texture;
-        };
-
-        state.textureY = createTexture(planes[0].width, planes[0].height);
-        state.textureU = createTexture(planes[1].width, planes[1].height);
-        state.textureV = createTexture(planes[2].width, planes[2].height);
+        state.textureY = CreateYuvTexture(planes[0].width, planes[0].height);
+        state.textureU = CreateYuvTexture(planes[1].width, planes[1].height);
+        state.textureV = CreateYuvTexture(planes[2].width, planes[2].height);
+        UpdateTextureSignature(state, planeWidths, planeHeights);
     }
 
     QOpenGLPixelTransferOptions options;
@@ -618,6 +628,33 @@ bool MultiViewRenderer::UploadTexturesIfNeeded(StreamRenderState& state) {
     state.textureUploads += 1;
     state.textureDirty = false;
     return true;
+}
+
+bool MultiViewRenderer::TextureSignatureMatches(const StreamRenderState& state,
+                                                const int (&planeWidths)[3],
+                                                const int (&planeHeights)[3]) const {
+    if (state.texturePixelFormat != state.pixelFormat) {
+        return false;
+    }
+
+    for (int index = 0; index < 3; ++index) {
+        if (state.texturePlaneWidths[index] != planeWidths[index]
+            || state.texturePlaneHeights[index] != planeHeights[index]) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void MultiViewRenderer::UpdateTextureSignature(StreamRenderState& state,
+                                               const int (&planeWidths)[3],
+                                               const int (&planeHeights)[3]) {
+    state.texturePixelFormat = state.pixelFormat;
+    for (int index = 0; index < 3; ++index) {
+        state.texturePlaneWidths[index] = planeWidths[index];
+        state.texturePlaneHeights[index] = planeHeights[index];
+    }
 }
 
 bool MultiViewRenderer::IsSupportedFrameFormat(const StreamRenderState& state) const {
