@@ -5,7 +5,6 @@
 #include <deque>
 #include <condition_variable>
 #include <atomic>
-#include <functional>
 #include <type_traits>
 #include <utility>
 
@@ -26,7 +25,6 @@ private:
     size_t max_size_;	///< 队列最大容量
     std::atomic<bool> stop_flag_;	///< 停止标志
     std::atomic<bool> wait_interrupted_;	///< 等待中断标志
-    std::function<void(T)> deleter_ = nullptr;	///< 元素析构器
 
     /**
      * @brief RawPointer 获取裸指针观察视图
@@ -45,13 +43,11 @@ public:
     /**
      * @brief SyncQueue 构造函数
      * @param max_size 队列最大容量
-     * @param deleter 队列清理元素时使用的析构器
      */
-    SyncQueue(size_t max_size ,std::function<void(T)> deleter = nullptr)
+    explicit SyncQueue(size_t max_size)
     : max_size_(max_size)
     , stop_flag_(false)
-    , wait_interrupted_(false)
-    , deleter_(deleter){
+    , wait_interrupted_(false) {
 
     }
 
@@ -75,9 +71,6 @@ public:
                     raw_queue_.size() < max_size_ || stop_flag_ || wait_interrupted_;
             });
             if (stop_flag_ || wait_interrupted_) {
-                if (deleter_) {
-                    deleter_(std::move(item));
-                }
                 return false;
             }
             raw_queue_.push_back(std::move(item));
@@ -170,9 +163,6 @@ public:
         {
             std::unique_lock<std::mutex> lock(mutex_);
             if(raw_queue_.empty()) return;
-            if (deleter_) {
-                deleter_(std::move(raw_queue_.front()));
-            }
             raw_queue_.pop_front();
         }
         cv_not_full_.notify_one();
@@ -203,12 +193,7 @@ public:
      */
     void Clear() {
         std::unique_lock<std::mutex> lock(mutex_);
-        while (!raw_queue_.empty()) {
-            if (deleter_) {
-                deleter_(std::move(raw_queue_.front()));
-            }
-            raw_queue_.pop_front();
-        }
+        raw_queue_.clear();
         cv_not_full_.notify_all();
         cv_not_empty_.notify_all();
     }

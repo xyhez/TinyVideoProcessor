@@ -5,21 +5,21 @@
 - 已完成：
   - 当前项目已有统一的 `SyncQueue<T>`，用于音视频包队列和帧队列。
   - 当前队列支持阻塞 `Push()`、阻塞 `Pop()`、`TryPop()`、`Front()`、`Clear()`、停止和等待中断。
-  - 当前队列通过 `std::function<void(T)> deleter_` 清理队列内残留的 `AVPacket*` / `AVFrame*`。
-  - 当前播放管线已稳定，`MediaPipeline -> VideoFrameScheduler -> IVideoFrameSink` 的帧所有权转移语义已经基本清楚。
+  - 已新增 `AVPacketPtr` / `AVFramePtr`，通过 `unique_ptr + FFmpeg 自定义 deleter` 表达单一所有权。
+  - 音视频 packet/frame 队列已迁移为 `SyncQueue<AVPacketPtr>` / `SyncQueue<AVFramePtr>`。
+  - `MediaPipeline -> VideoFrameScheduler -> IVideoFrameSink` 的帧所有权转移语义已改为 RAII 移动语义。
+  - `SyncQueue` 已删除旧的手动 `deleter_` 路径，只负责同步队列和元素移动。
 - 未完成：
-  - 队列元素仍主要使用 `AVPacket*` / `AVFrame*` 裸指针。
-  - `Pop()` 后的释放责任依赖调用方约定，编译器无法强制所有权。
-  - `Front()` 当前返回裸指针视图，后续迁移到 move-only RAII 类型时需要重新设计。
-  - 队列模板内部同时承担同步队列和 FFmpeg 指针清理责任，职责边界不够纯粹。
+  - 本轮未执行编译和运行验证，需要后续人工覆盖普通文件、无音频文件、多路文件和摄像头源。
+  - `AudioPlayer::m_frame` 仍是内部临时裸指针资源，后续如需要可单独收口。
 - 已知风险：
   - 直接把 `std::deque<T>` 改成 `std::deque<std::shared_ptr<T>>` 不符合当前单一所有权转移语义。
   - `AVPacket` / `AVFrame` 不能用普通 `delete` 释放，必须使用 `av_packet_free()` / `av_frame_free()`。
-  - 队列重构会影响 `demuxer`、`decoder`、`MediaPipeline`、`AudioPlayer`、`VideoFrameScheduler`、`VideoRender`、`MultiViewRenderer` 等核心链路，不能一次性大改。
+  - `SyncQueue` 删除 `deleter_` 后，不应再承载需要手动释放的裸指针资源。
 - 本轮范围：
-  - 先形成可执行 TODO，不直接修改代码。
-  - 优先设计 `unique_ptr + FFmpeg 自定义 deleter` 的迁移路线。
-  - 保持当前播放行为、seek、stop、shutdown、多路播放、无音频流行为不退化。
+  - 收口队列 RAII 所有权模型。
+  - 删除旧的 `SyncQueue` 手动 deleter 路径。
+  - 形成验收报告并记录剩余风险。
 
 ## 阶段目标
 
@@ -378,25 +378,25 @@ refactor: 将 frame 队列迁移到 RAII 所有权
 
 **任务清单**：
 
-- [ ] 删除或废弃 `SyncQueue` 构造函数中的 `std::function<void(T)> deleter`。
-- [ ] 删除 `Clear()` 中对 `deleter_` 的调用。
-- [ ] 删除 `Push()` 失败时对 `deleter_` 的调用。
-- [ ] 确认 `SyncQueue` 只负责同步队列，不再负责具体资源释放。
-- [ ] 确认所有 FFmpeg packet/frame 队列均使用 RAII 元素。
-- [ ] 记录最终所有权模型。
-- [ ] 记录已验证场景和剩余风险。
+- [x] 删除或废弃 `SyncQueue` 构造函数中的 `std::function<void(T)> deleter`。
+- [x] 删除 `Clear()` 中对 `deleter_` 的调用。
+- [x] 删除 `Push()` 失败时对 `deleter_` 的调用。
+- [x] 确认 `SyncQueue` 只负责同步队列，不再负责具体资源释放。
+- [x] 确认所有 FFmpeg packet/frame 队列均使用 RAII 元素。
+- [x] 记录最终所有权模型。
+- [x] 记录已验证场景和剩余风险。
 
 **验收标准**：
 
-- [ ] `SyncQueue` 不再感知 FFmpeg 资源释放函数。
-- [ ] `AVPacket` / `AVFrame` 资源释放由 RAII 类型负责。
+- [x] `SyncQueue` 不再感知 FFmpeg 资源释放函数。
+- [x] `AVPacket` / `AVFrame` 资源释放由 RAII 类型负责。
 - [ ] 当前播放、seek、stop、shutdown、多路、无音频流场景行为不退化。
-- [ ] 文档能说明为什么选择 `unique_ptr` 而不是 `shared_ptr`。
+- [x] 文档能说明为什么选择 `unique_ptr` 而不是 `shared_ptr`。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\core\queue.h doc\队列RAII重构_验收报告.md doc\TODO-队列RAII重构.md`
-- [ ] 定向搜索：`rg -n "deleter_|std::function<void\\(T\\)>|SyncQueue<AVPacket\\*>|SyncQueue<AVFrame\\*>|av_packet_free|av_frame_free" src doc\TODO-队列RAII重构.md`
+- [x] 静态检查：`git diff --check -- src\core\queue.h doc\队列RAII重构_验收报告.md doc\TODO-队列RAII重构.md`
+- [x] 定向搜索：`rg -n "deleter_|std::function<void\\(T\\)>|SyncQueue<AVPacket\\*>|SyncQueue<AVFrame\\*>|av_packet_free|av_frame_free" src doc\TODO-队列RAII重构.md`
 - [ ] 人工运行建议：普通文件、无音频文件、多路文件、摄像头源。
 
 **Commit message**：
