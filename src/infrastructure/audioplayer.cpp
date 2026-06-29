@@ -110,11 +110,7 @@ AudioPlayer::~AudioPlayer() {
     if (m_frame) {
         av_frame_free(&m_frame);
     }
-    if (m_audioSink) {
-        m_audioSink->stop();
-        delete m_audioSink;
-        m_audioSink = nullptr;
-    }
+    ReleaseAudioOutput();
 }
 
 void AudioPlayer::InitAudioPlay(AVCodecParameters* codecPar,
@@ -135,12 +131,8 @@ void AudioPlayer::InitAudioPlay(AVCodecParameters* codecPar,
     m_dstRate = m_srcRate;
     m_dstChannels = 2;
 
-    InitAudioOutput();
-
     APP_LOG_DEBUG("AudioPlayer initialized: source =", m_srcRate,
-                  "Hz,", m_srcChannels, "channels; output =", m_dstRate,
-                  "Hz,", m_dstChannels, "channels,",
-                  av_get_sample_fmt_name(m_dstFormat));
+                  "Hz,", m_srcChannels, "channels");
 }
 
 void AudioPlayer::InitResampler() {
@@ -190,6 +182,20 @@ void AudioPlayer::ApplyOutputVolume()
     if (m_audioSink) {
         m_audioSink->setVolume(outputVolume);
     }
+    m_outputVolumeDirty.store(false);
+}
+
+void AudioPlayer::ReleaseAudioOutput()
+{
+    if (!m_audioSink) {
+        m_ioDevice = nullptr;
+        return;
+    }
+
+    m_audioSink->stop();
+    delete m_audioSink;
+    m_audioSink = nullptr;
+    m_ioDevice = nullptr;
 }
 
 double AudioPlayer::CalculateHardwareLatency()
@@ -275,7 +281,11 @@ bool AudioPlayer::WritePcmBuffer(const char* data,
     qint64 outputSampleFramesWritten = 0;
 
     while (pcmIndex < bytes) {
-        if (m_stopFlag || m_pauseFlag) {
+        if (m_outputVolumeDirty.load()) {
+            ApplyOutputVolume();
+        }
+
+        if (m_stopFlag.load() || m_pauseFlag.load()) {
             break;
         }
 
@@ -321,22 +331,25 @@ bool AudioPlayer::WritePcmBuffer(const char* data,
 
 void AudioPlayer::StartAudioPlay()
 {
+    if (!m_audioSink) {
+        InitAudioOutput();
+    }
+
     if (m_audioSink) {
         m_ioDevice = m_audioSink->start();
         if (!m_ioDevice) {
             APP_LOG_CRITICAL("AudioPlayer: Failed to start audio sink!");
+            ReleaseAudioOutput();
             return;
         }
     }
 
     Run();
+    ReleaseAudioOutput();
 }
 
 void AudioPlayer::Run()
 {
-    m_stopFlag = false;
-    m_pauseFlag = false;
-
     if (!m_frame) {
         m_frame = av_frame_alloc();
     }
@@ -344,16 +357,25 @@ void AudioPlayer::Run()
     const int statusInterval = 5000;
 
     while (true) {
-        if (m_stopFlag) {
+        if (m_stopFlag.load()) {
             break;
         }
 
-        if (m_pauseFlag) {
-            m_audioSink->suspend();
-            while (m_pauseFlag && !m_stopFlag) {
+        if (m_outputVolumeDirty.load()) {
+            ApplyOutputVolume();
+        }
+
+        if (m_pauseFlag.load()) {
+            if (m_audioSink) {
+                m_audioSink->suspend();
+            }
+            while (m_pauseFlag.load() && !m_stopFlag.load()) {
+                if (m_outputVolumeDirty.load()) {
+                    ApplyOutputVolume();
+                }
                 QThread::msleep(10);
             }
-            if (!m_stopFlag) {
+            if (!m_stopFlag.load() && m_audioSink) {
                 m_audioSink->resume();
             }
             continue;
@@ -497,8 +519,8 @@ void AudioPlayer::Run()
 
 void AudioPlayer::Start()
 {
-    m_stopFlag = false;
-    m_pauseFlag = false;
+    m_stopFlag.store(false);
+    m_pauseFlag.store(false);
     APP_LOG_DEBUG("AudioPlayer started");
 }
 
@@ -515,14 +537,10 @@ void AudioPlayer::SetSpeed(double speed)
 
 void AudioPlayer::Stop()
 {
-    m_stopFlag = true;
+    m_stopFlag.store(true);
 
     if (m_audioFrameQueue) {
         m_audioFrameQueue->RequestStop();
-    }
-
-    if (m_audioSink) {
-        m_audioSink->stop();
     }
 
     APP_LOG_DEBUG("AudioPlayer stopped");
@@ -530,7 +548,7 @@ void AudioPlayer::Stop()
 
 void AudioPlayer::Pause()
 {
-    m_pauseFlag = true;
+    m_pauseFlag.store(true);
 
     if (m_audioFrameQueue) {
         m_audioFrameQueue->WakeAll();
@@ -540,7 +558,7 @@ void AudioPlayer::Pause()
 }
 
 void AudioPlayer::Forward() {
-    m_audioSink->suspend();
+    m_pauseFlag.store(true);
 }
 
 void AudioPlayer::VolumeUp() {
@@ -563,7 +581,7 @@ void AudioPlayer::SetVolume(qreal volume)
         m_volume = clampedVolume;
     }
 
-    ApplyOutputVolume();
+    m_outputVolumeDirty.store(true);
     emit VolumeChanged(clampedVolume);
 }
 
@@ -584,7 +602,7 @@ void AudioPlayer::SetMuted(bool muted)
         m_muted = muted;
     }
 
-    ApplyOutputVolume();
+    m_outputVolumeDirty.store(true);
     emit MuteChanged(muted);
 }
 

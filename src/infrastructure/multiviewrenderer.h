@@ -2,6 +2,7 @@
 #define MULTIVIEWRENDERER_H
 
 #include <QMap>
+#include <QElapsedTimer>
 #include <QMutex>
 #include <QOpenGLFunctions>
 #include <QOpenGLShaderProgram>
@@ -215,6 +216,12 @@ private:
         AVRational lastLoggedSampleAspectRatio = {0, 1};	///< 上次记录的像素宽高比
         bool lastLoggedSupported = false;	///< 上次记录的格式支持状态
         bool hasLoggedFrameFormat = false;	///< 是否已记录过帧格式
+        qint64 presentedFrames = 0;	///< 接收显示帧次数
+        qint64 textureUploads = 0;	///< 纹理上传次数
+        qint64 textureRebuilds = 0;	///< 纹理重建次数
+        qint64 lastPresentedElapsedMs = -1;	///< 最近一次接收帧的计时器毫秒
+        AVPixelFormat lastInputPixelFormat = AV_PIX_FMT_NONE;	///< 最近一次输入帧像素格式
+        bool lastFrameConverted = false;	///< 最近一次接收帧是否发生格式转换
     };
 
     /**
@@ -290,6 +297,11 @@ private:
     void LogFrameFormatIfNeeded(StreamId streamId, StreamRenderState& state, bool supported);
 
     /**
+     * @brief LogPerformanceStatsIfNeeded 按固定时间窗口输出渲染性能统计
+     */
+    void LogPerformanceStatsIfNeeded();
+
+    /**
      * @brief IsLogicalSlotIndex 判断是否为合法逻辑 slot
      * @param slotIndex slot 索引
      * @return true 合法
@@ -355,6 +367,12 @@ private:
     QOpenGLShaderProgram frameShader_;	///< 视频帧绘制 shader
     VideoFrameConverter frameConverter_;	///< 可显示帧格式转换器
     QMutex renderStateMutex_;	///< 渲染状态互斥锁
+    QElapsedTimer performanceTimer_;	///< 性能统计计时器
+    qint64 performanceWindowStartMs_ = 0;	///< 当前性能统计窗口起始毫秒
+    qint64 paintCount_ = 0;	///< paintGL 调用总次数
+    qint64 lastLoggedPaintCount_ = 0;	///< 上次日志记录时的 paint 次数
+    qint64 lastLoggedTextureUploads_ = 0;	///< 上次日志记录时的纹理上传次数
+    qint64 lastLoggedTextureRebuilds_ = 0;	///< 上次日志记录时的纹理重建次数
     bool glInitialized_ = false;	///< OpenGL 是否已初始化
 };
 

@@ -7,11 +7,11 @@
   - `VideoFrameScheduler` 已承担单路取帧、同步判断、丢帧和调度职责。
   - `MultiViewRenderer` 已支持多 slot 绘制、布局切换和聚焦交互。
   - Phase 3.14.1 已完成多路性能指标定义。
+  - Phase 3.14.2 已完成 MultiViewRenderer 轻量性能观测实现。
 - 前置要求：
   - Phase 3.13 应先解决非 `YUV420P` 和 4K MKV 显示正确性问题。
   - 性能优化必须建立在显示正确的基础上。
 - 未完成：
-  - 多路渲染指标观测实现。
   - 纹理资源复用策略。
   - 多路刷新频率控制。
   - 4 路以上扩容前的性能基线。
@@ -98,30 +98,38 @@ docs: 设计 MultiViewRenderer 多路性能指标
 
 - `src/infrastructure/multiviewrenderer.h`
 - `src/infrastructure/multiviewrenderer.cpp`
+- `src/infrastructure/decoder.h`
+- `src/infrastructure/decoder.cpp`
 - 可选：`src/core/AppLog.h`
 - `doc/Phase3_14TODO.md`
 
 **任务清单**：
 
-- [ ] 在 `MultiViewRenderer` 内部记录 paint 次数。
-- [ ] 记录每路纹理上传次数。
-- [ ] 记录每路当前帧尺寸、像素格式和是否发生转换。
-- [ ] 低频输出多路渲染统计日志。
-- [ ] 日志不阻塞渲染线程。
-- [ ] 默认日志频率可控，避免刷屏。
-- [ ] 不把统计逻辑传到 `MediaPipeline`。
+- [x] 在 `MultiViewRenderer` 内部记录 paint 次数。
+- [x] 记录每路纹理上传次数。
+- [x] 记录每路当前帧尺寸、像素格式和是否发生转换。
+- [x] 低频输出多路渲染统计日志。
+- [x] 日志低频输出，降低热路径阻塞风险。
+- [x] 默认日志频率可控，避免刷屏。
+- [x] 完全空闲状态不输出性能日志。
+- [x] 帧格式诊断日志只在格式变化时输出。
+- [x] 硬解 transfer 格式日志只在格式变化时输出。
+- [x] 不把统计逻辑传到 `MediaPipeline`。
 
 **验收标准**：
 
-- [ ] 可以判断 4 路播放时渲染器实际刷新频率。
-- [ ] 可以判断是否存在无效重复纹理上传。
-- [ ] 可以判断 4K 视频对上传压力的影响。
-- [ ] 正常播放日志量可控。
+- [x] 可以判断 4 路播放时渲染器实际刷新频率。
+- [x] 可以判断是否存在无效重复纹理上传。
+- [x] 可以判断 4K 视频对上传压力的影响。
+- [x] 正常播放日志量可控。
+- [x] 未绑定 stream 且无帧无上传时不输出空性能日志。
+- [x] 同一路同格式连续播放时不重复输出 accepted frame format。
+- [x] 硬解连续输出同一软件帧格式时不重复输出 transfer frame format。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\multiviewrenderer.h src\infrastructure\multiviewrenderer.cpp src\core\AppLog.h doc\Phase3_14TODO.md`
-- [ ] 定向搜索：`rg -n "fps|upload|stat|Render|Performance|texture" src\infrastructure src\core doc\Phase3_14TODO.md`
+- [x] 静态检查：`git diff --check -- src\infrastructure\multiviewrenderer.h src\infrastructure\multiviewrenderer.cpp src\infrastructure\decoder.h src\infrastructure\decoder.cpp doc\Phase3_14TODO.md`
+- [x] 定向搜索：`rg -n "paintFps|textureUploads|textureRebuilds|lastPresentedElapsedMs|LogPerformanceStatsIfNeeded|MultiViewRenderer perf|Hardware transfer frame format|hasLoggedFrameFormat" src\infrastructure\multiviewrenderer.* src\infrastructure\decoder.* doc\Phase3_14TODO.md`
 - [ ] 人工运行建议：1 路、4 路、4K 单路分别观察日志。
 
 **Commit message**：

@@ -166,8 +166,8 @@ private:
     qint64 m_bytesWrittenTotal = 0;	///< 累计写入字节数
     QElapsedTimer m_statusTimer;	///< 状态输出计时器
 
-    bool m_stopFlag = false;	///< 停止标志
-    bool m_pauseFlag = false;	///< 暂停标志
+    std::atomic_bool m_stopFlag {false};	///< 停止标志
+    std::atomic_bool m_pauseFlag {false};	///< 暂停标志
     QMutex m_mutex;	///< 播放互斥锁
     QWaitCondition m_queueNotEmpty;	///< 音频队列非空条件
 
@@ -175,6 +175,7 @@ private:
     bool m_muted = false;	///< 静音状态
     mutable QMutex m_volumeMutex;	///< 音量互斥锁
     std::atomic<double> m_speed {1.0};	///< 播放速度
+    std::atomic_bool m_outputVolumeDirty {true};	///< 音频输出音量是否需要刷新
 
 private:
     /**
@@ -191,6 +192,11 @@ private:
      * @brief ApplyOutputVolume 将用户音量和静音状态应用到音频输出设备
      */
     void ApplyOutputVolume();
+
+    /**
+     * @brief ReleaseAudioOutput 在音频对象所属线程释放 Qt 音频输出设备
+     */
+    void ReleaseAudioOutput();
 
     /**
      * @brief CalculateHardwareLatency 估算音频硬件缓冲延迟

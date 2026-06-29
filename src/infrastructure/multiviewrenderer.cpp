@@ -7,6 +7,7 @@
 #include <QMouseEvent>
 #include <QOpenGLPixelTransferOptions>
 #include <QOpenGLTexture>
+#include <QStringList>
 #include <QtGlobal>
 #include <utility>
 
@@ -24,6 +25,7 @@ constexpr int kGrid4x4Rows = 4;
 constexpr int kMaxLogicalSlots = kGrid4x4Columns * kGrid4x4Rows;
 constexpr int kSlotBorderWidth = 2;
 constexpr int kActiveSlotBorderWidth = 4;
+constexpr qint64 kPerformanceLogIntervalMs = 5000;
 
 constexpr float kBackgroundRed = 0.035f;
 constexpr float kBackgroundGreen = 0.04f;
@@ -119,6 +121,7 @@ double DisplayAspectRatio(int width, int height, AVRational sampleAspectRatio) {
 MultiViewRenderer::MultiViewRenderer(QWidget* parent)
     : QOpenGLWidget(parent) {
     setMinimumSize(320, 240);
+    performanceTimer_.start();
 }
 
 MultiViewRenderer::~MultiViewRenderer() {
@@ -233,10 +236,13 @@ void MultiViewRenderer::PresentFrame(StreamId streamId, AVFramePtr frame) {
         return;
     }
 
+    AVFrame* inputFrame = frame.get();
+    const AVPixelFormat inputPixelFormat = static_cast<AVPixelFormat>(inputFrame->format);
     AVFramePtr displayFrame = frameConverter_.ConvertToDisplayFrame(std::move(frame));
     if (!displayFrame) {
         return;
     }
+    const bool converted = displayFrame.get() != inputFrame;
 
     QMutexLocker locker(&renderStateMutex_);
     StreamRenderState& state = renderStates_[streamId];
@@ -249,6 +255,10 @@ void MultiViewRenderer::PresentFrame(StreamId streamId, AVFramePtr frame) {
     state.pixelFormat = static_cast<AVPixelFormat>(rawFrame->format);
     state.textureDirty = true;
     state.hasFrame = true;
+    state.presentedFrames += 1;
+    state.lastPresentedElapsedMs = performanceTimer_.elapsed();
+    state.lastInputPixelFormat = inputPixelFormat;
+    state.lastFrameConverted = converted;
 
     update();
 }
@@ -292,6 +302,8 @@ void MultiViewRenderer::initializeGL() {
 }
 
 void MultiViewRenderer::paintGL() {
+    paintCount_ += 1;
+
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_SCISSOR_TEST);
     const QSize framebufferSize = FramebufferSize();
@@ -304,6 +316,8 @@ void MultiViewRenderer::paintGL() {
         DrawViewport(viewport);
     }
     glDisable(GL_SCISSOR_TEST);
+
+    LogPerformanceStatsIfNeeded();
 }
 
 void MultiViewRenderer::mousePressEvent(QMouseEvent* event) {
@@ -354,7 +368,6 @@ void MultiViewRenderer::ReleaseCurrentFrame(StreamRenderState& state) {
     state.pixelFormat = AV_PIX_FMT_NONE;
     state.textureDirty = false;
     state.hasFrame = false;
-    state.hasLoggedFrameFormat = false;
 }
 
 void MultiViewRenderer::ReleaseStreamResources(StreamRenderState& state) {
@@ -564,10 +577,14 @@ bool MultiViewRenderer::UploadTexturesIfNeeded(StreamRenderState& state) {
         return true;
     }
 
+    const bool hasExistingTexture = state.textureY || state.textureU || state.textureV;
     if (!TextureMatches(state.textureY, planes[0])
         || !TextureMatches(state.textureU, planes[1])
         || !TextureMatches(state.textureV, planes[2])) {
         FreeTextures(state);
+        if (hasExistingTexture) {
+            state.textureRebuilds += 1;
+        }
     }
 
     if (!state.textureY) {
@@ -598,6 +615,7 @@ bool MultiViewRenderer::UploadTexturesIfNeeded(StreamRenderState& state) {
     options.setRowLength(planes[2].rowLength);
     state.textureV->setData(QOpenGLTexture::Red, QOpenGLTexture::UInt8, planes[2].data, &options);
 
+    state.textureUploads += 1;
     state.textureDirty = false;
     return true;
 }
@@ -698,6 +716,109 @@ void MultiViewRenderer::LogFrameFormatIfNeeded(StreamId streamId,
         << QString("colorspace=%1").arg(ColorSpaceName(frame->colorspace))
         << QString("color_primaries=%1").arg(ColorPrimariesName(frame->color_primaries))
         << QString("color_trc=%1").arg(ColorTransferName(frame->color_trc));
+}
+
+void MultiViewRenderer::LogPerformanceStatsIfNeeded() {
+    const qint64 nowMs = performanceTimer_.elapsed();
+    const qint64 windowMs = nowMs - performanceWindowStartMs_;
+    if (windowMs < kPerformanceLogIntervalMs) {
+        return;
+    }
+
+    const QVector<Viewport> viewports = Viewports();
+    int visibleStreams = 0;
+    int attachedStreams = 0;
+    int activeFrameStreams = 0;
+    int maxFrameWidth = 0;
+    int maxFrameHeight = 0;
+    qint64 totalTextureUploads = 0;
+    qint64 totalTextureRebuilds = 0;
+    QStringList streamSummaries;
+
+    {
+        QMutexLocker locker(&renderStateMutex_);
+        attachedStreams = static_cast<int>(renderStates_.size());
+
+        for (const Viewport& viewport : viewports) {
+            if (!viewport.IsBound()) {
+                continue;
+            }
+
+            auto it = renderStates_.find(viewport.streamId);
+            if (it != renderStates_.end() && it->second.hasFrame) {
+                visibleStreams += 1;
+            }
+        }
+
+        for (auto it = renderStates_.cbegin(); it != renderStates_.cend(); ++it) {
+            const StreamId streamId = it->first;
+            const StreamRenderState& state = it->second;
+            totalTextureUploads += state.textureUploads;
+            totalTextureRebuilds += state.textureRebuilds;
+
+            if (!state.hasFrame) {
+                continue;
+            }
+
+            activeFrameStreams += 1;
+            if (state.videoWidth * state.videoHeight > maxFrameWidth * maxFrameHeight) {
+                maxFrameWidth = state.videoWidth;
+                maxFrameHeight = state.videoHeight;
+            }
+
+            const qint64 lastFrameAgeMs = state.lastPresentedElapsedMs >= 0
+                ? nowMs - state.lastPresentedElapsedMs
+                : -1;
+            streamSummaries.append(QString("#%1 %2x%3 input=%4 display=%5 uploads=%6 ageMs=%7 converted=%8")
+                                       .arg(streamId)
+                                       .arg(state.videoWidth)
+                                       .arg(state.videoHeight)
+                                       .arg(PixelFormatName(state.lastInputPixelFormat))
+                                       .arg(PixelFormatName(state.pixelFormat))
+                                       .arg(state.textureUploads)
+                                       .arg(lastFrameAgeMs)
+                                       .arg(state.lastFrameConverted ? "yes" : "no"));
+        }
+    }
+
+    const qint64 paintDelta = paintCount_ - lastLoggedPaintCount_;
+    const qint64 uploadDelta = totalTextureUploads - lastLoggedTextureUploads_;
+    const qint64 rebuildDelta = totalTextureRebuilds - lastLoggedTextureRebuilds_;
+    const double windowSeconds = static_cast<double>(windowMs) / 1000.0;
+    const double paintFps = windowSeconds > 0.0 ? paintDelta / windowSeconds : 0.0;
+    const bool idleRenderer = attachedStreams == 0
+        && activeFrameStreams == 0
+        && totalTextureUploads == 0
+        && totalTextureRebuilds == 0;
+    if (idleRenderer) {
+        performanceWindowStartMs_ = nowMs;
+        lastLoggedPaintCount_ = paintCount_;
+        lastLoggedTextureUploads_ = totalTextureUploads;
+        lastLoggedTextureRebuilds_ = totalTextureRebuilds;
+        return;
+    }
+
+    APP_LOG_INFO_STREAM().noquote()
+        << "MultiViewRenderer perf:"
+        << QString("paintFps=%1").arg(paintFps, 0, 'f', 1)
+        << QString("paintCount=%1").arg(paintDelta)
+        << QString("visibleStreams=%1").arg(visibleStreams)
+        << QString("activeFrameStreams=%1").arg(activeFrameStreams)
+        << QString("attachedStreams=%1").arg(attachedStreams)
+        << QString("uploads=%1").arg(uploadDelta)
+        << QString("textureRebuilds=%1").arg(rebuildDelta)
+        << QString("maxFrame=%1x%2").arg(maxFrameWidth).arg(maxFrameHeight);
+
+    if (!streamSummaries.isEmpty()) {
+        APP_LOG_INFO_STREAM().noquote()
+            << "MultiViewRenderer stream perf:"
+            << streamSummaries.join(" | ");
+    }
+
+    performanceWindowStartMs_ = nowMs;
+    lastLoggedPaintCount_ = paintCount_;
+    lastLoggedTextureUploads_ = totalTextureUploads;
+    lastLoggedTextureRebuilds_ = totalTextureRebuilds;
 }
 
 void MultiViewRenderer::FillOpenGLRect(const QRect& rect,

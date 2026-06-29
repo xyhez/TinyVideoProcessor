@@ -184,6 +184,7 @@ private:
     AVBufferRef *m_hwDeviceCtx = nullptr;	///< 硬件设备上下文
     enum AVPixelFormat m_hwPixFmt = AV_PIX_FMT_NONE;	///< 硬件像素格式
     enum AVPixelFormat m_swPixFmt = AV_PIX_FMT_NONE;	///< 软件像素格式
+    enum AVPixelFormat m_lastLoggedTransferPixFmt = AV_PIX_FMT_NONE;	///< 上次记录的硬解转出像素格式
 };
 
 #endif // DECODER_H

@@ -134,8 +134,12 @@ AVFramePtr decoder::TransferHWFrame(AVFrame *hwFrame)
         softwareFrame->time_base = m_time_base;
     }
 
-    APP_LOG_DEBUG_STREAM() << "Hardware transfer frame format:"
-                           << av_get_pix_fmt_name(static_cast<AVPixelFormat>(softwareFrame->format));
+    const AVPixelFormat transferFormat = static_cast<AVPixelFormat>(softwareFrame->format);
+    if (m_lastLoggedTransferPixFmt != transferFormat) {
+        m_lastLoggedTransferPixFmt = transferFormat;
+        APP_LOG_DEBUG_STREAM() << "Hardware transfer frame format:"
+                               << av_get_pix_fmt_name(transferFormat);
+    }
 
     return softwareFrame;
 }
@@ -160,6 +164,7 @@ int decoder::InitDecoder(std::shared_ptr<SyncQueue<AVPacketPtr>> packetVec
     m_PacketVec = packetVec;
     m_FrameVec = framevec;
     m_time_base = time_base;
+    m_lastLoggedTransferPixFmt = AV_PIX_FMT_NONE;
 
     par = coderPar;
 
