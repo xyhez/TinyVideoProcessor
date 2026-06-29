@@ -3,6 +3,8 @@
 
 #include "core/ffmpeg_raii.h"
 
+#include <vector>
+
 extern "C" {
 #include <libavutil/frame.h>
 #include <libavutil/pixfmt.h>
@@ -40,6 +42,20 @@ public:
     AVFramePtr ConvertToDisplayFrame(AVFramePtr frame);
 
 private:
+    /**
+     * @brief ConversionLogSignature 格式转换日志签名
+     */
+    struct ConversionLogSignature {
+        AVPixelFormat sourceFormat = AV_PIX_FMT_NONE;	///< 输入像素格式
+        AVColorRange sourceRange = AVCOL_RANGE_UNSPECIFIED;	///< 输入色彩范围
+        AVColorSpace sourceColorSpace = AVCOL_SPC_UNSPECIFIED;	///< 输入色彩空间
+        int width = 0;	///< 输入宽度
+        int height = 0;	///< 输入高度
+        bool success = false;	///< 转换是否成功
+        bool usedFallback = false;	///< 是否使用默认色彩策略
+        bool usedBt2020Fallback = false;	///< 是否使用 BT.2020 降级
+    };
+
     /**
      * @brief IsDisplayFormat 判断是否已经是目标可显示格式
      * @param frame 待判断帧
@@ -88,16 +104,21 @@ private:
                                bool usedFallback,
                                bool usedBt2020Fallback);
 
+    /**
+     * @brief HasLoggedConversionSignature 判断指定转换签名是否已经记录过
+     * @param signature 转换日志签名
+     * @return true 已记录
+     */
+    bool HasLoggedConversionSignature(const ConversionLogSignature& signature) const;
+
+    /**
+     * @brief RememberConversionLogSignature 记录转换日志签名
+     * @param signature 转换日志签名
+     */
+    void RememberConversionLogSignature(const ConversionLogSignature& signature);
+
     SwsContext* swsContext_ = nullptr;	///< swscale 转换上下文
-    AVPixelFormat lastLoggedSourceFormat_ = AV_PIX_FMT_NONE;	///< 上次记录的输入格式
-    AVColorRange lastLoggedSourceRange_ = AVCOL_RANGE_UNSPECIFIED;	///< 上次记录的输入色彩范围
-    AVColorSpace lastLoggedSourceColorSpace_ = AVCOL_SPC_UNSPECIFIED;	///< 上次记录的输入色彩空间
-    int lastLoggedWidth_ = 0;	///< 上次记录的宽度
-    int lastLoggedHeight_ = 0;	///< 上次记录的高度
-    bool lastLoggedSuccess_ = false;	///< 上次记录的转换结果
-    bool lastLoggedUsedFallback_ = false;	///< 上次记录是否使用默认色彩策略
-    bool lastLoggedUsedBt2020Fallback_ = false;	///< 上次记录是否使用 BT.2020 降级
-    bool hasLoggedConversion_ = false;	///< 是否已经输出过转换日志
+    std::vector<ConversionLogSignature> loggedConversionSignatures_;	///< 已记录的转换日志签名
 };
 
 #endif // VIDEOFRAMECONVERTER_H

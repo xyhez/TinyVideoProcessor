@@ -19,6 +19,7 @@ constexpr int kDisplaySwsColorspace = SWS_CS_SMPTE170M;
 constexpr int kFullRangeFlag = 1;
 constexpr int kLimitedRangeFlag = 0;
 constexpr int kFixedPointIdentity = 1 << 16;
+constexpr int kMaxLoggedConversionSignatures = 64;
 
 struct SwsColorProfile {
     AVColorRange range = AVCOL_RANGE_UNSPECIFIED;
@@ -294,28 +295,22 @@ void VideoFrameConverter::LogConversionIfNeeded(AVPixelFormat sourceFormat,
                                                 bool usedFallback,
                                                 bool usedBt2020Fallback)
 {
-    const bool changed = !hasLoggedConversion_
-        || lastLoggedSourceFormat_ != sourceFormat
-        || lastLoggedSourceRange_ != sourceRange
-        || lastLoggedSourceColorSpace_ != sourceColorSpace
-        || lastLoggedWidth_ != width
-        || lastLoggedHeight_ != height
-        || lastLoggedSuccess_ != success
-        || lastLoggedUsedFallback_ != usedFallback
-        || lastLoggedUsedBt2020Fallback_ != usedBt2020Fallback;
-    if (!changed) {
+    const ConversionLogSignature signature {
+        sourceFormat,
+        sourceRange,
+        sourceColorSpace,
+        width,
+        height,
+        success,
+        usedFallback,
+        usedBt2020Fallback
+    };
+
+    if (HasLoggedConversionSignature(signature)) {
         return;
     }
 
-    hasLoggedConversion_ = true;
-    lastLoggedSourceFormat_ = sourceFormat;
-    lastLoggedSourceRange_ = sourceRange;
-    lastLoggedSourceColorSpace_ = sourceColorSpace;
-    lastLoggedWidth_ = width;
-    lastLoggedHeight_ = height;
-    lastLoggedSuccess_ = success;
-    lastLoggedUsedFallback_ = usedFallback;
-    lastLoggedUsedBt2020Fallback_ = usedBt2020Fallback;
+    RememberConversionLogSignature(signature);
 
     if (success) {
         APP_LOG_INFO_STREAM().noquote()
@@ -343,4 +338,31 @@ void VideoFrameConverter::LogConversionIfNeeded(AVPixelFormat sourceFormat,
         << QString("range=%1->%2").arg(ColorRangeName(sourceRange), ColorRangeName(kDisplayColorRange))
         << QString("colorspace=%1->%2").arg(ColorSpaceName(sourceColorSpace), ColorSpaceName(kDisplayColorSpace))
         << QString("size=%1x%2").arg(width).arg(height);
+}
+
+bool VideoFrameConverter::HasLoggedConversionSignature(const ConversionLogSignature& signature) const
+{
+    for (const ConversionLogSignature& loggedSignature : loggedConversionSignatures_) {
+        if (loggedSignature.sourceFormat == signature.sourceFormat
+            && loggedSignature.sourceRange == signature.sourceRange
+            && loggedSignature.sourceColorSpace == signature.sourceColorSpace
+            && loggedSignature.width == signature.width
+            && loggedSignature.height == signature.height
+            && loggedSignature.success == signature.success
+            && loggedSignature.usedFallback == signature.usedFallback
+            && loggedSignature.usedBt2020Fallback == signature.usedBt2020Fallback) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void VideoFrameConverter::RememberConversionLogSignature(const ConversionLogSignature& signature)
+{
+    if (loggedConversionSignatures_.size() >= kMaxLoggedConversionSignatures) {
+        loggedConversionSignatures_.clear();
+    }
+
+    loggedConversionSignatures_.push_back(signature);
 }
