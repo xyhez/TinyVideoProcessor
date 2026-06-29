@@ -6,6 +6,7 @@
 #include <QTimer>
 #include <memory>
 
+#include "core/ffmpeg_raii.h"
 #include "core/queue.h"
 #include "domain/IMediaSource.h"
 #include "infrastructure/audioplayer.h"
@@ -220,8 +221,8 @@ private:
      */
     void FlushDecoders();
 
-    std::shared_ptr<SyncQueue<AVPacket*>> APacket_ = nullptr;	///< 音频包队列
-    std::shared_ptr<SyncQueue<AVPacket*>> VPacket_ = nullptr;	///< 视频包队列
+    std::shared_ptr<SyncQueue<AVPacketPtr>> APacket_ = nullptr;	///< 音频包队列
+    std::shared_ptr<SyncQueue<AVPacketPtr>> VPacket_ = nullptr;	///< 视频包队列
     std::shared_ptr<SyncQueue<AVFrame*>> AFrame_ = nullptr;	///< 音频帧队列
     std::shared_ptr<SyncQueue<AVFrame*>> VFrame_ = nullptr;	///< 视频帧队列
 

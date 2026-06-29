@@ -209,7 +209,7 @@ AVFrame *decoder::TransferHWFrame(AVFrame *hwFrame)
     return yuv420pFrame;
 }
 
-int decoder::InitDecoder(std::shared_ptr<SyncQueue<AVPacket*>> packetVec
+int decoder::InitDecoder(std::shared_ptr<SyncQueue<AVPacketPtr>> packetVec
                          ,std::shared_ptr<SyncQueue<AVFrame*>> framevec
                          , AVCodecParameters *coderPar
                          , AVRational time_base) {
@@ -281,7 +281,7 @@ int decoder::StartDecoder() {
             break;
         }
 
-        AVPacket *packet = nullptr;
+        AVPacketPtr packet;
         if (!m_PacketVec->Pop(packet)) {
             if (m_PacketVec->IsStopRequested()) {
                 break;
@@ -292,16 +292,14 @@ int decoder::StartDecoder() {
         if (!packet) continue;
 
         if (IsSuspendRequested()) {
-            av_packet_free(&packet);
             continue;
         }
 
         int ret = 0;
         {
             QMutexLocker locker(&mutex);
-            ret = avcodec_send_packet(Ctx, packet);
+            ret = avcodec_send_packet(Ctx, packet.get());
         }
-        av_packet_free(&packet);
 
         if (ret < 0) {
             char errBuf[256];

@@ -7,6 +7,7 @@
 #include <QWaitCondition>
 #include <memory>
 
+#include "core/ffmpeg_raii.h"
 #include "core/queue.h"
 
 extern "C" {
@@ -47,7 +48,7 @@ public:
      * @return 0 初始化解码器成功
      * @return -1 初始化解码器失败
      */
-    int InitDecoder(std::shared_ptr<SyncQueue<AVPacket*>> packetVec
+    int InitDecoder(std::shared_ptr<SyncQueue<AVPacketPtr>> packetVec
                     ,std::shared_ptr<SyncQueue<AVFrame*>> frameVec
                     ,AVCodecParameters *
                     ,AVRational
@@ -148,7 +149,7 @@ private:
      */
     bool IsSuspendRequested() const;
 
-    std::shared_ptr<SyncQueue<AVPacket*>> m_PacketVec;	///< 包队列
+    std::shared_ptr<SyncQueue<AVPacketPtr>> m_PacketVec;	///< 包队列
     std::shared_ptr<SyncQueue<AVFrame*>>  m_FrameVec;	///< 帧队列
 
 

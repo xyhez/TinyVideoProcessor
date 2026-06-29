@@ -222,26 +222,26 @@ refactor: 让 SyncQueue 支持 move-only 元素
 
 **任务清单**：
 
-- [ ] 将音频包队列类型从 `SyncQueue<AVPacket*>` 迁移为 `SyncQueue<AVPacketPtr>`。
-- [ ] 将视频包队列类型从 `SyncQueue<AVPacket*>` 迁移为 `SyncQueue<AVPacketPtr>`。
-- [ ] `demuxer` 读取 packet 后以 move 方式入队。
-- [ ] `decoder` 以 move 方式出队并使用 `.get()` 调用 FFmpeg 解码接口。
-- [ ] `Push()` 失败时不再手动调用 `av_packet_free()`。
-- [ ] `Clear()` 时由 `AVPacketPtr` 自动释放资源。
-- [ ] 保持 stop / seek / shutdown 的 packet 清理语义不变。
+- [x] 将音频包队列类型从 `SyncQueue<AVPacket*>` 迁移为 `SyncQueue<AVPacketPtr>`。
+- [x] 将视频包队列类型从 `SyncQueue<AVPacket*>` 迁移为 `SyncQueue<AVPacketPtr>`。
+- [x] `demuxer` 读取 packet 后以 move 方式入队。
+- [x] `decoder` 以 move 方式出队并使用 `.get()` 调用 FFmpeg 解码接口。
+- [x] `Push()` 失败时不再手动调用 `av_packet_free()`。
+- [x] `Clear()` 时由 `AVPacketPtr` 自动释放资源。
+- [x] 保持 stop / seek / shutdown 的 packet 清理语义不变。
 
 **验收标准**：
 
-- [ ] packet 队列不再需要外部 deleter。
-- [ ] packet 出队后所有权明确归 decoder。
-- [ ] packet 队列清空时没有泄漏。
+- [x] packet 队列不再需要外部 deleter。
+- [x] packet 出队后所有权明确归 decoder。
+- [x] packet 队列清空时没有泄漏。
 - [ ] 普通文件播放不退化。
 - [ ] seek、stop、shutdown 不退化。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\core\ffmpeg_raii.h src\core\queue.h src\domain\MediaPipeline.h src\domain\MediaPipeline.cpp src\infrastructure\demuxer.h src\infrastructure\demuxer.cpp src\infrastructure\decoder.h src\infrastructure\decoder.cpp doc\TODO-队列RAII重构.md`
-- [ ] 定向搜索：`rg -n "SyncQueue<AVPacket\\*>|SyncQueue<AVPacketPtr>|av_packet_free|AVPacketPtr|Push\\(|Pop\\(" src doc\TODO-队列RAII重构.md`
+- [x] 静态检查：`git diff --check -- src\core\ffmpeg_raii.h src\core\queue.h src\domain\MediaPipeline.h src\domain\MediaPipeline.cpp src\infrastructure\demuxer.h src\infrastructure\demuxer.cpp src\infrastructure\decoder.h src\infrastructure\decoder.cpp doc\TODO-队列RAII重构.md`
+- [x] 定向搜索：`rg -n "SyncQueue<AVPacket\\*>|SyncQueue<AVPacketPtr>|av_packet_free|AVPacketPtr|Push\\(|Pop\\(" src doc\TODO-队列RAII重构.md`
 - [ ] 人工运行建议：普通 MP4 播放、seek、stop、关闭程序。
 
 **Commit message**：

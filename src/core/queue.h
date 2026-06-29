@@ -12,9 +12,9 @@
 /**
  * @brief 线程同步队列
  * 使用方法:
- * std::shared_ptr<SyncQueue<AVPacket*>>
+ * std::shared_ptr<SyncQueue<T>>
  * 代替之前的
- * std::shared_ptr<deque<AVPakcet*>>
+ * std::shared_ptr<deque<T>>
  */
 template<typename T>
 class SyncQueue {

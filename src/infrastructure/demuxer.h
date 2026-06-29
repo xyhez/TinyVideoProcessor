@@ -8,6 +8,7 @@
 #include <QString>
 #include <memory>
 
+#include "core/ffmpeg_raii.h"
 #include "core/queue.h"
 #include "domain/IMediaSource.h"
 
@@ -39,8 +40,8 @@ public:
      * @param parent Qt 父对象
      */
     explicit demuxer(std::shared_ptr<IMediaSource> mediaSource
-                     ,std::shared_ptr<SyncQueue<AVPacket*>> APacket = nullptr
-                     ,std::shared_ptr<SyncQueue<AVPacket*>> VPacket = nullptr
+                     ,std::shared_ptr<SyncQueue<AVPacketPtr>> APacket = nullptr
+                     ,std::shared_ptr<SyncQueue<AVPacketPtr>> VPacket = nullptr
                      ,std::shared_ptr<SyncQueue<AVFrame*>>  AFrame  = nullptr
                      ,std::shared_ptr<SyncQueue<AVFrame*>>  VFrame  = nullptr
                      ,QObject *parent = nullptr);
@@ -67,7 +68,7 @@ public:
      * @param APacket 音频包队列
      * @param AFrame 音频帧队列
      */
-    void SetAudioQueues(std::shared_ptr<SyncQueue<AVPacket*>> APacket,
+    void SetAudioQueues(std::shared_ptr<SyncQueue<AVPacketPtr>> APacket,
                         std::shared_ptr<SyncQueue<AVFrame*>> AFrame);
 
     /**
@@ -169,8 +170,8 @@ signals:
 
 private:
     std::shared_ptr<IMediaSource> m_mediaSource;	///< 媒体源
-    std::shared_ptr<SyncQueue<AVPacket*>> m_APacket;	///< 音频包队列
-    std::shared_ptr<SyncQueue<AVPacket*>> m_VPacket;	///< 视频包队列
+    std::shared_ptr<SyncQueue<AVPacketPtr>> m_APacket;	///< 音频包队列
+    std::shared_ptr<SyncQueue<AVPacketPtr>> m_VPacket;	///< 视频包队列
     std::shared_ptr<SyncQueue<AVFrame*>>  m_AFrame;	///< 音频帧队列
     std::shared_ptr<SyncQueue<AVFrame*>>  m_VFrame;	///< 视频帧队列
 
@@ -203,8 +204,6 @@ private:
      * @return false 未请求挂起
      */
     bool IsSuspendRequested() const;
-
-    AVPacket* packet = nullptr;	///< 当前读取包
 
     int m_videoStreamIndex = -1;	///< 视频流索引
 

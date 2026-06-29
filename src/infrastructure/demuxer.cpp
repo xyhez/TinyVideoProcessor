@@ -2,6 +2,7 @@
 #include "core/AppLog.h"
 
 #include <QMutexLocker>
+#include <utility>
 
 namespace {
 constexpr double kSeekStepSeconds = 10.0;
@@ -17,8 +18,8 @@ QString AvErrorString(int errorCode)
 }
 
 demuxer::demuxer(std::shared_ptr<IMediaSource> mediaSource,
-                 std::shared_ptr<SyncQueue<AVPacket*>> APacket,
-                 std::shared_ptr<SyncQueue<AVPacket*>> VPacket,
+                 std::shared_ptr<SyncQueue<AVPacketPtr>> APacket,
+                 std::shared_ptr<SyncQueue<AVPacketPtr>> VPacket,
                  std::shared_ptr<SyncQueue<AVFrame*>> AFrame,
                  std::shared_ptr<SyncQueue<AVFrame*>> VFrame,
                  QObject *parent)
@@ -112,7 +113,7 @@ AVCodecParameters* demuxer::ReVcoderPar()
     return m_V_coderPar;
 }
 
-void demuxer::SetAudioQueues(std::shared_ptr<SyncQueue<AVPacket*>> APacket,
+void demuxer::SetAudioQueues(std::shared_ptr<SyncQueue<AVPacketPtr>> APacket,
                              std::shared_ptr<SyncQueue<AVFrame*>> AFrame)
 {
     QMutexLocker locker(&mutex);
@@ -154,20 +155,23 @@ int demuxer::StartDemuxer()
             break;
         }
 
-        AVPacket* packet = av_packet_alloc();
+        AVPacketPtr packet = MakeAVPacket();
+        if (!packet) {
+            errorMessage = "Allocate packet failed";
+            failed = true;
+            break;
+        }
         int ret = 0;
 
         {
             QMutexLocker locker(&mutex);
             if (stop_flag) {
-                av_packet_free(&packet);
                 break;
             }
-            ret = av_read_frame(ic, packet);
+            ret = av_read_frame(ic, packet.get());
         }
 
         if (ret < 0) {
-            av_packet_free(&packet);
             if (ret == AVERROR_EOF) {
                 APP_LOG_DEBUG("Demuxing finished (EOF)");
                 reachedEof = true;
@@ -201,13 +205,11 @@ int demuxer::StartDemuxer()
         consecutiveReadErrors = 0;
 
         if (IsSuspendRequested()) {
-            av_packet_free(&packet);
             continue;
         }
 
         if (packet->stream_index != m_audioStreamIndex &&
             packet->stream_index != m_videoStreamIndex) {
-            av_packet_free(&packet);
             continue;
         }
 
@@ -215,24 +217,22 @@ int demuxer::StartDemuxer()
             {
                 QMutexLocker locker(&mutex);
                 if (stop_flag) {
-                    av_packet_free(&packet);
                     break;
                 }
                 m_AcurrentPTS = packet->pts;
             }
-            if (!m_APacket->Push(packet)) {
+            if (!m_APacket->Push(std::move(packet))) {
                 continue;
             }
         } else {
             {
                 QMutexLocker locker(&mutex);
                 if (stop_flag) {
-                    av_packet_free(&packet);
                     break;
                 }
                 m_VcurrentPTS = packet->pts;
             }
-            if (!m_VPacket->Push(packet)) {
+            if (!m_VPacket->Push(std::move(packet))) {
                 continue;
             }
         }
