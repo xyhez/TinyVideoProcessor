@@ -11,6 +11,7 @@
   - Phase 3.13.3 已修正硬解 transfer 后固定按 `NV12` 转换的问题，改为按实际软件帧格式转换。
   - Phase 3.13.3 已新增 `VideoFrameConverter`，并在 `MultiViewRenderer::PresentFrame()` 前归一化可显示帧格式。
   - Phase 3.13.4 已将色彩 range/colorspace 策略收口到 `VideoFrameConverter`，并移除 decoder 旧格式转换路径。
+  - Phase 3.13.5 已收口 YUV420P 三平面纹理上传边界，区分可见宽高、row length 和纹理尺寸。
 - 未完成：
   - 真实异常样本日志尚未收集，需要人工运行非 `YUV420P` / 4K MKV 样本后补充。
   - 非 `YUV420P` 视频帧的稳定显示。
@@ -277,12 +278,12 @@ fix: 完善视频帧色彩范围处理
 
 **任务清单**：
 
-- [ ] 复核 `videoWidth` / `videoHeight` 与 `linesize` 的使用边界。
-- [ ] 确保纹理尺寸使用可见宽高，而不是错误使用 stride。
-- [ ] 复核 `CalcFrameRect()` 对 SAR/DAR 的处理。
-- [ ] 确保 4K 帧在不同 viewport 中保持完整可见。
-- [ ] 确认高 DPI 下 framebuffer 坐标不影响 4K 纹理显示。
-- [ ] 确认多路布局中 4K 视频不会越界绘制到其他 slot。
+- [x] 复核 `videoWidth` / `videoHeight` 与 `linesize` 的使用边界。
+- [x] 确保纹理尺寸使用可见宽高，而不是错误使用 stride。
+- [x] 复核 `CalcFrameRect()` 对 SAR/DAR 的处理。
+- [x] 确保 4K 帧在不同 viewport 中保持完整可见。
+- [x] 确认高 DPI 下 framebuffer 坐标不影响 4K 纹理显示。
+- [x] 确认多路布局中 4K 视频不会越界绘制到其他 slot。
 
 **验收标准**：
 
@@ -293,8 +294,8 @@ fix: 完善视频帧色彩范围处理
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\multiviewrenderer.h src\infrastructure\multiviewrenderer.cpp src\infrastructure\videorender.h src\infrastructure\videorender.cpp doc\Phase3_13TODO.md`
-- [ ] 定向搜索：`rg -n "CalcFrameRect|videoWidth|videoHeight|linesize|sampleAspectRatio|glTexImage|glTexSubImage" src\infrastructure doc\Phase3_13TODO.md`
+- [x] 静态检查：`git diff --check -- src\infrastructure\multiviewrenderer.cpp doc\Phase3_13TODO.md`
+- [x] 定向搜索：`rg -n "CalcFrameRect|DisplayAspectRatio|videoWidth|videoHeight|linesize|sampleAspectRatio|YuvPlaneUpload|setRowLength|setAlignment" src\infrastructure doc\Phase3_13TODO.md`
 - [ ] 人工运行建议：4K MKV 单路播放、多路播放、布局切换、双击聚焦恢复。
 
 **Commit message**：

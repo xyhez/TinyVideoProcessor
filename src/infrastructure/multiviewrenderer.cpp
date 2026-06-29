@@ -41,6 +41,13 @@ constexpr float kActiveBorderRed = 0.16f;
 constexpr float kActiveBorderGreen = 0.48f;
 constexpr float kActiveBorderBlue = 0.92f;
 
+struct YuvPlaneUpload {
+    const uchar* data = nullptr;
+    int width = 0;
+    int height = 0;
+    int rowLength = 0;
+};
+
 QString PixelFormatName(AVPixelFormat format) {
     const char* name = av_get_pix_fmt_name(format);
     return name ? QString::fromUtf8(name) : QString("unknown(%1)").arg(static_cast<int>(format));
@@ -64,6 +71,48 @@ QString ColorPrimariesName(AVColorPrimaries primaries) {
 QString ColorTransferName(AVColorTransferCharacteristic transfer) {
     const char* name = av_color_transfer_name(transfer);
     return name ? QString::fromUtf8(name) : QString("unknown(%1)").arg(static_cast<int>(transfer));
+}
+
+int ChromaPlaneSize(int lumaSize) {
+    return (lumaSize + 1) / 2;
+}
+
+bool BuildYuv420pUploadPlanes(const AVFrame* frame, YuvPlaneUpload (&planes)[3]) {
+    if (!frame || frame->width <= 0 || frame->height <= 0) {
+        return false;
+    }
+
+    planes[0] = {frame->data[0], frame->width, frame->height, frame->linesize[0]};
+    planes[1] = {frame->data[1], ChromaPlaneSize(frame->width), ChromaPlaneSize(frame->height), frame->linesize[1]};
+    planes[2] = {frame->data[2], ChromaPlaneSize(frame->width), ChromaPlaneSize(frame->height), frame->linesize[2]};
+
+    for (const YuvPlaneUpload& plane : planes) {
+        if (!plane.data || plane.width <= 0 || plane.height <= 0 || plane.rowLength < plane.width) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool TextureMatches(const QOpenGLTexture* texture, const YuvPlaneUpload& plane) {
+    return texture && texture->width() == plane.width && texture->height() == plane.height;
+}
+
+double SampleAspectRatioValue(AVRational sampleAspectRatio) {
+    if (sampleAspectRatio.num <= 0 || sampleAspectRatio.den <= 0) {
+        return 1.0;
+    }
+
+    return static_cast<double>(sampleAspectRatio.num) / sampleAspectRatio.den;
+}
+
+double DisplayAspectRatio(int width, int height, AVRational sampleAspectRatio) {
+    if (width <= 0 || height <= 0) {
+        return 1.0;
+    }
+
+    return static_cast<double>(width) * SampleAspectRatioValue(sampleAspectRatio) / height;
 }
 }
 
@@ -506,12 +555,18 @@ bool MultiViewRenderer::UploadTexturesIfNeeded(StreamRenderState& state) {
         return false;
     }
 
+    YuvPlaneUpload planes[3];
+    if (!BuildYuv420pUploadPlanes(frame, planes)) {
+        return false;
+    }
+
     if (!state.textureDirty && state.textureY && state.textureU && state.textureV) {
         return true;
     }
 
-    if (state.textureY &&
-        (state.textureY->width() != frame->width || state.textureY->height() != frame->height)) {
+    if (!TextureMatches(state.textureY, planes[0])
+        || !TextureMatches(state.textureU, planes[1])
+        || !TextureMatches(state.textureV, planes[2])) {
         FreeTextures(state);
     }
 
@@ -526,21 +581,22 @@ bool MultiViewRenderer::UploadTexturesIfNeeded(StreamRenderState& state) {
             return texture;
         };
 
-        state.textureY = createTexture(frame->width, frame->height);
-        state.textureU = createTexture(frame->width / 2, frame->height / 2);
-        state.textureV = createTexture(frame->width / 2, frame->height / 2);
+        state.textureY = createTexture(planes[0].width, planes[0].height);
+        state.textureU = createTexture(planes[1].width, planes[1].height);
+        state.textureV = createTexture(planes[2].width, planes[2].height);
     }
 
     QOpenGLPixelTransferOptions options;
+    options.setAlignment(1);
 
-    options.setRowLength(frame->linesize[0]);
-    state.textureY->setData(QOpenGLTexture::Red, QOpenGLTexture::UInt8, frame->data[0], &options);
+    options.setRowLength(planes[0].rowLength);
+    state.textureY->setData(QOpenGLTexture::Red, QOpenGLTexture::UInt8, planes[0].data, &options);
 
-    options.setRowLength(frame->linesize[1]);
-    state.textureU->setData(QOpenGLTexture::Red, QOpenGLTexture::UInt8, frame->data[1], &options);
+    options.setRowLength(planes[1].rowLength);
+    state.textureU->setData(QOpenGLTexture::Red, QOpenGLTexture::UInt8, planes[1].data, &options);
 
-    options.setRowLength(frame->linesize[2]);
-    state.textureV->setData(QOpenGLTexture::Red, QOpenGLTexture::UInt8, frame->data[2], &options);
+    options.setRowLength(planes[2].rowLength);
+    state.textureV->setData(QOpenGLTexture::Red, QOpenGLTexture::UInt8, planes[2].data, &options);
 
     state.textureDirty = false;
     return true;
@@ -567,10 +623,8 @@ void MultiViewRenderer::CalcFrameRect(const Viewport& viewport,
         return;
     }
 
-    const double sar = (state.sampleAspectRatio.num && state.sampleAspectRatio.den)
-        ? static_cast<double>(state.sampleAspectRatio.num) / state.sampleAspectRatio.den
-        : 1.0;
-    const double displayAspectRatio = static_cast<double>(state.videoWidth) * sar / state.videoHeight;
+    const double displayAspectRatio =
+        DisplayAspectRatio(state.videoWidth, state.videoHeight, state.sampleAspectRatio);
     const double viewportAspectRatio = static_cast<double>(viewportWidth) / viewportHeight;
 
     if (displayAspectRatio > viewportAspectRatio) {
