@@ -12,11 +12,10 @@
   - Phase 3.13.3 已新增 `VideoFrameConverter`，并在 `MultiViewRenderer::PresentFrame()` 前归一化可显示帧格式。
   - Phase 3.13.4 已将色彩 range/colorspace 策略收口到 `VideoFrameConverter`，并移除 decoder 旧格式转换路径。
   - Phase 3.13.5 已收口 YUV420P 三平面纹理上传边界，区分可见宽高、row length 和纹理尺寸。
+  - Phase 3.13.6 已形成渲染输入格式与显示质量验收报告。
 - 未完成：
   - 真实异常样本日志尚未收集，需要人工运行非 `YUV420P` / 4K MKV 样本后补充。
-  - 非 `YUV420P` 视频帧的稳定显示。
-  - 4K MKV 颜色异常和画面只显示局部的问题。
-  - 色彩范围、色彩空间、像素格式和显示矩形的系统性处理。
+  - `YUV420P`、非 `YUV420P`、4K MKV 的最终画面效果仍需人工播放验收确认。
 - 已知风险：
   - 如果直接在 `MultiViewRenderer::DrawStreamFrame()` 中堆格式判断，会形成补丁式渲染逻辑。
   - 如果把格式转换塞进 `VideoFrameScheduler`，会破坏调度器只负责取帧、同步判断和丢帧的边界。
@@ -320,24 +319,24 @@ fix: 修正 4K 视频显示矩形和纹理上传
 
 **任务清单**：
 
-- [ ] 记录最终支持的像素格式范围。
-- [ ] 记录 4K MKV 修复结论。
-- [ ] 记录色彩范围和色彩空间策略。
-- [ ] 记录暂不支持 HDR / BT.2020 完整还原的原因。
-- [ ] 记录对 `MultiViewRenderer`、`VideoFrameScheduler`、`MediaPipeline` 边界的影响。
-- [ ] 给出进入 Phase 3.14 性能优化的前置条件。
+- [x] 记录最终支持的像素格式范围。
+- [x] 记录 4K MKV 修复结论。
+- [x] 记录色彩范围和色彩空间策略。
+- [x] 记录暂不支持 HDR / BT.2020 完整还原的原因。
+- [x] 记录对 `MultiViewRenderer`、`VideoFrameScheduler`、`MediaPipeline` 边界的影响。
+- [x] 给出进入 Phase 3.14 性能优化的前置条件。
 
 **验收标准**：
 
-- [ ] 能说明非 `YUV420P` 问题是否关闭。
-- [ ] 能说明 4K MKV 色彩和画面问题是否关闭。
-- [ ] 能说明还剩哪些高阶格式未支持。
-- [ ] 能说明下一阶段性能优化的观测指标。
+- [x] 能说明非 `YUV420P` 问题是否关闭。
+- [x] 能说明 4K MKV 色彩和画面问题是否关闭。
+- [x] 能说明还剩哪些高阶格式未支持。
+- [x] 能说明下一阶段性能优化的观测指标。
 
 **测试流程**：
 
-- [ ] 本任务为验收报告，不运行程序。
-- [ ] 静态检查：`git diff --check -- doc\Phase3_13_渲染输入格式与显示质量验收报告.md doc\Phase3_13TODO.md`
+- [x] 本任务为验收报告，不运行程序。
+- [x] 静态检查：`git diff --check -- doc\Phase3_13_渲染输入格式与显示质量验收报告.md doc\Phase3_13TODO.md`
 
 **Commit message**：
 
