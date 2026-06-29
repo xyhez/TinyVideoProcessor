@@ -1,6 +1,7 @@
 ﻿#include "videorender.h"
 #include "core/AppLog.h"
 #include <QOpenGLPixelTransferOptions>
+#include <utility>
 
 extern "C" {
 #include <libavutil/pixdesc.h>
@@ -53,19 +54,18 @@ VideoRender::~VideoRender()
     doneCurrent();
 }
 
-void VideoRender::PresentFrame(AVFrame* frame)
+void VideoRender::PresentFrame(AVFramePtr frame)
 {
     if (!frame) {
         return;
     }
 
     m_frameMutex.lock();
-    // m_displayFrame 持有当前显示帧；替换时释放旧帧，接管 frame 所有权。
-    av_frame_free(&m_displayFrame);
-    m_displayFrame = frame;
-    m_videoW = frame->width;
-    m_videoH = frame->height;
-    m_sar = frame->sample_aspect_ratio;
+    AVFrame* rawFrame = frame.get();
+    m_displayFrame = std::move(frame);
+    m_videoW = rawFrame->width;
+    m_videoH = rawFrame->height;
+    m_sar = rawFrame->sample_aspect_ratio;
     m_hasFrame = true;
     m_frameMutex.unlock();
 
@@ -80,7 +80,7 @@ void VideoRender::ClearFrame()
 void VideoRender::ClearCurrentFrame(bool requestUpdate)
 {
     m_frameMutex.lock();
-    av_frame_free(&m_displayFrame);
+    m_displayFrame.reset();
     m_videoW = 0;
     m_videoH = 0;
     m_sar = {1, 1};
@@ -145,7 +145,7 @@ void VideoRender::paintGL()
     }
 
     m_frameMutex.lock();
-    AVFrame* frame = m_displayFrame;
+    AVFrame* frame = m_displayFrame.get();
     bool hasFrame = m_hasFrame;
     m_frameMutex.unlock();
 

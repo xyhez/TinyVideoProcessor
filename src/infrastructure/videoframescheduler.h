@@ -3,13 +3,16 @@
 
 #include <QObject>
 #include <atomic>
+#include <cstdint>
 #include <memory>
 
+#include "core/ffmpeg_raii.h"
 #include "core/queue.h"
 #include "infrastructure/ivideoframesink.h"
 #include "infrastructure/syncmanager.h"
 
 extern "C" {
+#include <libavutil/avutil.h>
 #include <libavutil/frame.h>
 }
 
@@ -41,7 +44,7 @@ public:
      * @param frameRate 视频帧率
      * @param videoTimeBase 视频流时间基
      */
-    void Initialize(std::shared_ptr<SyncQueue<AVFrame*>> frameQueue,
+    void Initialize(std::shared_ptr<SyncQueue<AVFramePtr>> frameQueue,
                     std::shared_ptr<syncmanager> syncManager,
                     double frameRate,
                     double videoTimeBase);
@@ -105,6 +108,13 @@ private:
     };
 
     /**
+     * @brief FrameTimingSnapshot 队首帧同步判断快照
+     */
+    struct FrameTimingSnapshot {
+        int64_t pts = AV_NOPTS_VALUE;	///< 队首帧 PTS
+    };
+
+    /**
      * @brief CalculateScaledFrameInterval 计算播放速度修正后的帧间隔
      * @param speed 当前播放速度快照
      * @return 修正后的帧间隔，单位毫秒
@@ -112,21 +122,23 @@ private:
     int CalculateScaledFrameInterval(double speed) const;
 
     /**
-     * @brief PeekNextFrame 查看队首帧但不弹出队列
-     * @param frame 输出队首帧指针
+     * @brief PeekNextFrameTiming 查看队首帧同步判断快照但不弹出队列
+     * @param snapshot 输出队首帧同步判断快照
      * @return true 成功取得队首帧
      * @return false 队列为空或队首帧无效
      */
-    bool PeekNextFrame(AVFrame*& frame);
+    bool PeekNextFrameTiming(FrameTimingSnapshot& snapshot);
 
     /**
      * @brief EvaluateFrameTiming 根据同步时钟判断队首帧应显示、等待或丢弃
-     * @param frame 队首帧
+     * @param snapshot 队首帧同步判断快照
      * @param syncType 当前同步类型
      * @param waitMs 输出等待时间，只有返回 Wait 时有效
      * @return 当前帧调度结果
      */
-    FrameTimingDecision EvaluateFrameTiming(const AVFrame* frame, SYNCTYPE syncType, int& waitMs) const;
+    FrameTimingDecision EvaluateFrameTiming(const FrameTimingSnapshot& snapshot,
+                                            SYNCTYPE syncType,
+                                            int& waitMs) const;
 
     /**
      * @brief DropLateFrame 弹出并释放过晚帧
@@ -137,11 +149,11 @@ private:
 
     /**
      * @brief PopDisplayableFrame 弹出可显示帧并转交给调用方
-     * @param frame 输出可显示帧指针
+     * @param frame 输出可显示帧
      * @return true 成功弹出可显示帧
      * @return false 没有可显示帧
      */
-    bool PopDisplayableFrame(AVFrame*& frame);
+    bool PopDisplayableFrame(AVFramePtr& frame);
 
     /**
      * @brief RefreshVideoClockIfNeeded 在 VIDEO sync 模式下刷新视频主时钟
@@ -155,7 +167,7 @@ private:
      * @details 调用后 frame 所有权转移给目标 sink，调用方不能再访问该指针。
      * @param frame 已完成调度判断的可显示帧
      */
-    void PresentDisplayableFrame(AVFrame* frame);
+    void PresentDisplayableFrame(AVFramePtr frame);
 
     /**
      * @brief ScheduleNextFrame 安排下一次调度
@@ -163,7 +175,7 @@ private:
      */
     void ScheduleNextFrame(int delayMs);
 
-    std::shared_ptr<SyncQueue<AVFrame*>> frameQueue_;	///< 视频帧队列
+    std::shared_ptr<SyncQueue<AVFramePtr>> frameQueue_;	///< 视频帧队列
     std::shared_ptr<syncmanager> syncManager_;	///< 同步时钟管理器
     IVideoFrameSink* frameSink_ = nullptr;	///< 视频帧输出目标
 

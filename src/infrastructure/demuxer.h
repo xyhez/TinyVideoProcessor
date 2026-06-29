@@ -42,8 +42,8 @@ public:
     explicit demuxer(std::shared_ptr<IMediaSource> mediaSource
                      ,std::shared_ptr<SyncQueue<AVPacketPtr>> APacket = nullptr
                      ,std::shared_ptr<SyncQueue<AVPacketPtr>> VPacket = nullptr
-                     ,std::shared_ptr<SyncQueue<AVFrame*>>  AFrame  = nullptr
-                     ,std::shared_ptr<SyncQueue<AVFrame*>>  VFrame  = nullptr
+                     ,std::shared_ptr<SyncQueue<AVFramePtr>>  AFrame  = nullptr
+                     ,std::shared_ptr<SyncQueue<AVFramePtr>>  VFrame  = nullptr
                      ,QObject *parent = nullptr);
 
     /**
@@ -69,7 +69,7 @@ public:
      * @param AFrame 音频帧队列
      */
     void SetAudioQueues(std::shared_ptr<SyncQueue<AVPacketPtr>> APacket,
-                        std::shared_ptr<SyncQueue<AVFrame*>> AFrame);
+                        std::shared_ptr<SyncQueue<AVFramePtr>> AFrame);
 
     /**
      * @brief ReAtimebase
@@ -172,8 +172,8 @@ private:
     std::shared_ptr<IMediaSource> m_mediaSource;	///< 媒体源
     std::shared_ptr<SyncQueue<AVPacketPtr>> m_APacket;	///< 音频包队列
     std::shared_ptr<SyncQueue<AVPacketPtr>> m_VPacket;	///< 视频包队列
-    std::shared_ptr<SyncQueue<AVFrame*>>  m_AFrame;	///< 音频帧队列
-    std::shared_ptr<SyncQueue<AVFrame*>>  m_VFrame;	///< 视频帧队列
+    std::shared_ptr<SyncQueue<AVFramePtr>>  m_AFrame;	///< 音频帧队列
+    std::shared_ptr<SyncQueue<AVFramePtr>>  m_VFrame;	///< 视频帧队列
 
     bool pause_flag = false;	///< 暂停标志
 

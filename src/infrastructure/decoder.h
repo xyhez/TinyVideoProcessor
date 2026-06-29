@@ -49,7 +49,7 @@ public:
      * @return -1 初始化解码器失败
      */
     int InitDecoder(std::shared_ptr<SyncQueue<AVPacketPtr>> packetVec
-                    ,std::shared_ptr<SyncQueue<AVFrame*>> frameVec
+                    ,std::shared_ptr<SyncQueue<AVFramePtr>> frameVec
                     ,AVCodecParameters *
                     ,AVRational
                     );
@@ -123,9 +123,9 @@ private:
     /**
      * @brief TransferHWFrame 将硬件帧转换为系统内存帧
      * @param hwFrame 硬件帧
-     * @return AVFrame* 转换后的帧，失败返回nullptr
+     * @return AVFramePtr 转换后的帧，失败返回空
      */
-    AVFrame *TransferHWFrame(AVFrame *hwFrame);
+    AVFramePtr TransferHWFrame(AVFrame *hwFrame);
 
     /**
      * @brief ShouldDiscardFrame 判断候选帧是否早于丢弃边界
@@ -150,7 +150,7 @@ private:
     bool IsSuspendRequested() const;
 
     std::shared_ptr<SyncQueue<AVPacketPtr>> m_PacketVec;	///< 包队列
-    std::shared_ptr<SyncQueue<AVFrame*>>  m_FrameVec;	///< 帧队列
+    std::shared_ptr<SyncQueue<AVFramePtr>>  m_FrameVec;	///< 帧队列
 
 
     AVCodecContext *Ctx = nullptr;	///< 解码器上下文

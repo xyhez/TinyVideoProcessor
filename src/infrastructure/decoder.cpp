@@ -2,6 +2,7 @@
 #include "core/AppLog.h"
 
 #include <QMutexLocker>
+#include <utility>
 
 namespace {
 constexpr bool kEnableHardwareDecoder = true;
@@ -106,30 +107,29 @@ bool decoder::InitHWDecoder()
     return false;
 }
 
-AVFrame *decoder::TransferHWFrame(AVFrame *hwFrame)
+AVFramePtr decoder::TransferHWFrame(AVFrame *hwFrame)
 {
     if (!m_isHWDecoder || !hwFrame) {
-        return nullptr;
+        return {};
     }
 
 
-    AVFrame *nv12Frame = av_frame_alloc();
+    AVFramePtr nv12Frame = MakeAVFrame();
     if (!nv12Frame) {
         APP_LOG_DEBUG_STREAM() << "Allocate NV12 frame failed";
-        return nullptr;
+        return {};
     }
 
-    int ret = av_hwframe_transfer_data(nv12Frame, hwFrame, 0);
+    int ret = av_hwframe_transfer_data(nv12Frame.get(), hwFrame, 0);
     if (ret < 0) {
         char errBuf[256];
         av_strerror(ret, errBuf, sizeof(errBuf));
         APP_LOG_DEBUG_STREAM() << "Hardware frame transfer failed:" << errBuf;
-        av_frame_free(&nv12Frame);
-        return nullptr;
+        return {};
     }
 
     // 澶嶅埗鎵€鏈夊睘鎬э紙鍖呮嫭pts, time_base绛夛級
-    av_frame_copy_props(nv12Frame, hwFrame);
+    av_frame_copy_props(nv12Frame.get(), hwFrame);
 
     // 纭繚time_base涔熻璁剧疆锛堟湁浜涚‖浠惰В鐮佸櫒鍙兘涓嶈缃繖涓級
     if (hwFrame->time_base.den > 0) {
@@ -150,10 +150,9 @@ AVFrame *decoder::TransferHWFrame(AVFrame *hwFrame)
     }
 
     // 绗簩姝ワ細NV12 -> YUV420P 杞崲
-    AVFrame *yuv420pFrame = av_frame_alloc();
+    AVFramePtr yuv420pFrame = MakeAVFrame();
     if (!yuv420pFrame) {
-        av_frame_free(&nv12Frame);
-        return nullptr;
+        return {};
     }
 
     yuv420pFrame->format = AV_PIX_FMT_YUV420P;
@@ -169,12 +168,10 @@ AVFrame *decoder::TransferHWFrame(AVFrame *hwFrame)
     yuv420pFrame->duration = nv12Frame->duration;
 
     // 鍒嗛厤缂撳啿鍖?
-    ret = av_frame_get_buffer(yuv420pFrame, 32);
+    ret = av_frame_get_buffer(yuv420pFrame.get(), 32);
     if (ret < 0) {
         APP_LOG_DEBUG_STREAM() << "Allocate YUV420P buffer failed";
-        av_frame_free(&nv12Frame);
-        av_frame_free(&yuv420pFrame);
-        return nullptr;
+        return {};
     }
 
     m_swsCtx = sws_getCachedContext(m_swsCtx,
@@ -186,9 +183,7 @@ AVFrame *decoder::TransferHWFrame(AVFrame *hwFrame)
 
     if (!m_swsCtx) {
         APP_LOG_DEBUG_STREAM() << "Create sws context failed";
-        av_frame_free(&nv12Frame);
-        av_frame_free(&yuv420pFrame);
-        return nullptr;
+        return {};
     }
 
 
@@ -201,16 +196,11 @@ AVFrame *decoder::TransferHWFrame(AVFrame *hwFrame)
     yuv420pFrame->time_base = nv12Frame->time_base;
     yuv420pFrame->best_effort_timestamp = nv12Frame->best_effort_timestamp;
 
-
-
-    // 娓呯悊涓棿甯?
-    av_frame_free(&nv12Frame);
-
     return yuv420pFrame;
 }
 
 int decoder::InitDecoder(std::shared_ptr<SyncQueue<AVPacketPtr>> packetVec
-                         ,std::shared_ptr<SyncQueue<AVFrame*>> framevec
+                         ,std::shared_ptr<SyncQueue<AVFramePtr>> framevec
                          , AVCodecParameters *coderPar
                          , AVRational time_base) {
     if (!coderPar) {
@@ -333,7 +323,7 @@ int decoder::StartDecoder() {
             }
 
             // 澶勭悊甯э紙鍖哄垎瑙嗛纭В/瑙嗛杞В/闊抽锛?
-            AVFrame *outFrame = nullptr;
+            AVFramePtr outFrame;
 
             if (decoder_type == "瑙嗛" && m_isHWDecoder &&
                 frame->format == m_hwPixFmt) {
@@ -345,7 +335,7 @@ int decoder::StartDecoder() {
                 }
             } else {
                 // 瑙嗛杞В 鎴?闊抽锛氶渶瑕佸垽鏂槸鍚﹂渶瑕佹牸寮忚浆鎹?
-                outFrame = av_frame_alloc();
+                outFrame = MakeAVFrame();
                 if (!outFrame) {
                     APP_LOG_DEBUG_STREAM() << "Allocate output frame failed";
                     continue;
@@ -366,10 +356,9 @@ int decoder::StartDecoder() {
                     outFrame->duration = frame->duration;
 
                     // 鍒嗛厤缂撳啿鍖?
-                    int ret = av_frame_get_buffer(outFrame, 32);
+                    int ret = av_frame_get_buffer(outFrame.get(), 32);
                     if (ret < 0) {
                         APP_LOG_DEBUG_STREAM() << "Allocate converted frame buffer failed";
-                        av_frame_free(&outFrame);
                         continue;
                     }
 
@@ -382,7 +371,6 @@ int decoder::StartDecoder() {
 
                     if (!m_swsCtx) {
                         APP_LOG_DEBUG_STREAM() << "Create format conversion context failed";
-                        av_frame_free(&outFrame);
                         continue;
                     }
 
@@ -397,9 +385,8 @@ int decoder::StartDecoder() {
                              << "->" << av_get_pix_fmt_name(AV_PIX_FMT_YUV420P);
                 } else {
                     // 闊抽 鎴?宸茬粡鏄?yuv420p 鐨勮棰戯細鐩存帴寮曠敤
-                    if (av_frame_ref(outFrame, frame) < 0) {
+                    if (av_frame_ref(outFrame.get(), frame) < 0) {
                         APP_LOG_DEBUG_STREAM() << "Reference frame failed";
-                        av_frame_free(&outFrame);
                         continue;
                     }
 
@@ -413,18 +400,16 @@ int decoder::StartDecoder() {
             // 楠岃瘉杈撳嚭甯?
             if (decoder_type == "瑙嗛" && (outFrame->width <= 0 || outFrame->height <= 0)) {
                 APP_LOG_DEBUG_STREAM() << "Invalid video frame size, dropping";
-                av_frame_free(&outFrame);
                 continue;
             }
 
-            if (ShouldDiscardFrame(outFrame)) {
-                av_frame_free(&outFrame);
+            if (ShouldDiscardFrame(outFrame.get())) {
                 av_frame_unref(frame);
                 continue;
             }
 
             // ========== 鍏ラ槦 ==========
-            if (!m_FrameVec->Push(outFrame)) {
+            if (!m_FrameVec->Push(std::move(outFrame))) {
                 av_frame_unref(frame);
                 if (m_FrameVec->IsStopRequested()) {
                     exitRequested = true;

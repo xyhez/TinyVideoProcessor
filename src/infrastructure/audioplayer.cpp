@@ -118,7 +118,7 @@ AudioPlayer::~AudioPlayer() {
 }
 
 void AudioPlayer::InitAudioPlay(AVCodecParameters* codecPar,
-                                std::shared_ptr<SyncQueue<AVFrame*>> frameQueue,
+                                std::shared_ptr<SyncQueue<AVFramePtr>> frameQueue,
                                 std::shared_ptr<syncmanager> syncManager,
                                 double audioTimeBase)
 {
@@ -359,7 +359,7 @@ void AudioPlayer::Run()
             continue;
         }
 
-        AVFrame *tmp = nullptr;
+        AVFramePtr tmp;
         if (!m_audioFrameQueue) {
             break;
         }
@@ -373,7 +373,6 @@ void AudioPlayer::Run()
         }
 
         // if((tmp->pts * av_q2d(tmp->time_base) * 1000) < m_syncManager->GetClock()) {
-        //     av_frame_free(&tmp);
         //     continue;
         // }
 
@@ -384,8 +383,6 @@ void AudioPlayer::Run()
                 : m_srcChannels;
             if (!CopyOrDefaultChannelLayout(&inLayout, tmp->ch_layout, fallbackInputChannels)) {
                 APP_LOG_WARN("AudioPlayer: Invalid input channel layout, skipping audio frame");
-                av_frame_unref(tmp);
-                av_frame_free(&tmp);
                 continue;
             }
 
@@ -412,8 +409,6 @@ void AudioPlayer::Run()
                 APP_LOG_WARN("AudioPlayer: Resampler allocation failed:", AvErrorString(ret));
                 av_channel_layout_uninit(&inLayout);
                 av_channel_layout_uninit(&outLayout);
-                av_frame_unref(tmp);
-                av_frame_free(&tmp);
                 break;
             }
 
@@ -423,8 +418,6 @@ void AudioPlayer::Run()
                 swr_free(&m_swr);
                 av_channel_layout_uninit(&inLayout);
                 av_channel_layout_uninit(&outLayout);
-                av_frame_unref(tmp);
-                av_frame_free(&tmp);
                 break;
             }
 
@@ -442,8 +435,6 @@ void AudioPlayer::Run()
 
         if (!m_swr) {
             APP_LOG_WARN("AudioPlayer: Resampler is not initialized, stopping audio playback");
-            av_frame_unref(tmp);
-            av_frame_free(&tmp);
             break;
         }
 
@@ -465,8 +456,6 @@ void AudioPlayer::Run()
 
         if (converted <= 0) {
             APP_LOG_WARN("AudioPlayer: Resampling failed, skipping frame");
-            av_frame_unref(tmp);
-            av_frame_free(&tmp);
             continue;
         }
 
@@ -491,9 +480,6 @@ void AudioPlayer::Run()
                        bytesPerSampleFrame,
                        speedSnapshot,
                        frameStartClockMs);
-
-        av_frame_unref(tmp);
-        av_frame_free(&tmp);
 
         double latency = CalculateHardwareLatency();
 

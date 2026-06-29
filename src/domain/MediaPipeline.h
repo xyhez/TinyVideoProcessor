@@ -223,8 +223,8 @@ private:
 
     std::shared_ptr<SyncQueue<AVPacketPtr>> APacket_ = nullptr;	///< 音频包队列
     std::shared_ptr<SyncQueue<AVPacketPtr>> VPacket_ = nullptr;	///< 视频包队列
-    std::shared_ptr<SyncQueue<AVFrame*>> AFrame_ = nullptr;	///< 音频帧队列
-    std::shared_ptr<SyncQueue<AVFrame*>> VFrame_ = nullptr;	///< 视频帧队列
+    std::shared_ptr<SyncQueue<AVFramePtr>> AFrame_ = nullptr;	///< 音频帧队列
+    std::shared_ptr<SyncQueue<AVFramePtr>> VFrame_ = nullptr;	///< 视频帧队列
 
     std::shared_ptr<IMediaSource> mediaSource_;	///< 当前媒体源
     std::shared_ptr<syncmanager> syncManager_;	///< 同步时钟管理器

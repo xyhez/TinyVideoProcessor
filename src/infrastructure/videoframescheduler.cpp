@@ -5,6 +5,7 @@
 #include <QTimer>
 #include <QtGlobal>
 #include <cmath>
+#include <utility>
 
 extern "C" {
 #include <libavutil/avutil.h>
@@ -35,7 +36,7 @@ VideoFrameScheduler::~VideoFrameScheduler()
     SetFrameSink(nullptr);
 }
 
-void VideoFrameScheduler::Initialize(std::shared_ptr<SyncQueue<AVFrame*>> frameQueue,
+void VideoFrameScheduler::Initialize(std::shared_ptr<SyncQueue<AVFramePtr>> frameQueue,
                                      std::shared_ptr<syncmanager> syncManager,
                                      double frameRate,
                                      double videoTimeBase)
@@ -105,8 +106,8 @@ void VideoFrameScheduler::Tick()
     const double speedSnapshot = speed_.load();
     const int scaledInterval = CalculateScaledFrameInterval(speedSnapshot);
 
-    AVFrame* nextFrame = nullptr;
-    if (!PeekNextFrame(nextFrame)) {
+    FrameTimingSnapshot nextFrame;
+    if (!PeekNextFrameTiming(nextFrame)) {
         ScheduleNextFrame(scaledInterval);
         return;
     }
@@ -124,14 +125,14 @@ void VideoFrameScheduler::Tick()
         return;
     }
 
-    AVFrame* newFrame = nullptr;
+    AVFramePtr newFrame;
     if (!PopDisplayableFrame(newFrame)) {
         ScheduleNextFrame(scaledInterval);
         return;
     }
 
-    RefreshVideoClockIfNeeded(newFrame, syncType);
-    PresentDisplayableFrame(newFrame);
+    RefreshVideoClockIfNeeded(newFrame.get(), syncType);
+    PresentDisplayableFrame(std::move(newFrame));
     ScheduleNextFrame(scaledInterval);
 }
 
@@ -145,23 +146,37 @@ int VideoFrameScheduler::CalculateScaledFrameInterval(double speed) const
     return qMax(1, qRound(frameIntervalMs_ / speed));
 }
 
-bool VideoFrameScheduler::PeekNextFrame(AVFrame*& frame)
+bool VideoFrameScheduler::PeekNextFrameTiming(FrameTimingSnapshot& snapshot)
 {
-    frame = nullptr;
-    return frameQueue_ && frameQueue_->Front(frame) && frame;
+    snapshot = {};
+    if (!frameQueue_) {
+        return false;
+    }
+
+    bool hasFrame = false;
+    const bool visited = frameQueue_->VisitFront([&snapshot, &hasFrame](const AVFramePtr& frame) {
+        if (!frame) {
+            return;
+        }
+
+        snapshot.pts = frame->pts;
+        hasFrame = true;
+    });
+
+    return visited && hasFrame;
 }
 
 VideoFrameScheduler::FrameTimingDecision VideoFrameScheduler::EvaluateFrameTiming(
-    const AVFrame* frame,
+    const FrameTimingSnapshot& snapshot,
     SYNCTYPE syncType,
     int& waitMs) const
 {
     waitMs = 0;
-    if (!frame || syncType != SYNCTYPE::AUDIO) {
+    if (syncType != SYNCTYPE::AUDIO || snapshot.pts == AV_NOPTS_VALUE) {
         return FrameTimingDecision::Display;
     }
 
-    const double videoPts = frame->pts * videoTimeBase_ * 1000.0;
+    const double videoPts = snapshot.pts * videoTimeBase_ * 1000.0;
     const double audioPts = syncManager_->GetClock() - 20;
     const double diff = videoPts - audioPts;
 
@@ -179,19 +194,18 @@ VideoFrameScheduler::FrameTimingDecision VideoFrameScheduler::EvaluateFrameTimin
 
 bool VideoFrameScheduler::DropLateFrame()
 {
-    AVFrame* drop = nullptr;
+    AVFramePtr drop;
     if (!frameQueue_ || !frameQueue_->TryPop(drop) || !drop) {
         return false;
     }
 
-    av_frame_free(&drop);
     dropped_.fetch_add(1);
     return true;
 }
 
-bool VideoFrameScheduler::PopDisplayableFrame(AVFrame*& frame)
+bool VideoFrameScheduler::PopDisplayableFrame(AVFramePtr& frame)
 {
-    frame = nullptr;
+    frame.reset();
     return frameQueue_ && frameQueue_->TryPop(frame) && frame;
 }
 
@@ -206,18 +220,17 @@ void VideoFrameScheduler::RefreshVideoClockIfNeeded(const AVFrame* frame, SYNCTY
     }
 }
 
-void VideoFrameScheduler::PresentDisplayableFrame(AVFrame* frame)
+void VideoFrameScheduler::PresentDisplayableFrame(AVFramePtr frame)
 {
     if (!frame) {
         return;
     }
 
     if (!frameSink_) {
-        av_frame_free(&frame);
         return;
     }
 
-    frameSink_->PresentFrame(frame);
+    frameSink_->PresentFrame(std::move(frame));
     rendered_.fetch_add(1);
 }
 

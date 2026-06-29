@@ -7,12 +7,6 @@
 namespace {
 constexpr size_t kPacketQueueMax = 30;
 constexpr size_t kFrameQueueMax = 30;
-
-auto frameDeleter = [](AVFrame* frame) {
-    if (frame) {
-        av_frame_free(&frame);
-    }
-};
 }
 
 MediaPipeline::MediaPipeline(QObject* parent)
@@ -257,7 +251,7 @@ bool MediaPipeline::CreatePipelineResources(std::shared_ptr<IMediaSource> mediaS
     mediaSource_ = mediaSource;
 
     VPacket_ = std::make_shared<SyncQueue<AVPacketPtr>>(kPacketQueueMax);
-    VFrame_ = std::make_shared<SyncQueue<AVFrame*>>(kFrameQueueMax, frameDeleter);
+    VFrame_ = std::make_shared<SyncQueue<AVFramePtr>>(kFrameQueueMax);
 
     demuxer_ = std::make_unique<demuxer>(mediaSource_, APacket_, VPacket_, AFrame_, VFrame_);
 
@@ -265,7 +259,7 @@ bool MediaPipeline::CreatePipelineResources(std::shared_ptr<IMediaSource> mediaS
     const bool hasAudio = sourceInfo.hasAudio_;
     if (hasAudio) {
         APacket_ = std::make_shared<SyncQueue<AVPacketPtr>>(kPacketQueueMax);
-        AFrame_ = std::make_shared<SyncQueue<AVFrame*>>(kFrameQueueMax, frameDeleter);
+        AFrame_ = std::make_shared<SyncQueue<AVFramePtr>>(kFrameQueueMax);
         demuxer_->SetAudioQueues(APacket_, AFrame_);
     }
 

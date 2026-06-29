@@ -41,7 +41,7 @@ public:
      * @details IVideoFrameSink 接口实现。frame 所有权转移给 VideoRender 的当前显示帧。
      * @param frame 可显示帧
      */
-    void PresentFrame(AVFrame* frame) override;
+    void PresentFrame(AVFramePtr frame) override;
 
     /**
      * @brief ClearFrame 清理当前显示帧
@@ -122,9 +122,7 @@ private:
     QOpenGLTexture *m_texY = nullptr, *m_texU = nullptr, *m_texV = nullptr;	///< YUV 分量纹理
     bool m_glInited = false;	///< OpenGL 是否已初始化
 
-    // 当前显示帧所有权由 VideoRender 接管：从队列弹出后赋值给该指针，
-    // 替换显示帧或析构时由 VideoRender 调用 av_frame_free() 释放。
-    AVFrame* m_displayFrame = nullptr;	///< 当前显示帧
+    AVFramePtr m_displayFrame;	///< 当前显示帧
 
     QMutex m_frameMutex;	///< 显示帧互斥锁
 

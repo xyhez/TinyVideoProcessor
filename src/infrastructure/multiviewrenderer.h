@@ -10,6 +10,10 @@
 #include <QSize>
 #include <QVector>
 
+#include <map>
+
+#include "core/ffmpeg_raii.h"
+
 extern "C" {
 #include <libavutil/frame.h>
 #include <libavutil/pixfmt.h>
@@ -132,7 +136,7 @@ public:
      * @param streamId 目标 StreamId
      * @param frame 已经过调度判断、允许显示的视频帧
      */
-    void PresentFrame(StreamId streamId, AVFrame* frame);
+    void PresentFrame(StreamId streamId, AVFramePtr frame);
 
     /**
      * @brief ClearFrame 清理指定 stream 当前显示帧
@@ -189,7 +193,7 @@ private:
      * @brief StreamRenderState 单路渲染状态
      */
     struct StreamRenderState {
-        AVFrame* currentFrame = nullptr;	///< 当前显示帧
+        AVFramePtr currentFrame;	///< 当前显示帧
         QOpenGLTexture* textureY = nullptr;	///< Y 分量纹理
         QOpenGLTexture* textureU = nullptr;	///< U 分量纹理
         QOpenGLTexture* textureV = nullptr;	///< V 分量纹理
@@ -334,7 +338,7 @@ private:
 
     Layout layout_ = Layout::Single;	///< 当前布局
     QMap<int, StreamId> viewSlots_;	///< slot 到流 ID 的绑定表
-    QMap<StreamId, StreamRenderState> renderStates_;	///< 每路渲染状态
+    std::map<StreamId, StreamRenderState> renderStates_;	///< 每路渲染状态
     StreamId activeStreamId_ = InvalidStreamId;	///< 当前活动显示流
     QOpenGLShaderProgram frameShader_;	///< 视频帧绘制 shader
     QMutex renderStateMutex_;	///< 渲染状态互斥锁

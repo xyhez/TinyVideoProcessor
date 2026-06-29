@@ -28,7 +28,7 @@ public:
      *          renderer 已销毁时释放 frame，保证所有权不泄漏。
      * @param frame 已经完成调度判断、允许显示的视频帧
      */
-    void PresentFrame(AVFrame* frame) override;
+    void PresentFrame(AVFramePtr frame) override;
 
     /**
      * @brief ClearFrame 清理当前 stream 的显示帧

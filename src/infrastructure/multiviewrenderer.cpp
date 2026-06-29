@@ -8,6 +8,7 @@
 #include <QOpenGLPixelTransferOptions>
 #include <QOpenGLTexture>
 #include <QtGlobal>
+#include <utility>
 
 extern "C" {
 #include <libavutil/pixdesc.h>
@@ -58,7 +59,7 @@ MultiViewRenderer::~MultiViewRenderer() {
     }
 
     for (auto it = renderStates_.begin(); it != renderStates_.end(); ++it) {
-        ReleaseStreamResources(it.value());
+        ReleaseStreamResources(it->second);
     }
     renderStates_.clear();
 
@@ -158,20 +159,20 @@ MultiViewRenderer::Viewport MultiViewRenderer::ViewportForSlot(int slotIndex) co
     };
 }
 
-void MultiViewRenderer::PresentFrame(StreamId streamId, AVFrame* frame) {
+void MultiViewRenderer::PresentFrame(StreamId streamId, AVFramePtr frame) {
     if (streamId == InvalidStreamId || !frame) {
-        av_frame_free(&frame);
         return;
     }
 
     QMutexLocker locker(&renderStateMutex_);
     StreamRenderState& state = renderStates_[streamId];
     ReleaseCurrentFrame(state);
-    state.currentFrame = frame;
-    state.videoWidth = frame->width;
-    state.videoHeight = frame->height;
-    state.sampleAspectRatio = frame->sample_aspect_ratio;
-    state.pixelFormat = static_cast<AVPixelFormat>(frame->format);
+    AVFrame* rawFrame = frame.get();
+    state.currentFrame = std::move(frame);
+    state.videoWidth = rawFrame->width;
+    state.videoHeight = rawFrame->height;
+    state.sampleAspectRatio = rawFrame->sample_aspect_ratio;
+    state.pixelFormat = static_cast<AVPixelFormat>(rawFrame->format);
     state.textureDirty = true;
     state.hasFrame = true;
 
@@ -185,7 +186,7 @@ void MultiViewRenderer::ClearFrame(StreamId streamId) {
         return;
     }
 
-    ReleaseCurrentFrame(it.value());
+    ReleaseCurrentFrame(it->second);
     update();
 }
 
@@ -199,7 +200,7 @@ void MultiViewRenderer::DetachStream(StreamId streamId) {
     if (context()) {
         makeCurrent();
     }
-    ReleaseStreamResources(it.value());
+    ReleaseStreamResources(it->second);
     if (context()) {
         doneCurrent();
     }
@@ -272,7 +273,7 @@ void MultiViewRenderer::mouseDoubleClickEvent(QMouseEvent* event) {
 }
 
 void MultiViewRenderer::ReleaseCurrentFrame(StreamRenderState& state) {
-    av_frame_free(&state.currentFrame);
+    state.currentFrame.reset();
     state.videoWidth = 0;
     state.videoHeight = 0;
     state.sampleAspectRatio = {1, 1};
@@ -417,7 +418,7 @@ void MultiViewRenderer::DrawViewport(const Viewport& viewport) {
         QMutexLocker locker(&renderStateMutex_);
         auto it = renderStates_.find(viewport.streamId);
         if (it != renderStates_.end()) {
-            DrawStreamFrame(viewport, it.value());
+            DrawStreamFrame(viewport, it->second);
         }
     }
 
@@ -474,7 +475,7 @@ bool MultiViewRenderer::DrawStreamFrame(const Viewport& viewport, StreamRenderSt
 }
 
 bool MultiViewRenderer::UploadTexturesIfNeeded(StreamRenderState& state) {
-    AVFrame* frame = state.currentFrame;
+    AVFrame* frame = state.currentFrame.get();
     if (!frame || !IsSupportedFrameFormat(state)) {
         return false;
     }

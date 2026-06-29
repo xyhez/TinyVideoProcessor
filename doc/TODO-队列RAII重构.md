@@ -267,26 +267,26 @@ refactor: 将 packet 队列迁移到 RAII 所有权
 
 **任务清单**：
 
-- [ ] 分析 `VideoFrameScheduler` 当前 `Front()`、`Pop()`、`DropLateFrame()` 语义。
-- [ ] 明确 `AVFramePtr` 队首观察方案。
-- [ ] 明确可显示帧从 scheduler 转交给 sink 时是否继续使用 raw pointer 接口。
-- [ ] 评估是否将 `IVideoFrameSink::PresentFrame(AVFrame*)` 改为 `PresentFrame(AVFramePtr)`。
-- [ ] 评估 `VideoRender` 和 `MultiViewRenderer` 当前显示帧持有方式。
-- [ ] 明确是否先在 scheduler 内部 `.release()` 兼容旧 sink 接口。
-- [ ] 给出最小风险迁移顺序。
+- [x] 分析 `VideoFrameScheduler` 当前 `Front()`、`Pop()`、`DropLateFrame()` 语义。
+- [x] 明确 `AVFramePtr` 队首观察方案。
+- [x] 明确可显示帧从 scheduler 转交给 sink 时是否继续使用 raw pointer 接口。
+- [x] 评估是否将 `IVideoFrameSink::PresentFrame(AVFrame*)` 改为 `PresentFrame(AVFramePtr)`。
+- [x] 评估 `VideoRender` 和 `MultiViewRenderer` 当前显示帧持有方式。
+- [x] 明确是否先在 scheduler 内部 `.release()` 兼容旧 sink 接口。
+- [x] 给出最小风险迁移顺序。
 
 **验收标准**：
 
-- [ ] 能说明 `Front()` 在 move-only frame 队列下如何替代。
-- [ ] 能说明 `AVFramePtr` 如何从 decoder 转移到 scheduler。
-- [ ] 能说明可显示帧如何转移到 sink。
-- [ ] 能说明旧 `VideoRender` fallback 是否需要同步迁移。
+- [x] 能说明 `Front()` 在 move-only frame 队列下如何替代。
+- [x] 能说明 `AVFramePtr` 如何从 decoder 转移到 scheduler。
+- [x] 能说明可显示帧如何转移到 sink。
+- [x] 能说明旧 `VideoRender` fallback 是否需要同步迁移。
 
 **测试流程**：
 
-- [ ] 本任务为方案文档，不运行程序。
-- [ ] 静态检查：`git diff --check -- doc\队列RAII重构_Frame迁移方案.md doc\TODO-队列RAII重构.md`
-- [ ] 定向搜索：`rg -n "Front\\(|PopDisplayableFrame|DropLateFrame|PresentFrame|AVFrame\\*|m_displayFrame|currentFrame" src`
+- [x] 本任务为方案文档，不运行程序。
+- [x] 静态检查：`git diff --check -- doc\队列RAII重构_Frame迁移方案.md doc\TODO-队列RAII重构.md`
+- [x] 定向搜索：`rg -n "Front\\(|PopDisplayableFrame|DropLateFrame|PresentFrame|AVFrame\\*|m_displayFrame|currentFrame" src`
 
 **Commit message**：
 
@@ -326,30 +326,30 @@ docs: 设计 frame 队列 RAII 迁移方案
 
 **任务清单**：
 
-- [ ] 将音频帧队列迁移为 `SyncQueue<AVFramePtr>`。
-- [ ] 将视频帧队列迁移为 `SyncQueue<AVFramePtr>`。
-- [ ] `decoder` 解码输出后以 move 方式入队。
-- [ ] `AudioPlayer` 出队后持有 `AVFramePtr`，处理完自动释放。
-- [ ] `VideoFrameScheduler` 支持队首观察和 move 出队。
-- [ ] `DropLateFrame()` 丢弃帧时依赖 RAII 自动释放。
-- [ ] `PresentDisplayableFrame()` 明确帧所有权转移。
-- [ ] `VideoRender` / `MultiViewRenderer` 显示帧持有方式与新所有权语义一致。
-- [ ] seek、stop、remove stream、shutdown 时不重复释放帧。
+- [x] 将音频帧队列迁移为 `SyncQueue<AVFramePtr>`。
+- [x] 将视频帧队列迁移为 `SyncQueue<AVFramePtr>`。
+- [x] `decoder` 解码输出后以 move 方式入队。
+- [x] `AudioPlayer` 出队后持有 `AVFramePtr`，处理完自动释放。
+- [x] `VideoFrameScheduler` 支持队首观察和 move 出队。
+- [x] `DropLateFrame()` 丢弃帧时依赖 RAII 自动释放。
+- [x] `PresentDisplayableFrame()` 明确帧所有权转移。
+- [x] `VideoRender` / `MultiViewRenderer` 显示帧持有方式与新所有权语义一致。
+- [x] seek、stop、remove stream、shutdown 时不重复释放帧。
 
 **验收标准**：
 
-- [ ] frame 队列不再需要外部 deleter。
-- [ ] decoder 输出帧后所有权明确进入队列。
-- [ ] scheduler 显示帧时所有权明确转移到 sink。
-- [ ] drop late frame 自动释放。
+- [x] frame 队列不再需要外部 deleter。
+- [x] decoder 输出帧后所有权明确进入队列。
+- [x] scheduler 显示帧时所有权明确转移到 sink。
+- [x] drop late frame 自动释放。
 - [ ] stop / seek / shutdown 不泄漏、不重复释放、不显示旧帧。
 - [ ] 多路文件播放不退化。
 - [ ] 无音频流播放不退化。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\core\ffmpeg_raii.h src\core\queue.h src\domain\MediaPipeline.h src\domain\MediaPipeline.cpp src\infrastructure\decoder.h src\infrastructure\decoder.cpp src\infrastructure\audioplayer.h src\infrastructure\audioplayer.cpp src\infrastructure\videoframescheduler.h src\infrastructure\videoframescheduler.cpp src\infrastructure\ivideoframesink.h src\infrastructure\videorender.h src\infrastructure\videorender.cpp src\infrastructure\multiviewrenderer.h src\infrastructure\multiviewrenderer.cpp src\infrastructure\singlestreamframesinkadapter.h src\infrastructure\singlestreamframesinkadapter.cpp doc\TODO-队列RAII重构.md`
-- [ ] 定向搜索：`rg -n "SyncQueue<AVFrame\\*>|SyncQueue<AVFramePtr>|av_frame_free|AVFramePtr|PresentFrame|DropLateFrame|ClearFrame" src doc\TODO-队列RAII重构.md`
+- [x] 静态检查：`git diff --check -- src\core\ffmpeg_raii.h src\core\queue.h src\domain\MediaPipeline.h src\domain\MediaPipeline.cpp src\infrastructure\decoder.h src\infrastructure\decoder.cpp src\infrastructure\audioplayer.h src\infrastructure\audioplayer.cpp src\infrastructure\videoframescheduler.h src\infrastructure\videoframescheduler.cpp src\infrastructure\ivideoframesink.h src\infrastructure\videorender.h src\infrastructure\videorender.cpp src\infrastructure\multiviewrenderer.h src\infrastructure\multiviewrenderer.cpp src\infrastructure\singlestreamframesinkadapter.h src\infrastructure\singlestreamframesinkadapter.cpp doc\TODO-队列RAII重构.md`
+- [x] 定向搜索：`rg -n "SyncQueue<AVFrame\\*>|SyncQueue<AVFramePtr>|av_frame_free|AVFramePtr|PresentFrame|DropLateFrame|ClearFrame" src doc\TODO-队列RAII重构.md`
 - [ ] 人工运行建议：普通 MP4 播放、seek、pause、stop、播放中关闭。
 - [ ] 人工运行建议：无音频流视频播放、seek、关闭。
 - [ ] 人工运行建议：多路 2x2 播放、切 active stream、remove stream、关闭。

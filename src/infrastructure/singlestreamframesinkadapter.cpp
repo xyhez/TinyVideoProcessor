@@ -1,8 +1,6 @@
 #include "singlestreamframesinkadapter.h"
 
-extern "C" {
-#include <libavutil/frame.h>
-}
+#include <utility>
 
 SingleStreamFrameSinkAdapter::SingleStreamFrameSinkAdapter(
     MultiViewRenderer* renderer,
@@ -12,7 +10,7 @@ SingleStreamFrameSinkAdapter::SingleStreamFrameSinkAdapter(
 {
 }
 
-void SingleStreamFrameSinkAdapter::PresentFrame(AVFrame* frame)
+void SingleStreamFrameSinkAdapter::PresentFrame(AVFramePtr frame)
 {
     if (!frame) {
         return;
@@ -20,11 +18,10 @@ void SingleStreamFrameSinkAdapter::PresentFrame(AVFrame* frame)
 
     MultiViewRenderer* renderer = renderer_.data();
     if (!renderer || streamId_ == MultiViewRenderer::InvalidStreamId) {
-        av_frame_free(&frame);
         return;
     }
 
-    renderer->PresentFrame(streamId_, frame);
+    renderer->PresentFrame(streamId_, std::move(frame));
 }
 
 void SingleStreamFrameSinkAdapter::ClearFrame()

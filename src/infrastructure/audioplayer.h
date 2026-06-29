@@ -15,6 +15,7 @@
 #include <QWaitCondition>
 #include <atomic>
 
+#include "core/ffmpeg_raii.h"
 #include "infrastructure/syncmanager.h"
 #include "core/queue.h"
 
@@ -53,7 +54,7 @@ public:
      * @param audioTimeBase 音频流时间基
      */
     void InitAudioPlay(AVCodecParameters* codecPar,
-                       std::shared_ptr<SyncQueue<AVFrame*>> frameQueue,
+                       std::shared_ptr<SyncQueue<AVFramePtr>> frameQueue,
                        std::shared_ptr<syncmanager> syncManager,
                        double audioTimeBase);
 
@@ -136,7 +137,7 @@ signals:
     void MuteChanged(bool muted);
 
 private:
-    std::shared_ptr<SyncQueue<AVFrame*>> m_audioFrameQueue;	///< 音频帧队列
+    std::shared_ptr<SyncQueue<AVFramePtr>> m_audioFrameQueue;	///< 音频帧队列
     std::shared_ptr<syncmanager> m_syncManager;	///< 同步时钟管理器
     double m_audioTimeBase = 0.0;	///< 音频时间基
     bool m_first = true;	///< 是否为首帧音频

@@ -20,8 +20,8 @@ QString AvErrorString(int errorCode)
 demuxer::demuxer(std::shared_ptr<IMediaSource> mediaSource,
                  std::shared_ptr<SyncQueue<AVPacketPtr>> APacket,
                  std::shared_ptr<SyncQueue<AVPacketPtr>> VPacket,
-                 std::shared_ptr<SyncQueue<AVFrame*>> AFrame,
-                 std::shared_ptr<SyncQueue<AVFrame*>> VFrame,
+                 std::shared_ptr<SyncQueue<AVFramePtr>> AFrame,
+                 std::shared_ptr<SyncQueue<AVFramePtr>> VFrame,
                  QObject *parent)
     : QObject{parent}
     , m_mediaSource(mediaSource)
@@ -114,7 +114,7 @@ AVCodecParameters* demuxer::ReVcoderPar()
 }
 
 void demuxer::SetAudioQueues(std::shared_ptr<SyncQueue<AVPacketPtr>> APacket,
-                             std::shared_ptr<SyncQueue<AVFrame*>> AFrame)
+                             std::shared_ptr<SyncQueue<AVFramePtr>> AFrame)
 {
     QMutexLocker locker(&mutex);
     m_APacket = APacket;
