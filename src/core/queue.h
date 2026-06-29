@@ -6,6 +6,8 @@
 #include <condition_variable>
 #include <atomic>
 #include <functional>
+#include <type_traits>
+#include <utility>
 
 /**
  * @brief 线程同步队列
@@ -25,6 +27,19 @@ private:
     std::atomic<bool> stop_flag_;	///< 停止标志
     std::atomic<bool> wait_interrupted_;	///< 等待中断标志
     std::function<void(T)> deleter_ = nullptr;	///< 元素析构器
+
+    /**
+     * @brief RawPointer 获取裸指针观察视图
+     * @param item 队列元素
+     * @return 裸指针观察视图
+     */
+    static auto RawPointer(const T& item) {
+        if constexpr (std::is_pointer_v<T>) {
+            return item;
+        } else {
+            return item.get();
+        }
+    }
 public:
 // 核心接口
     /**
@@ -61,11 +76,11 @@ public:
             });
             if (stop_flag_ || wait_interrupted_) {
                 if (deleter_) {
-                    deleter_(item);
+                    deleter_(std::move(item));
                 }
                 return false;
             }
-            raw_queue_.push_back(item);
+            raw_queue_.push_back(std::move(item));
             cv_not_empty_.notify_one();
         }
         return true;
@@ -85,7 +100,7 @@ public:
             });
 
             if (raw_queue_.empty()) return false;
-            item = raw_queue_.front();
+            item = std::move(raw_queue_.front());
             raw_queue_.pop_front();
         }
         cv_not_full_.notify_one();
@@ -102,7 +117,7 @@ public:
         {
             std::unique_lock<std::mutex> lock(mutex_);
             if(raw_queue_.empty()) return false;
-            item = raw_queue_.front();
+            item = std::move(raw_queue_.front());
             raw_queue_.pop_front();
         }
         cv_not_full_.notify_one();
@@ -125,12 +140,39 @@ public:
     }
 
     /**
+     * @brief VisitFront 在锁内只读访问队首元素，不转移所有权
+     * @param visitor 队首元素访问函数
+     * @return true 访问成功
+     * @return false 队列为空
+     */
+    template<typename Visitor>
+    bool VisitFront(Visitor&& visitor) {
+        std::unique_lock<std::mutex> lock(mutex_);
+        if (raw_queue_.empty()) return false;
+        std::forward<Visitor>(visitor)(static_cast<const T&>(raw_queue_.front()));
+        return true;
+    }
+
+    /**
+     * @brief FrontRaw 获取队首元素的裸指针观察视图，不转移所有权
+     * @return 队首元素裸指针，队列为空时返回 nullptr
+     */
+    auto FrontRaw() {
+        std::unique_lock<std::mutex> lock(mutex_);
+        if (raw_queue_.empty()) return decltype(RawPointer(raw_queue_.front()))(nullptr);
+        return RawPointer(raw_queue_.front());
+    }
+
+    /**
      * @brief PopFront 移除队首元素但不返回
      */
     void PopFront() {
         {
             std::unique_lock<std::mutex> lock(mutex_);
             if(raw_queue_.empty()) return;
+            if (deleter_) {
+                deleter_(std::move(raw_queue_.front()));
+            }
             raw_queue_.pop_front();
         }
         cv_not_full_.notify_one();
@@ -162,8 +204,9 @@ public:
     void Clear() {
         std::unique_lock<std::mutex> lock(mutex_);
         while (!raw_queue_.empty()) {
-            if (deleter_)
-                deleter_(raw_queue_.front());
+            if (deleter_) {
+                deleter_(std::move(raw_queue_.front()));
+            }
             raw_queue_.pop_front();
         }
         cv_not_full_.notify_all();

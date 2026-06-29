@@ -171,26 +171,26 @@ feat: 增加 FFmpeg RAII 资源类型
 
 **任务清单**：
 
-- [ ] 将 `Push(T item)` 内部改为 move 入队。
-- [ ] 将 `Pop(T& item)` 改为 move 出队。
-- [ ] 将 `TryPop(T& item)` 改为 move 出队。
-- [ ] 评估 `Front(T& item)` 对 move-only 类型是否仍成立。
-- [ ] 为 move-only 类型新增 `FrontRaw()`、`Peek()` 或 `VisitFront()` 等只读观察接口。
-- [ ] 保持现有 `SyncQueue<AVPacket*>` / `SyncQueue<AVFrame*>` 调用点暂不退化。
-- [ ] 明确 `deleter_` 在 RAII 队列中应逐步废弃。
-- [ ] 不在本步迁移所有调用点。
+- [x] 将 `Push(T item)` 内部改为 move 入队。
+- [x] 将 `Pop(T& item)` 改为 move 出队。
+- [x] 将 `TryPop(T& item)` 改为 move 出队。
+- [x] 评估 `Front(T& item)` 对 move-only 类型是否仍成立。
+- [x] 为 move-only 类型新增 `FrontRaw()`、`Peek()` 或 `VisitFront()` 等只读观察接口。
+- [x] 保持现有 `SyncQueue<AVPacket*>` / `SyncQueue<AVFrame*>` 调用点暂不退化。
+- [x] 明确 `deleter_` 在 RAII 队列中应逐步废弃。
+- [x] 不在本步迁移所有调用点。
 
 **验收标准**：
 
-- [ ] `SyncQueue<T>` 仍兼容当前裸指针队列。
-- [ ] `SyncQueue<std::unique_ptr<...>>` 的接口设计可成立。
-- [ ] 队列清空时 move-only 元素能自动释放。
-- [ ] `Front()` 替代方案能满足 `VideoFrameScheduler` 的队首帧同步判断需求。
+- [x] `SyncQueue<T>` 仍兼容当前裸指针队列。
+- [x] `SyncQueue<std::unique_ptr<...>>` 的接口设计可成立。
+- [x] 队列清空时 move-only 元素能自动释放。
+- [x] `Front()` 替代方案能满足 `VideoFrameScheduler` 的队首帧同步判断需求。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\core\queue.h doc\TODO-队列RAII重构.md`
-- [ ] 定向搜索：`rg -n "Push\\(|Pop\\(|TryPop\\(|Front\\(|VisitFront|FrontRaw|std::move|deleter_" src\core\queue.h doc\TODO-队列RAII重构.md`
+- [x] 静态检查：`git diff --check -- src\core\queue.h doc\TODO-队列RAII重构.md`
+- [x] 定向搜索：`rg -n "Push\\(|Pop\\(|TryPop\\(|Front\\(|VisitFront|FrontRaw|std::move|deleter_" src\core\queue.h doc\TODO-队列RAII重构.md`
 - [ ] 人工编译建议：确认当前裸指针队列调用不退化。
 
 **Commit message**：
