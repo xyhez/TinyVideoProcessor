@@ -10,6 +10,7 @@
   - Phase 3.13.2 已完成渲染输入格式适配方案设计，推荐新增 `VideoFrameConverter` 收口可显示帧格式边界。
   - Phase 3.13.3 已修正硬解 transfer 后固定按 `NV12` 转换的问题，改为按实际软件帧格式转换。
   - Phase 3.13.3 已新增 `VideoFrameConverter`，并在 `MultiViewRenderer::PresentFrame()` 前归一化可显示帧格式。
+  - Phase 3.13.4 已将色彩 range/colorspace 策略收口到 `VideoFrameConverter`，并移除 decoder 旧格式转换路径。
 - 未完成：
   - 真实异常样本日志尚未收集，需要人工运行非 `YUV420P` / 4K MKV 样本后补充。
   - 非 `YUV420P` 视频帧的稳定显示。
@@ -222,31 +223,33 @@ feat: 增加渲染输入格式转换能力
 
 - `src/infrastructure/multiviewrenderer.h`
 - `src/infrastructure/multiviewrenderer.cpp`
+- `src/infrastructure/decoder.h`
+- `src/infrastructure/decoder.cpp`
 - 可选：`src/infrastructure/videoframeconverter.h`
 - 可选：`src/infrastructure/videoframeconverter.cpp`
 - `doc/Phase3_13TODO.md`
 
 **任务清单**：
 
-- [ ] 明确 limited range 和 full range 的处理方式。
-- [ ] 处理 `YUVJ420P` / JPEG range 场景。
-- [ ] 明确 BT.601、BT.709 的第一版策略。
-- [ ] 对 4K 视频优先按 BT.709 处理。
-- [ ] 对未知色彩信息使用稳定默认值，并输出一次性日志。
-- [ ] 不在本步完整支持 HDR tone mapping。
-- [ ] 不在本步支持 BT.2020 / PQ 的完整显示还原。
+- [x] 明确 limited range 和 full range 的处理方式。
+- [x] 处理 `YUVJ420P` / JPEG range 场景。
+- [x] 明确 BT.601、BT.709 的第一版策略。
+- [x] 对 4K 视频优先按 BT.709 处理。
+- [x] 对未知色彩信息使用稳定默认值，并输出一次性日志。
+- [x] 不在本步完整支持 HDR tone mapping。
+- [x] 不在本步支持 BT.2020 / PQ 的完整显示还原。
 
 **验收标准**：
 
 - [ ] 常见 SDR 视频颜色正常。
 - [ ] `YUVJ420P` 不明显发灰或过曝。
 - [ ] 4K SDR MKV 颜色不再明显错误。
-- [ ] HDR/BT.2020 未完整支持时有明确限制说明。
+- [x] HDR/BT.2020 未完整支持时有明确限制说明。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\multiviewrenderer.h src\infrastructure\multiviewrenderer.cpp src\infrastructure\videoframeconverter.h src\infrastructure\videoframeconverter.cpp doc\Phase3_13TODO.md`
-- [ ] 定向搜索：`rg -n "color_range|color_space|BT|YUVJ|AVCOL|sws_setColorspaceDetails" src\infrastructure doc\Phase3_13TODO.md`
+- [x] 静态检查：`git diff --check -- src\infrastructure\decoder.h src\infrastructure\decoder.cpp src\infrastructure\multiviewrenderer.h src\infrastructure\multiviewrenderer.cpp src\infrastructure\videoframeconverter.h src\infrastructure\videoframeconverter.cpp doc\Phase3_13TODO.md`
+- [x] 定向搜索：`rg -n "color_range|color_space|BT|YUVJ|AVCOL|sws_setColorspaceDetails|m_swsCtx" src\infrastructure doc\Phase3_13TODO.md`
 - [ ] 人工运行建议：分别播放 SDR 720p、1080p、4K MKV、疑似 full range 视频。
 
 **Commit message**：

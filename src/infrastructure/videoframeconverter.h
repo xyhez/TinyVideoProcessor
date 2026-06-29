@@ -48,6 +48,13 @@ private:
     bool IsDisplayFormat(const AVFrame* frame) const;
 
     /**
+     * @brief HasDisplayColorProfile 判断是否已经符合当前渲染器显示色彩约束
+     * @param frame 待判断帧
+     * @return true 已经符合显示色彩约束
+     */
+    bool HasDisplayColorProfile(const AVFrame* frame) const;
+
+    /**
      * @brief IsHardwareFrameFormat 判断是否为硬件像素格式
      * @param format 像素格式
      * @return true 硬件像素格式
@@ -64,17 +71,32 @@ private:
     /**
      * @brief LogConversionIfNeeded 输出格式转换诊断日志
      * @param sourceFormat 输入像素格式
+     * @param sourceRange 输入色彩范围
+     * @param sourceColorSpace 输入色彩空间
      * @param width 输入宽度
      * @param height 输入高度
      * @param success 是否转换成功
+     * @param usedFallback 是否使用默认色彩策略
+     * @param usedBt2020Fallback 是否发生 BT.2020 降级
      */
-    void LogConversionIfNeeded(AVPixelFormat sourceFormat, int width, int height, bool success);
+    void LogConversionIfNeeded(AVPixelFormat sourceFormat,
+                               AVColorRange sourceRange,
+                               AVColorSpace sourceColorSpace,
+                               int width,
+                               int height,
+                               bool success,
+                               bool usedFallback,
+                               bool usedBt2020Fallback);
 
     SwsContext* swsContext_ = nullptr;	///< swscale 转换上下文
     AVPixelFormat lastLoggedSourceFormat_ = AV_PIX_FMT_NONE;	///< 上次记录的输入格式
+    AVColorRange lastLoggedSourceRange_ = AVCOL_RANGE_UNSPECIFIED;	///< 上次记录的输入色彩范围
+    AVColorSpace lastLoggedSourceColorSpace_ = AVCOL_SPC_UNSPECIFIED;	///< 上次记录的输入色彩空间
     int lastLoggedWidth_ = 0;	///< 上次记录的宽度
     int lastLoggedHeight_ = 0;	///< 上次记录的高度
     bool lastLoggedSuccess_ = false;	///< 上次记录的转换结果
+    bool lastLoggedUsedFallback_ = false;	///< 上次记录是否使用默认色彩策略
+    bool lastLoggedUsedBt2020Fallback_ = false;	///< 上次记录是否使用 BT.2020 降级
     bool hasLoggedConversion_ = false;	///< 是否已经输出过转换日志
 };
 

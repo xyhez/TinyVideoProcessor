@@ -20,10 +20,6 @@ decoder::~decoder() {
     if (m_hwDeviceCtx) {
         av_buffer_unref(&m_hwDeviceCtx);
     }
-    if (m_swsCtx) {
-        sws_freeContext(m_swsCtx);
-        m_swsCtx = nullptr;
-    }
     APP_LOG_DEBUG_STREAM() << decoder_type << "瑙ｇ爜鍣ㄨ祫婧愬凡娓呯悊";
 }
 
@@ -138,65 +134,10 @@ AVFramePtr decoder::TransferHWFrame(AVFrame *hwFrame)
         softwareFrame->time_base = m_time_base;
     }
 
-    const AVPixelFormat sourceFormat = static_cast<AVPixelFormat>(softwareFrame->format);
-    if (sourceFormat == AV_PIX_FMT_YUV420P) {
-        APP_LOG_DEBUG_STREAM() << "Hardware transfer frame is already YUV420P, pts="
-                               << softwareFrame->pts;
-        return softwareFrame;
-    }
-
     APP_LOG_DEBUG_STREAM() << "Hardware transfer frame format:"
-                           << av_get_pix_fmt_name(sourceFormat);
+                           << av_get_pix_fmt_name(static_cast<AVPixelFormat>(softwareFrame->format));
 
-    AVFramePtr yuv420pFrame = MakeAVFrame();
-    if (!yuv420pFrame) {
-        return {};
-    }
-
-    yuv420pFrame->format = AV_PIX_FMT_YUV420P;
-    yuv420pFrame->width = softwareFrame->width;
-    yuv420pFrame->height = softwareFrame->height;
-
-    // 鍒嗛厤缂撳啿鍖?
-    ret = av_frame_get_buffer(yuv420pFrame.get(), 32);
-    if (ret < 0) {
-        APP_LOG_DEBUG_STREAM() << "Allocate YUV420P buffer failed";
-        return {};
-    }
-
-    av_frame_copy_props(yuv420pFrame.get(), softwareFrame.get());
-    if (yuv420pFrame->time_base.den <= 0 && m_time_base.den > 0) {
-        yuv420pFrame->time_base = m_time_base;
-    }
-
-    m_swsCtx = sws_getCachedContext(m_swsCtx,
-                                   softwareFrame->width, softwareFrame->height,
-                                   sourceFormat,
-                                   yuv420pFrame->width, yuv420pFrame->height,
-                                   AV_PIX_FMT_YUV420P,
-                                   SWS_BILINEAR, nullptr, nullptr, nullptr);
-
-    if (!m_swsCtx) {
-        APP_LOG_DEBUG_STREAM() << "Create sws context failed";
-        return {};
-    }
-
-
-    ret = sws_scale(m_swsCtx,
-                    softwareFrame->data, softwareFrame->linesize,
-                    0, softwareFrame->height,
-                    yuv420pFrame->data, yuv420pFrame->linesize);
-    if (ret <= 0) {
-        APP_LOG_DEBUG_STREAM() << "Hardware frame format conversion failed";
-        return {};
-    }
-
-    APP_LOG_DEBUG_STREAM() << "Hardware frame format conversion:"
-                           << av_get_pix_fmt_name(sourceFormat)
-                           << "->" << av_get_pix_fmt_name(AV_PIX_FMT_YUV420P)
-                           << "size=" << yuv420pFrame->width << "x" << yuv420pFrame->height;
-
-    return yuv420pFrame;
+    return softwareFrame;
 }
 
 int decoder::InitDecoder(std::shared_ptr<SyncQueue<AVPacketPtr>> packetVec
@@ -334,66 +275,20 @@ int decoder::StartDecoder() {
                     continue;
                 }
             } else {
-                // 瑙嗛杞В 鎴?闊抽锛氶渶瑕佸垽鏂槸鍚﹂渶瑕佹牸寮忚浆鎹?
+                // 视频软解或音频：只引用解码输出帧，格式适配交给后续渲染边界
                 outFrame = MakeAVFrame();
                 if (!outFrame) {
                     APP_LOG_DEBUG_STREAM() << "Allocate output frame failed";
                     continue;
                 }
 
-                // 濡傛灉鏄棰戜笖鏍煎紡涓嶆槸 yuv420p锛岃繘琛屾牸寮忚浆鎹?
-                if (decoder_type == "瑙嗛" && frame->format != AV_PIX_FMT_YUV420P) {
-                    // 鏍煎紡杞崲锛氫换鎰忔牸寮?-> yuv420p
-                    outFrame->format = AV_PIX_FMT_YUV420P;
-                    outFrame->width = frame->width;
-                    outFrame->height = frame->height;
+                if (av_frame_ref(outFrame.get(), frame) < 0) {
+                    APP_LOG_DEBUG_STREAM() << "Reference frame failed";
+                    continue;
+                }
 
-                    // 澶嶅埗鏃堕棿鎴冲睘鎬?
-                    outFrame->pts = frame->pts;
-                    outFrame->pkt_dts = frame->pkt_dts;
-                    outFrame->time_base = frame->time_base.den > 0 ? frame->time_base : m_time_base;
-                    outFrame->best_effort_timestamp = frame->best_effort_timestamp;
-                    outFrame->duration = frame->duration;
-
-                    // 鍒嗛厤缂撳啿鍖?
-                    int ret = av_frame_get_buffer(outFrame.get(), 32);
-                    if (ret < 0) {
-                        APP_LOG_DEBUG_STREAM() << "Allocate converted frame buffer failed";
-                        continue;
-                    }
-
-                    // 鍒涘缓鎴栨洿鏂?sws 杞崲涓婁笅鏂?
-                    m_swsCtx = sws_getCachedContext(
-                        m_swsCtx,
-                        frame->width, frame->height, (AVPixelFormat)frame->format,
-                        outFrame->width, outFrame->height, AV_PIX_FMT_YUV420P,
-                        SWS_BILINEAR, nullptr, nullptr, nullptr);
-
-                    if (!m_swsCtx) {
-                        APP_LOG_DEBUG_STREAM() << "Create format conversion context failed";
-                        continue;
-                    }
-
-                    // 鎵ц鏍煎紡杞崲
-                    sws_scale(m_swsCtx,
-                              frame->data, frame->linesize,
-                              0, frame->height,
-                              outFrame->data, outFrame->linesize);
-
-                    APP_LOG_DEBUG_STREAM() << "Video format conversion:"
-                             << av_get_pix_fmt_name((AVPixelFormat)frame->format)
-                             << "->" << av_get_pix_fmt_name(AV_PIX_FMT_YUV420P);
-                } else {
-                    // 闊抽 鎴?宸茬粡鏄?yuv420p 鐨勮棰戯細鐩存帴寮曠敤
-                    if (av_frame_ref(outFrame.get(), frame) < 0) {
-                        APP_LOG_DEBUG_STREAM() << "Reference frame failed";
-                        continue;
-                    }
-
-                    // 纭繚 time_base
-                    if (outFrame->time_base.den <= 0) {
-                        outFrame->time_base = m_time_base;
-                    }
+                if (outFrame->time_base.den <= 0) {
+                    outFrame->time_base = m_time_base;
                 }
             }
 

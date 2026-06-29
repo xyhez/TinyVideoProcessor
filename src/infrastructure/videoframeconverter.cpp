@@ -11,11 +11,105 @@ extern "C" {
 
 namespace {
 constexpr AVPixelFormat kDisplayPixelFormat = AV_PIX_FMT_YUV420P;
+constexpr AVColorRange kDisplayColorRange = AVCOL_RANGE_JPEG;
+constexpr AVColorSpace kDisplayColorSpace = AVCOL_SPC_SMPTE170M;
+constexpr AVColorPrimaries kDisplayColorPrimaries = AVCOL_PRI_SMPTE170M;
+constexpr AVColorTransferCharacteristic kDisplayColorTransfer = AVCOL_TRC_BT709;
+constexpr int kDisplaySwsColorspace = SWS_CS_SMPTE170M;
+constexpr int kFullRangeFlag = 1;
+constexpr int kLimitedRangeFlag = 0;
+constexpr int kFixedPointIdentity = 1 << 16;
+
+struct SwsColorProfile {
+    AVColorRange range = AVCOL_RANGE_UNSPECIFIED;
+    AVColorSpace colorSpace = AVCOL_SPC_UNSPECIFIED;
+    int swsColorspace = SWS_CS_DEFAULT;
+    bool usedFallback = false;
+    bool usedBt2020Fallback = false;
+};
 
 QString PixelFormatName(AVPixelFormat format)
 {
     const char* name = av_get_pix_fmt_name(format);
     return name ? QString::fromUtf8(name) : QString("unknown(%1)").arg(static_cast<int>(format));
+}
+
+QString ColorRangeName(AVColorRange range)
+{
+    const char* name = av_color_range_name(range);
+    return name ? QString::fromUtf8(name) : QString("unknown(%1)").arg(static_cast<int>(range));
+}
+
+QString ColorSpaceName(AVColorSpace colorSpace)
+{
+    const char* name = av_color_space_name(colorSpace);
+    return name ? QString::fromUtf8(name) : QString("unknown(%1)").arg(static_cast<int>(colorSpace));
+}
+
+bool IsJpegRangePixelFormat(AVPixelFormat format)
+{
+    return format == AV_PIX_FMT_YUVJ420P
+        || format == AV_PIX_FMT_YUVJ422P
+        || format == AV_PIX_FMT_YUVJ444P
+        || format == AV_PIX_FMT_YUVJ440P
+        || format == AV_PIX_FMT_YUVJ411P;
+}
+
+int RangeFlag(AVColorRange range)
+{
+    return range == AVCOL_RANGE_JPEG ? kFullRangeFlag : kLimitedRangeFlag;
+}
+
+SwsColorProfile ResolveSourceColorProfile(const AVFrame* frame, AVPixelFormat sourceFormat)
+{
+    SwsColorProfile profile;
+
+    if (frame && frame->color_range == AVCOL_RANGE_JPEG) {
+        profile.range = AVCOL_RANGE_JPEG;
+    } else if (frame && frame->color_range == AVCOL_RANGE_MPEG) {
+        profile.range = AVCOL_RANGE_MPEG;
+    } else if (IsJpegRangePixelFormat(sourceFormat)) {
+        profile.range = AVCOL_RANGE_JPEG;
+        profile.usedFallback = true;
+    } else {
+        profile.range = AVCOL_RANGE_MPEG;
+        profile.usedFallback = true;
+    }
+
+    const AVColorSpace colorSpace = frame ? frame->colorspace : AVCOL_SPC_UNSPECIFIED;
+    switch (colorSpace) {
+    case AVCOL_SPC_BT709:
+        profile.colorSpace = AVCOL_SPC_BT709;
+        profile.swsColorspace = SWS_CS_ITU709;
+        break;
+    case AVCOL_SPC_FCC:
+        profile.colorSpace = AVCOL_SPC_FCC;
+        profile.swsColorspace = SWS_CS_FCC;
+        break;
+    case AVCOL_SPC_BT470BG:
+    case AVCOL_SPC_SMPTE170M:
+        profile.colorSpace = colorSpace;
+        profile.swsColorspace = SWS_CS_SMPTE170M;
+        break;
+    case AVCOL_SPC_SMPTE240M:
+        profile.colorSpace = AVCOL_SPC_SMPTE240M;
+        profile.swsColorspace = SWS_CS_SMPTE240M;
+        break;
+    case AVCOL_SPC_BT2020_NCL:
+    case AVCOL_SPC_BT2020_CL:
+        profile.colorSpace = AVCOL_SPC_BT709;
+        profile.swsColorspace = SWS_CS_ITU709;
+        profile.usedFallback = true;
+        profile.usedBt2020Fallback = true;
+        break;
+    default:
+        profile.colorSpace = frame && frame->width >= 1280 ? AVCOL_SPC_BT709 : AVCOL_SPC_SMPTE170M;
+        profile.swsColorspace = frame && frame->width >= 1280 ? SWS_CS_ITU709 : SWS_CS_SMPTE170M;
+        profile.usedFallback = true;
+        break;
+    }
+
+    return profile;
 }
 }
 
@@ -33,7 +127,7 @@ AVFramePtr VideoFrameConverter::ConvertToDisplayFrame(AVFramePtr frame)
         return {};
     }
 
-    if (IsDisplayFormat(frame.get())) {
+    if (IsDisplayFormat(frame.get()) && HasDisplayColorProfile(frame.get())) {
         return std::move(frame);
     }
 
@@ -43,6 +137,13 @@ AVFramePtr VideoFrameConverter::ConvertToDisplayFrame(AVFramePtr frame)
 bool VideoFrameConverter::IsDisplayFormat(const AVFrame* frame) const
 {
     return frame && frame->format == kDisplayPixelFormat;
+}
+
+bool VideoFrameConverter::HasDisplayColorProfile(const AVFrame* frame) const
+{
+    return frame
+        && frame->color_range == kDisplayColorRange
+        && frame->colorspace == kDisplayColorSpace;
 }
 
 bool VideoFrameConverter::IsHardwareFrameFormat(AVPixelFormat format) const
@@ -59,13 +160,29 @@ AVFramePtr VideoFrameConverter::ConvertSoftwareFrame(AVFramePtr frame)
 
     const AVPixelFormat sourceFormat = static_cast<AVPixelFormat>(frame->format);
     if (sourceFormat == AV_PIX_FMT_NONE || IsHardwareFrameFormat(sourceFormat)) {
-        LogConversionIfNeeded(sourceFormat, frame->width, frame->height, false);
+        LogConversionIfNeeded(sourceFormat,
+                              AVCOL_RANGE_UNSPECIFIED,
+                              AVCOL_SPC_UNSPECIFIED,
+                              frame->width,
+                              frame->height,
+                              false,
+                              false,
+                              false);
         return {};
     }
 
+    const SwsColorProfile sourceProfile = ResolveSourceColorProfile(frame.get(), sourceFormat);
+
     AVFramePtr convertedFrame = MakeAVFrame();
     if (!convertedFrame) {
-        LogConversionIfNeeded(sourceFormat, frame->width, frame->height, false);
+        LogConversionIfNeeded(sourceFormat,
+                              sourceProfile.range,
+                              sourceProfile.colorSpace,
+                              frame->width,
+                              frame->height,
+                              false,
+                              sourceProfile.usedFallback,
+                              sourceProfile.usedBt2020Fallback);
         return {};
     }
 
@@ -75,7 +192,14 @@ AVFramePtr VideoFrameConverter::ConvertSoftwareFrame(AVFramePtr frame)
 
     int ret = av_frame_get_buffer(convertedFrame.get(), 32);
     if (ret < 0) {
-        LogConversionIfNeeded(sourceFormat, frame->width, frame->height, false);
+        LogConversionIfNeeded(sourceFormat,
+                              sourceProfile.range,
+                              sourceProfile.colorSpace,
+                              frame->width,
+                              frame->height,
+                              false,
+                              sourceProfile.usedFallback,
+                              sourceProfile.usedBt2020Fallback);
         return {};
     }
 
@@ -83,6 +207,10 @@ AVFramePtr VideoFrameConverter::ConvertSoftwareFrame(AVFramePtr frame)
     if (convertedFrame->time_base.den <= 0) {
         convertedFrame->time_base = frame->time_base;
     }
+    convertedFrame->color_range = kDisplayColorRange;
+    convertedFrame->colorspace = kDisplayColorSpace;
+    convertedFrame->color_primaries = kDisplayColorPrimaries;
+    convertedFrame->color_trc = kDisplayColorTransfer;
 
     swsContext_ = sws_getCachedContext(swsContext_,
                                        frame->width,
@@ -96,7 +224,34 @@ AVFramePtr VideoFrameConverter::ConvertSoftwareFrame(AVFramePtr frame)
                                        nullptr,
                                        nullptr);
     if (!swsContext_) {
-        LogConversionIfNeeded(sourceFormat, frame->width, frame->height, false);
+        LogConversionIfNeeded(sourceFormat,
+                              sourceProfile.range,
+                              sourceProfile.colorSpace,
+                              frame->width,
+                              frame->height,
+                              false,
+                              sourceProfile.usedFallback,
+                              sourceProfile.usedBt2020Fallback);
+        return {};
+    }
+
+    ret = sws_setColorspaceDetails(swsContext_,
+                                   sws_getCoefficients(sourceProfile.swsColorspace),
+                                   RangeFlag(sourceProfile.range),
+                                   sws_getCoefficients(kDisplaySwsColorspace),
+                                   RangeFlag(kDisplayColorRange),
+                                   0,
+                                   kFixedPointIdentity,
+                                   kFixedPointIdentity);
+    if (ret < 0) {
+        LogConversionIfNeeded(sourceFormat,
+                              sourceProfile.range,
+                              sourceProfile.colorSpace,
+                              frame->width,
+                              frame->height,
+                              false,
+                              sourceProfile.usedFallback,
+                              sourceProfile.usedBt2020Fallback);
         return {};
     }
 
@@ -108,40 +263,76 @@ AVFramePtr VideoFrameConverter::ConvertSoftwareFrame(AVFramePtr frame)
                     convertedFrame->data,
                     convertedFrame->linesize);
     if (ret <= 0) {
-        LogConversionIfNeeded(sourceFormat, frame->width, frame->height, false);
+        LogConversionIfNeeded(sourceFormat,
+                              sourceProfile.range,
+                              sourceProfile.colorSpace,
+                              frame->width,
+                              frame->height,
+                              false,
+                              sourceProfile.usedFallback,
+                              sourceProfile.usedBt2020Fallback);
         return {};
     }
 
-    LogConversionIfNeeded(sourceFormat, frame->width, frame->height, true);
+    LogConversionIfNeeded(sourceFormat,
+                          sourceProfile.range,
+                          sourceProfile.colorSpace,
+                          frame->width,
+                          frame->height,
+                          true,
+                          sourceProfile.usedFallback,
+                          sourceProfile.usedBt2020Fallback);
     return convertedFrame;
 }
 
 void VideoFrameConverter::LogConversionIfNeeded(AVPixelFormat sourceFormat,
+                                                AVColorRange sourceRange,
+                                                AVColorSpace sourceColorSpace,
                                                 int width,
                                                 int height,
-                                                bool success)
+                                                bool success,
+                                                bool usedFallback,
+                                                bool usedBt2020Fallback)
 {
     const bool changed = !hasLoggedConversion_
         || lastLoggedSourceFormat_ != sourceFormat
+        || lastLoggedSourceRange_ != sourceRange
+        || lastLoggedSourceColorSpace_ != sourceColorSpace
         || lastLoggedWidth_ != width
         || lastLoggedHeight_ != height
-        || lastLoggedSuccess_ != success;
+        || lastLoggedSuccess_ != success
+        || lastLoggedUsedFallback_ != usedFallback
+        || lastLoggedUsedBt2020Fallback_ != usedBt2020Fallback;
     if (!changed) {
         return;
     }
 
     hasLoggedConversion_ = true;
     lastLoggedSourceFormat_ = sourceFormat;
+    lastLoggedSourceRange_ = sourceRange;
+    lastLoggedSourceColorSpace_ = sourceColorSpace;
     lastLoggedWidth_ = width;
     lastLoggedHeight_ = height;
     lastLoggedSuccess_ = success;
+    lastLoggedUsedFallback_ = usedFallback;
+    lastLoggedUsedBt2020Fallback_ = usedBt2020Fallback;
 
     if (success) {
         APP_LOG_INFO_STREAM().noquote()
             << "VideoFrameConverter format conversion:"
             << PixelFormatName(sourceFormat)
             << "->" << PixelFormatName(kDisplayPixelFormat)
+            << QString("range=%1->%2").arg(ColorRangeName(sourceRange), ColorRangeName(kDisplayColorRange))
+            << QString("colorspace=%1->%2").arg(ColorSpaceName(sourceColorSpace), ColorSpaceName(kDisplayColorSpace))
             << QString("size=%1x%2").arg(width).arg(height);
+        if (usedBt2020Fallback) {
+            APP_LOG_WARN_STREAM().noquote()
+                << "VideoFrameConverter BT.2020/HDR full restoration is not supported yet,"
+                << "fallback to SDR BT.709 input strategy.";
+        } else if (usedFallback) {
+            APP_LOG_INFO_STREAM().noquote()
+                << "VideoFrameConverter used default SDR color strategy for unspecified frame metadata.";
+        }
         return;
     }
 
@@ -149,5 +340,7 @@ void VideoFrameConverter::LogConversionIfNeeded(AVPixelFormat sourceFormat,
         << "VideoFrameConverter format conversion failed:"
         << PixelFormatName(sourceFormat)
         << "->" << PixelFormatName(kDisplayPixelFormat)
+        << QString("range=%1->%2").arg(ColorRangeName(sourceRange), ColorRangeName(kDisplayColorRange))
+        << QString("colorspace=%1->%2").arg(ColorSpaceName(sourceColorSpace), ColorSpaceName(kDisplayColorSpace))
         << QString("size=%1x%2").arg(width).arg(height);
 }
