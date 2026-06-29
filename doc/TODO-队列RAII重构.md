@@ -81,29 +81,29 @@ SyncQueue<AVFramePtr>
 
 **任务清单**：
 
-- [ ] 梳理 `AVPacket*` 的创建位置。
-- [ ] 梳理 `AVPacket*` 的入队位置。
-- [ ] 梳理 `AVPacket*` 的出队位置。
-- [ ] 梳理 `AVPacket*` 的最终释放位置。
-- [ ] 梳理 `AVFrame*` 的创建位置。
-- [ ] 梳理 `AVFrame*` 的入队位置。
-- [ ] 梳理 `AVFrame*` 的出队位置。
-- [ ] 梳理 `AVFrame*` 的最终释放位置。
-- [ ] 标记 `Clear()`、`Stop()`、`Seek()`、`Shutdown()` 中队列资源释放路径。
-- [ ] 标记当前是否存在裸指针重复释放或释放责任不明确的位置。
+- [x] 梳理 `AVPacket*` 的创建位置。
+- [x] 梳理 `AVPacket*` 的入队位置。
+- [x] 梳理 `AVPacket*` 的出队位置。
+- [x] 梳理 `AVPacket*` 的最终释放位置。
+- [x] 梳理 `AVFrame*` 的创建位置。
+- [x] 梳理 `AVFrame*` 的入队位置。
+- [x] 梳理 `AVFrame*` 的出队位置。
+- [x] 梳理 `AVFrame*` 的最终释放位置。
+- [x] 标记 `Clear()`、`Stop()`、`Seek()`、`Shutdown()` 中队列资源释放路径。
+- [x] 标记当前是否存在裸指针重复释放或释放责任不明确的位置。
 
 **验收标准**：
 
-- [ ] 能说明 packet 队列元素当前谁创建、谁释放。
-- [ ] 能说明 frame 队列元素当前谁创建、谁释放。
-- [ ] 能说明队列清空、seek、stop、shutdown 时残留资源如何释放。
-- [ ] 能判断哪些调用点适合先迁移，哪些调用点必须后迁移。
+- [x] 能说明 packet 队列元素当前谁创建、谁释放。
+- [x] 能说明 frame 队列元素当前谁创建、谁释放。
+- [x] 能说明队列清空、seek、stop、shutdown 时残留资源如何释放。
+- [x] 能判断哪些调用点适合先迁移，哪些调用点必须后迁移。
 
 **测试流程**：
 
-- [ ] 本任务为链路复盘，不运行程序。
-- [ ] 静态检查：`git diff --check -- doc\TODO-队列RAII重构.md doc\队列RAII重构_所有权链路报告.md`
-- [ ] 定向搜索：`rg -n "AVPacket\\*|AVFrame\\*|SyncQueue|av_packet_alloc|av_packet_free|av_frame_alloc|av_frame_free|Clear\\(|Pop\\(|Push\\(" src`
+- [x] 本任务为链路复盘，不运行程序。
+- [x] 静态检查：`git diff --check -- doc\TODO-队列RAII重构.md doc\队列RAII重构_所有权链路报告.md`
+- [x] 定向搜索：`rg -n "AVPacket\\*|AVFrame\\*|SyncQueue|av_packet_alloc|av_packet_free|av_frame_alloc|av_frame_free|Clear\\(|Pop\\(|Push\\(" src`
 
 **Commit message**：
 
@@ -127,26 +127,26 @@ docs: 梳理队列资源所有权链路
 
 **任务清单**：
 
-- [ ] 新增 `AVPacketDeleter`。
-- [ ] 新增 `AVFrameDeleter`。
-- [ ] 定义 `AVPacketPtr = std::unique_ptr<AVPacket, AVPacketDeleter>`。
-- [ ] 定义 `AVFramePtr = std::unique_ptr<AVFrame, AVFrameDeleter>`。
-- [ ] 提供 `MakeAVPacket()` 工具函数。
-- [ ] 提供 `MakeAVFrame()` 工具函数。
-- [ ] 提供必要的 `GetRaw()` 或 `.get()` 使用说明。
-- [ ] 明确 RAII 类型只表达单一所有权，不用于共享显示帧。
+- [x] 新增 `AVPacketDeleter`。
+- [x] 新增 `AVFrameDeleter`。
+- [x] 定义 `AVPacketPtr = std::unique_ptr<AVPacket, AVPacketDeleter>`。
+- [x] 定义 `AVFramePtr = std::unique_ptr<AVFrame, AVFrameDeleter>`。
+- [x] 提供 `MakeAVPacket()` 工具函数。
+- [x] 提供 `MakeAVFrame()` 工具函数。
+- [x] 提供必要的 `GetRaw()` 或 `.get()` 使用说明。
+- [x] 明确 RAII 类型只表达单一所有权，不用于共享显示帧。
 
 **验收标准**：
 
-- [ ] RAII 类型能表达 FFmpeg 资源释放方式。
-- [ ] RAII 类型不依赖 UI、播放管线或渲染器。
-- [ ] RAII 类型可以作为后续 `SyncQueue<T>` 元素类型。
-- [ ] 不改变现有播放行为。
+- [x] RAII 类型能表达 FFmpeg 资源释放方式。
+- [x] RAII 类型不依赖 UI、播放管线或渲染器。
+- [x] RAII 类型可以作为后续 `SyncQueue<T>` 元素类型。
+- [x] 不改变现有播放行为。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\core\ffmpeg_raii.h doc\TODO-队列RAII重构.md`
-- [ ] 定向搜索：`rg -n "AVPacketDeleter|AVFrameDeleter|AVPacketPtr|AVFramePtr|MakeAVPacket|MakeAVFrame" src\core doc\TODO-队列RAII重构.md`
+- [x] 静态检查：`git diff --check -- src\core\ffmpeg_raii.h doc\TODO-队列RAII重构.md`
+- [x] 定向搜索：`rg -n "AVPacketDeleter|AVFrameDeleter|AVPacketPtr|AVFramePtr|MakeAVPacket|MakeAVFrame" src\core doc\TODO-队列RAII重构.md`
 - [ ] 人工编译建议：确认新增头文件语法正确。
 
 **Commit message**：
