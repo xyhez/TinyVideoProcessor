@@ -7,7 +7,9 @@
 #include <QMouseEvent>
 #include <QOpenGLPixelTransferOptions>
 #include <QOpenGLTexture>
+#include <QMetaObject>
 #include <QStringList>
+#include <QThread>
 #include <QtGlobal>
 #include <utility>
 
@@ -160,7 +162,7 @@ void MultiViewRenderer::SetLayout(Layout layout) {
     }
 
     layout_ = layout;
-    update();
+    RequestRenderUpdate();
 }
 
 MultiViewRenderer::Layout MultiViewRenderer::CurrentLayout() const {
@@ -181,7 +183,7 @@ void MultiViewRenderer::SetViewSlots(const QMap<int, StreamId>& viewSlots) {
     }
 
     viewSlots_ = normalizedViewSlots;
-    update();
+    RequestRenderUpdate();
 }
 
 QMap<int, MultiViewRenderer::StreamId> MultiViewRenderer::ViewSlots() const {
@@ -194,7 +196,7 @@ void MultiViewRenderer::SetActiveStream(StreamId streamId) {
     }
 
     activeStreamId_ = streamId;
-    update();
+    RequestRenderUpdate();
 }
 
 MultiViewRenderer::StreamId MultiViewRenderer::ActiveStream() const {
@@ -254,52 +256,60 @@ void MultiViewRenderer::PresentFrame(StreamId streamId, AVFramePtr frame) {
     }
     const bool converted = displayFrame.get() != inputFrame;
 
-    QMutexLocker locker(&renderStateMutex_);
-    StreamRenderState& state = renderStates_[streamId];
-    ReleaseCurrentFrame(state);
-    AVFrame* rawFrame = displayFrame.get();
-    state.currentFrame = std::move(displayFrame);
-    state.videoWidth = rawFrame->width;
-    state.videoHeight = rawFrame->height;
-    state.sampleAspectRatio = rawFrame->sample_aspect_ratio;
-    state.pixelFormat = static_cast<AVPixelFormat>(rawFrame->format);
-    state.textureDirty = true;
-    state.hasFrame = true;
-    state.presentedFrames += 1;
-    state.lastPresentedElapsedMs = performanceTimer_.elapsed();
-    state.lastInputPixelFormat = inputPixelFormat;
-    state.lastFrameConverted = converted;
+    {
+        QMutexLocker locker(&renderStateMutex_);
+        StreamRenderState& state = renderStates_[streamId];
+        ReleaseCurrentFrame(state);
+        AVFrame* rawFrame = displayFrame.get();
+        state.currentFrame = std::move(displayFrame);
+        state.videoWidth = rawFrame->width;
+        state.videoHeight = rawFrame->height;
+        state.sampleAspectRatio = rawFrame->sample_aspect_ratio;
+        state.pixelFormat = static_cast<AVPixelFormat>(rawFrame->format);
+        state.textureDirty = true;
+        state.hasFrame = true;
+        state.presentedFrames += 1;
+        state.lastPresentedElapsedMs = performanceTimer_.elapsed();
+        state.lastInputPixelFormat = inputPixelFormat;
+        state.lastFrameConverted = converted;
+    }
 
-    update();
+    RequestRenderUpdate();
 }
 
 void MultiViewRenderer::ClearFrame(StreamId streamId) {
-    QMutexLocker locker(&renderStateMutex_);
-    auto it = renderStates_.find(streamId);
-    if (it == renderStates_.end()) {
-        return;
+    {
+        QMutexLocker locker(&renderStateMutex_);
+        auto it = renderStates_.find(streamId);
+        if (it == renderStates_.end()) {
+            return;
+        }
+
+        ReleaseCurrentFrame(it->second);
     }
 
-    ReleaseCurrentFrame(it->second);
-    update();
+    RequestRenderUpdate();
 }
 
 void MultiViewRenderer::DetachStream(StreamId streamId) {
-    QMutexLocker locker(&renderStateMutex_);
-    auto it = renderStates_.find(streamId);
-    if (it == renderStates_.end()) {
-        return;
+    {
+        QMutexLocker locker(&renderStateMutex_);
+        auto it = renderStates_.find(streamId);
+        if (it == renderStates_.end()) {
+            return;
+        }
+
+        if (context()) {
+            makeCurrent();
+        }
+        ReleaseStreamResources(it->second);
+        if (context()) {
+            doneCurrent();
+        }
+        renderStates_.erase(it);
     }
 
-    if (context()) {
-        makeCurrent();
-    }
-    ReleaseStreamResources(it->second);
-    if (context()) {
-        doneCurrent();
-    }
-    renderStates_.erase(it);
-    update();
+    RequestRenderUpdate();
 }
 
 void MultiViewRenderer::initializeGL() {
@@ -312,6 +322,11 @@ void MultiViewRenderer::initializeGL() {
 }
 
 void MultiViewRenderer::paintGL() {
+    {
+        QMutexLocker locker(&renderUpdateMutex_);
+        renderUpdatePending_ = false;
+    }
+
     paintCount_ += 1;
 
     glDisable(GL_DEPTH_TEST);
@@ -856,6 +871,30 @@ void MultiViewRenderer::LogPerformanceStatsIfNeeded() {
     lastLoggedPaintCount_ = paintCount_;
     lastLoggedTextureUploads_ = totalTextureUploads;
     lastLoggedTextureRebuilds_ = totalTextureRebuilds;
+}
+
+void MultiViewRenderer::RequestRenderUpdate() {
+    bool shouldRequestUpdate = false;
+    {
+        QMutexLocker locker(&renderUpdateMutex_);
+        if (!renderUpdatePending_) {
+            renderUpdatePending_ = true;
+            shouldRequestUpdate = true;
+        }
+    }
+
+    if (!shouldRequestUpdate) {
+        return;
+    }
+
+    if (QThread::currentThread() == thread()) {
+        update();
+        return;
+    }
+
+    QMetaObject::invokeMethod(this, [this]() {
+        update();
+    }, Qt::QueuedConnection);
 }
 
 void MultiViewRenderer::FillOpenGLRect(const QRect& rect,

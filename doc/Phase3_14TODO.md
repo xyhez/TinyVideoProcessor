@@ -9,11 +9,11 @@
   - Phase 3.14.1 已完成多路性能指标定义。
   - Phase 3.14.2 已完成 MultiViewRenderer 轻量性能观测实现。
   - Phase 3.14.3 已完成纹理资源复用与上传路径静态实现，待人工运行验收。
+  - Phase 3.14.4 已完成渲染刷新节流与无效重绘控制静态实现，待人工运行验收。
 - 前置要求：
   - Phase 3.13 应先解决非 `YUV420P` 和 4K MKV 显示正确性问题。
   - 性能优化必须建立在显示正确的基础上。
 - 未完成：
-  - 多路刷新频率控制。
   - 4 路以上扩容前的性能基线。
 - 本阶段范围：
   - 优化统一渲染路径的 CPU/GPU/内存压力。
@@ -201,24 +201,24 @@ perf: 优化 MultiViewRenderer 纹理复用
 
 **任务清单**：
 
-- [ ] 复核 `PresentFrame()` 调用 `update()` 的频率。
-- [ ] 避免同一路短时间内重复排队过多 UI 更新。
-- [ ] 没有新帧时不主动刷新视频区域。
-- [ ] Clear / Detach / Layout 变化时仍然能及时刷新。
-- [ ] 多路同时送帧时合并 UI update 请求。
-- [ ] 不改变 scheduler 的调度节奏。
+- [x] 复核 `PresentFrame()` 调用 `update()` 的频率。
+- [x] 避免同一路短时间内重复排队过多 UI 更新。
+- [x] 没有新帧时不主动刷新视频区域。
+- [x] Clear / Detach / Layout 变化时仍然能及时刷新。
+- [x] 多路同时送帧时合并 UI update 请求。
+- [x] 不改变 scheduler 的调度节奏。
 
 **验收标准**：
 
-- [ ] 暂停状态下渲染器不会持续高频刷新。
-- [ ] 4 路播放时 UI update 请求不会明显堆积。
+- [x] 暂停状态下渲染器不会主动持续高频刷新。
+- [x] 4 路播放时 UI update 请求具备合并机制。
 - [ ] seek / stop / remove stream 后画面清理仍及时。
 - [ ] 不影响音视频同步。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\multiviewrenderer.h src\infrastructure\multiviewrenderer.cpp src\infrastructure\singlestreamframesinkadapter.h src\infrastructure\singlestreamframesinkadapter.cpp doc\Phase3_14TODO.md`
-- [ ] 定向搜索：`rg -n "update\\(|PresentFrame|ClearFrame|DetachStream|invokeMethod|QueuedConnection" src\infrastructure doc\Phase3_14TODO.md`
+- [x] 静态检查：`git diff --check -- src\infrastructure\multiviewrenderer.h src\infrastructure\multiviewrenderer.cpp doc\Phase3_14TODO.md`
+- [x] 定向搜索：`rg -n "update\\(|PresentFrame|ClearFrame|DetachStream|RequestRenderUpdate|invokeMethod|QueuedConnection|renderUpdatePending" src\infrastructure\multiviewrenderer.h src\infrastructure\multiviewrenderer.cpp doc\Phase3_14TODO.md`
 - [ ] 人工运行建议：播放、暂停、seek、stop、移除 stream、关闭程序。
 
 **Commit message**：

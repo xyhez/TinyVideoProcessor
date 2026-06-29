@@ -327,6 +327,12 @@ private:
     void LogPerformanceStatsIfNeeded();
 
     /**
+     * @brief RequestRenderUpdate 合并渲染刷新请求
+     * @details 可从非 UI 线程调用；同一轮 paint 前只投递一次 update。
+     */
+    void RequestRenderUpdate();
+
+    /**
      * @brief IsLogicalSlotIndex 判断是否为合法逻辑 slot
      * @param slotIndex slot 索引
      * @return true 合法
@@ -392,6 +398,8 @@ private:
     QOpenGLShaderProgram frameShader_;	///< 视频帧绘制 shader
     VideoFrameConverter frameConverter_;	///< 可显示帧格式转换器
     QMutex renderStateMutex_;	///< 渲染状态互斥锁
+    QMutex renderUpdateMutex_;	///< 渲染刷新请求互斥锁
+    bool renderUpdatePending_ = false;	///< 是否已有待处理渲染刷新请求
     QElapsedTimer performanceTimer_;	///< 性能统计计时器
     qint64 performanceWindowStartMs_ = 0;	///< 当前性能统计窗口起始毫秒
     qint64 paintCount_ = 0;	///< paintGL 调用总次数
