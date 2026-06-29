@@ -113,6 +113,13 @@ public:
     void SetPlaybackSpeed(double speed);
 
     /**
+     * @brief SetPreviewFrameRateReductionEnabled 设置预览降帧策略
+     * @param enabled 是否启用预览降帧
+     * @param targetFps 启用后目标预览帧率
+     */
+    void SetPreviewFrameRateReductionEnabled(bool enabled, int targetFps);
+
+    /**
      * @brief SetVolume 设置音量
      * @param volume 音量值，范围 0.0-1.0
      */

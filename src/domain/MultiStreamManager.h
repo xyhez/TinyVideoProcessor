@@ -230,6 +230,23 @@ public:
     bool SetStreamPlaybackSpeed(StreamId id, double speed);
 
     /**
+     * @brief SetPreviewFrameRateReductionEnabled 设置全部流的预览降帧策略
+     * @param enabled 是否启用预览降帧
+     * @param targetFps 启用后目标预览帧率
+     */
+    void SetPreviewFrameRateReductionEnabled(bool enabled, int targetFps);
+
+    /**
+     * @brief SetStreamPreviewFrameRateReductionEnabled 设置指定流的预览降帧策略
+     * @param id 目标 StreamId
+     * @param enabled 是否启用预览降帧
+     * @param targetFps 启用后目标预览帧率
+     * @return true 操作已下发
+     * @return false id 不存在
+     */
+    bool SetStreamPreviewFrameRateReductionEnabled(StreamId id, bool enabled, int targetFps);
+
+    /**
      * @brief SetStreamVolume 设置指定逻辑流音量
      * @param id 目标 StreamId
      * @param volume 音量值，范围 0.0-1.0

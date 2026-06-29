@@ -15,6 +15,9 @@ static const int SYNC_THRESHOLD_MS = 40;
 
 namespace {
 constexpr double kSpeedEpsilon = 0.001;
+constexpr int kMinPreviewFrameRateLimitFps = 1;
+constexpr int kMaxPreviewFrameRateLimitFps = 60;
+constexpr double kPreviewFrameRateEpsilonMs = 0.5;
 
 bool IsSupportedSpeed(double speed)
 {
@@ -62,6 +65,7 @@ void VideoFrameScheduler::Start()
     }
 
     running_.store(true);
+    hasPreviewPresentedPts_ = false;
     rendered_.store(0);
     dropped_.store(0);
     QTimer::singleShot(0, this, &VideoFrameScheduler::Tick);
@@ -90,8 +94,19 @@ void VideoFrameScheduler::SetSpeed(double speed)
     speed_.store(speed);
 }
 
+void VideoFrameScheduler::SetPreviewFrameRateReductionEnabled(bool enabled, int targetFps)
+{
+    const int clampedTargetFps = qBound(kMinPreviewFrameRateLimitFps,
+                                       targetFps,
+                                       kMaxPreviewFrameRateLimitFps);
+    previewFrameRateReductionEnabled_.store(enabled);
+    previewFrameIntervalMs_.store(qMax(1, qRound(1000.0 / clampedTargetFps)));
+    hasPreviewPresentedPts_ = false;
+}
+
 void VideoFrameScheduler::ClearOutputFrame()
 {
+    hasPreviewPresentedPts_ = false;
     if (frameSink_) {
         frameSink_->ClearFrame();
     }
@@ -121,6 +136,12 @@ void VideoFrameScheduler::Tick()
     }
     if (timingDecision == FrameTimingDecision::Drop) {
         DropLateFrame();
+        ScheduleNextFrame(0);
+        return;
+    }
+
+    if (ShouldDropForPreviewFrameRateLimit(nextFrame, speedSnapshot)) {
+        DropPreviewRateLimitedFrame(syncType);
         ScheduleNextFrame(0);
         return;
     }
@@ -203,6 +224,36 @@ bool VideoFrameScheduler::DropLateFrame()
     return true;
 }
 
+bool VideoFrameScheduler::ShouldDropForPreviewFrameRateLimit(
+    const FrameTimingSnapshot& snapshot,
+    double speed) const
+{
+    if (!previewFrameRateReductionEnabled_.load()) {
+        return false;
+    }
+
+    if (!hasPreviewPresentedPts_ || snapshot.pts == AV_NOPTS_VALUE || videoTimeBase_ <= 0.0) {
+        return false;
+    }
+
+    const double videoPtsMs = snapshot.pts * videoTimeBase_ * 1000.0;
+    const double speedFactor = speed > 0.0 ? speed : 1.0;
+    const double targetIntervalMs = previewFrameIntervalMs_.load() * speedFactor;
+    return videoPtsMs - lastPreviewPresentedPtsMs_ < targetIntervalMs - kPreviewFrameRateEpsilonMs;
+}
+
+bool VideoFrameScheduler::DropPreviewRateLimitedFrame(SYNCTYPE syncType)
+{
+    AVFramePtr drop;
+    if (!PopDisplayableFrame(drop)) {
+        return false;
+    }
+
+    RefreshVideoClockIfNeeded(drop.get(), syncType);
+    dropped_.fetch_add(1);
+    return true;
+}
+
 bool VideoFrameScheduler::PopDisplayableFrame(AVFramePtr& frame)
 {
     frame.reset();
@@ -220,6 +271,16 @@ void VideoFrameScheduler::RefreshVideoClockIfNeeded(const AVFrame* frame, SYNCTY
     }
 }
 
+void VideoFrameScheduler::RememberPreviewPresentedFrame(const AVFrame* frame)
+{
+    if (!frame || frame->pts == AV_NOPTS_VALUE || videoTimeBase_ <= 0.0) {
+        return;
+    }
+
+    lastPreviewPresentedPtsMs_ = frame->pts * videoTimeBase_ * 1000.0;
+    hasPreviewPresentedPts_ = true;
+}
+
 void VideoFrameScheduler::PresentDisplayableFrame(AVFramePtr frame)
 {
     if (!frame) {
@@ -230,6 +291,7 @@ void VideoFrameScheduler::PresentDisplayableFrame(AVFramePtr frame)
         return;
     }
 
+    RememberPreviewPresentedFrame(frame.get());
     frameSink_->PresentFrame(std::move(frame));
     rendered_.fetch_add(1);
 }

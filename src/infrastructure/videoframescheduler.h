@@ -78,6 +78,13 @@ public:
     void SetSpeed(double speed);
 
     /**
+     * @brief SetPreviewFrameRateReductionEnabled 设置预览降帧策略
+     * @param enabled 是否启用预览降帧
+     * @param targetFps 启用后目标预览帧率
+     */
+    void SetPreviewFrameRateReductionEnabled(bool enabled, int targetFps);
+
+    /**
      * @brief ClearOutputFrame 清理当前输出 sink 持有的显示帧
      * @details 只清理当前显示帧，不清空队列、不 flush decoder、不重置同步时钟。
      */
@@ -148,6 +155,22 @@ private:
     bool DropLateFrame();
 
     /**
+     * @brief ShouldDropForPreviewFrameRateLimit 判断当前帧是否应因预览降帧被丢弃
+     * @param snapshot 队首帧同步判断快照
+     * @param speed 当前播放速度快照
+     * @return true 应丢弃当前帧
+     */
+    bool ShouldDropForPreviewFrameRateLimit(const FrameTimingSnapshot& snapshot,
+                                            double speed) const;
+
+    /**
+     * @brief DropPreviewRateLimitedFrame 弹出并释放被预览降帧策略跳过的帧
+     * @param syncType 当前同步类型
+     * @return true 成功丢弃一帧
+     */
+    bool DropPreviewRateLimitedFrame(SYNCTYPE syncType);
+
+    /**
      * @brief PopDisplayableFrame 弹出可显示帧并转交给调用方
      * @param frame 输出可显示帧
      * @return true 成功弹出可显示帧
@@ -161,6 +184,12 @@ private:
      * @param syncType 当前同步类型
      */
     void RefreshVideoClockIfNeeded(const AVFrame* frame, SYNCTYPE syncType);
+
+    /**
+     * @brief RememberPreviewPresentedFrame 记录最近一次真正提交到渲染器的帧时间
+     * @param frame 已提交显示的帧
+     */
+    void RememberPreviewPresentedFrame(const AVFrame* frame);
 
     /**
      * @brief PresentDisplayableFrame 将可显示帧提交给当前输出 sink
@@ -182,6 +211,10 @@ private:
     double videoTimeBase_ = 0.0;	///< 视频时间基
     int frameIntervalMs_ = 33;	///< 默认帧间隔，单位毫秒
     std::atomic<double> speed_{1.0};	///< 当前播放速度
+    std::atomic<bool> previewFrameRateReductionEnabled_{false};	///< 是否启用预览降帧
+    std::atomic<int> previewFrameIntervalMs_{67};	///< 预览降帧目标帧间隔
+    bool hasPreviewPresentedPts_ = false;	///< 是否已有预览显示时间戳
+    double lastPreviewPresentedPtsMs_ = 0.0;	///< 最近一次预览显示帧 PTS
     std::atomic<bool> running_{false};	///< 是否正在调度
     std::atomic<int> dropped_{0};	///< 丢帧计数
     std::atomic<int> rendered_{0};	///< 显示帧计数

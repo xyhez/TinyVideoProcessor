@@ -223,6 +223,13 @@ void MediaPipeline::SetPlaybackSpeed(double speed)
     }
 }
 
+void MediaPipeline::SetPreviewFrameRateReductionEnabled(bool enabled, int targetFps)
+{
+    if (videoFrameScheduler_) {
+        videoFrameScheduler_->SetPreviewFrameRateReductionEnabled(enabled, targetFps);
+    }
+}
+
 void MediaPipeline::SetVolume(double volume)
 {
     const double clampedVolume = std::clamp(volume, 0.0, 1.0);

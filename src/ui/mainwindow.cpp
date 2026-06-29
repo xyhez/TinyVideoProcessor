@@ -14,6 +14,7 @@
 #include <QFileInfo>
 #include <QListWidgetItem>
 #include <QMessageBox>
+#include <QRadioButton>
 #include <QSignalBlocker>
 #include <QStringList>
 #include <QTimer>
@@ -41,6 +42,7 @@ MainWindow::MainWindow(QWidget *parent)
     InitializePlayModeComboBox();
     InitializeVolumeControls();
     InitializePlaybackSpeedComboBox();
+    InitializePreviewFrameRateControls();
     InitializeCursorHideTimer();
     InitializeMultiViewRenderer();
     InitializeMultiViewLayout();
@@ -90,6 +92,14 @@ void MainWindow::CreateConnects() {
 
     connect(mediaPlayController_.get(), &MediaPlayController::PlaybackSpeedChanged,
             this, &MainWindow::UpdatePlaybackSpeedComboBox);
+
+    connect(mediaPlayController_.get(), &MediaPlayController::PreviewFrameRateReductionChanged,
+            this, [this](bool enabled) {
+                QSignalBlocker originalBlocker(ui->radioButton_originalPreviewFrameRate);
+                QSignalBlocker reduceBlocker(ui->radioButton_reducePreviewFrameRate);
+                ui->radioButton_originalPreviewFrameRate->setChecked(!enabled);
+                ui->radioButton_reducePreviewFrameRate->setChecked(enabled);
+            });
 
     connect(mediaPlayController_.get(), &MediaPlayController::PlaybackFinished,
             this, &MainWindow::HandlePlaybackFinished);
@@ -216,6 +226,11 @@ void MainWindow::CreateConnects() {
 
         SetMultiViewLayout(static_cast<MultiViewLayout>(layoutValue));
     });
+
+    connect(ui->radioButton_reducePreviewFrameRate, &QRadioButton::toggled,
+            this, [this](bool checked) {
+                mediaPlayController_->SetPreviewFrameRateReductionEnabled(checked);
+            });
 
     connect(ui->pushButton_fullscreen, &QPushButton::clicked,
             this, &MainWindow::ToggleFullScreen);
@@ -445,6 +460,12 @@ void MainWindow::InitializePlaybackSpeedComboBox() {
     ui->comboBox_speed->addItem("1.5x", 1.5);
     ui->comboBox_speed->addItem("2.0x", 2.0);
     UpdatePlaybackSpeedComboBox(mediaPlayController_->PlaybackSpeed());
+}
+
+void MainWindow::InitializePreviewFrameRateControls() {
+    const bool enabled = mediaPlayController_->IsPreviewFrameRateReductionEnabled();
+    ui->radioButton_originalPreviewFrameRate->setChecked(!enabled);
+    ui->radioButton_reducePreviewFrameRate->setChecked(enabled);
 }
 
 void MainWindow::InitializeCursorHideTimer() {

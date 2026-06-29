@@ -169,6 +169,11 @@ private:
     void InitializePlaybackSpeedComboBox();
 
     /**
+     * @brief InitializePreviewFrameRateControls 初始化预览降帧单选控件
+     */
+    void InitializePreviewFrameRateControls();
+
+    /**
      * @brief InitializeCursorHideTimer 初始化全屏鼠标隐藏定时器
      */
     void InitializeCursorHideTimer();

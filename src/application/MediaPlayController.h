@@ -292,6 +292,19 @@ public:
      */
     double PlaybackSpeed() const;
 
+    /**
+     * @brief SetPreviewFrameRateReductionEnabled 设置多路预览降帧策略
+     * @param enabled 是否启用预览降帧
+     */
+    void SetPreviewFrameRateReductionEnabled(bool enabled);
+
+    /**
+     * @brief IsPreviewFrameRateReductionEnabled 获取多路预览降帧状态
+     * @return true 已启用
+     * @return false 未启用
+     */
+    bool IsPreviewFrameRateReductionEnabled() const;
+
 signals:
     /**
      * @brief StateChanged 播放状态变化信号
@@ -316,6 +329,12 @@ signals:
      * @param speed 当前播放速度
      */
     void PlaybackSpeedChanged(double speed);
+
+    /**
+     * @brief PreviewFrameRateReductionChanged 预览降帧状态变化信号
+     * @param enabled 是否启用预览降帧
+     */
+    void PreviewFrameRateReductionChanged(bool enabled);
 
     /**
      * @brief PlaybackFinished 当前媒体源自然播放结束信号
@@ -406,6 +425,7 @@ private:
     double playbackSpeed_ = 1.0;	///< 当前播放速度
     double volume_ = 1.0;	///< 当前音量
     bool muted_ = false;	///< 当前静音状态
+    bool previewFrameRateReductionEnabled_ = false;	///< 是否启用多路预览降帧
 
     /**
      * @brief ConnectManagerSignals 创建 Controller 与 MultiStreamManager 的信号转发连接

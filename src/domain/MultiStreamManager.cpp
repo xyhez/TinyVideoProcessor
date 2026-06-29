@@ -359,6 +359,27 @@ bool MultiStreamManager::SetStreamPlaybackSpeed(StreamId id, double speed) {
     return true;
 }
 
+void MultiStreamManager::SetPreviewFrameRateReductionEnabled(bool enabled, int targetFps) {
+    for (auto& stream : streams_) {
+        if (stream.second.pipeline) {
+            stream.second.pipeline->SetPreviewFrameRateReductionEnabled(enabled, targetFps);
+        }
+    }
+}
+
+bool MultiStreamManager::SetStreamPreviewFrameRateReductionEnabled(
+    StreamId id,
+    bool enabled,
+    int targetFps) {
+    MediaPipeline* pipeline = FindPipeline(id);
+    if (!pipeline) {
+        return false;
+    }
+
+    pipeline->SetPreviewFrameRateReductionEnabled(enabled, targetFps);
+    return true;
+}
+
 bool MultiStreamManager::SetStreamVolume(StreamId id, double volume) {
     MediaPipeline* pipeline = FindPipeline(id);
     if (!pipeline) {

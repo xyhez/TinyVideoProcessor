@@ -15,6 +15,7 @@ constexpr double kSeekStepSeconds = 10.0;
 constexpr double kSpeedEpsilon = 0.001;
 constexpr double kVolumeStep = 0.05;
 constexpr double kVolumeEpsilon = 0.0001;
+constexpr int kPreviewFrameRateLimitFps = 15;
 
 bool IsSupportedPlaybackSpeed(double speed)
 {
@@ -137,6 +138,10 @@ MediaPlayController::StreamId MediaPlayController::AddStreamWithFrameSinkFactory
     }
 
     multiStreamManager_->SetStreamPlaybackSpeed(streamId, playbackSpeed_);
+    multiStreamManager_->SetStreamPreviewFrameRateReductionEnabled(
+        streamId,
+        previewFrameRateReductionEnabled_,
+        kPreviewFrameRateLimitFps);
 
     return streamId;
 }
@@ -384,6 +389,25 @@ double MediaPlayController::Position() const {
 
 double MediaPlayController::PlaybackSpeed() const {
     return playbackSpeed_;
+}
+
+void MediaPlayController::SetPreviewFrameRateReductionEnabled(bool enabled) {
+    if (previewFrameRateReductionEnabled_ == enabled) {
+        return;
+    }
+
+    previewFrameRateReductionEnabled_ = enabled;
+    if (multiStreamManager_) {
+        multiStreamManager_->SetPreviewFrameRateReductionEnabled(
+            previewFrameRateReductionEnabled_,
+            kPreviewFrameRateLimitFps);
+    }
+
+    emit PreviewFrameRateReductionChanged(previewFrameRateReductionEnabled_);
+}
+
+bool MediaPlayController::IsPreviewFrameRateReductionEnabled() const {
+    return previewFrameRateReductionEnabled_;
 }
 
 void MediaPlayController::SetPlaybackSpeed(double speed) {

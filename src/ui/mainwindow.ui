@@ -204,6 +204,23 @@
           <widget class="QComboBox" name="comboBox_layout"/>
          </item>
          <item>
+          <widget class="QRadioButton" name="radioButton_originalPreviewFrameRate">
+           <property name="text">
+            <string>原始帧率</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QRadioButton" name="radioButton_reducePreviewFrameRate">
+           <property name="text">
+            <string>降帧预览</string>
+           </property>
+          </widget>
+         </item>
+         <item>
           <widget class="QPushButton" name="pushButton_fullscreen">
            <property name="text">
             <string>全屏</string>

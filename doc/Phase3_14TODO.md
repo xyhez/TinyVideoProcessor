@@ -11,6 +11,7 @@
   - Phase 3.14.3 已完成纹理资源复用与上传路径静态实现，待人工运行验收。
   - Phase 3.14.4 已完成渲染刷新节流与无效重绘控制静态实现，待人工运行验收。
   - 已补充 `VideoFrameConverter` 转换日志签名去重，避免多路交替转换时刷屏。
+  - Phase 3.14.5 已完成用户可控预览降帧，并通过人工运行验收。
 - 前置要求：
   - Phase 3.13 应先解决非 `YUV420P` 和 4K MKV 显示正确性问题。
   - 性能优化必须建立在显示正确的基础上。
@@ -233,7 +234,57 @@ perf: 控制 MultiViewRenderer 无效重绘
 - 不改变 VideoFrameScheduler 的同步调度职责
 ```
 
-## 3.14.5 多路性能基线验收
+## 3.14.5 用户可控预览降帧
+
+**目标**：在不改变播放速度和同步职责的前提下，允许用户主动开启多路预览降帧，降低高帧率/高分辨率源进入渲染器的压力。
+
+**预计修改文件**：
+- `src/infrastructure/videoframescheduler.h`
+- `src/infrastructure/videoframescheduler.cpp`
+- `src/domain/MediaPipeline.h`
+- `src/domain/MediaPipeline.cpp`
+- `src/domain/MultiStreamManager.h`
+- `src/domain/MultiStreamManager.cpp`
+- `src/application/MediaPlayController.h`
+- `src/application/MediaPlayController.cpp`
+- `src/ui/mainwindow.h`
+- `src/ui/mainwindow.cpp`
+- `src/ui/mainwindow.ui`
+- `doc/Phase3_14TODO.md`
+
+**任务清单**：
+- [x] 在 `VideoFrameScheduler` 增加预览降帧判断，不让 `MultiViewRenderer` 参与取帧和同步。
+- [x] 基于帧 PTS 间隔跳过中间预览帧，避免无音频视频变慢。
+- [x] 通过 `MediaPipeline`、`MultiStreamManager`、`MediaPlayController` 逐层下发降帧设置。
+- [x] 新增流继承当前预览降帧设置。
+- [x] 在主窗口增加“原始帧率 / 降帧预览”单选控件，由用户主动选择。
+- [x] 默认保持原始帧率，不改变现有播放体验。
+
+**验收标准**：
+- [x] 默认“原始帧率”时，播放行为与修改前一致。
+- [x] 选择“降帧预览”后，高帧率视频资源占用有下降。
+- [x] 有音频流视频不出现明显音画不同步。
+- [x] 无音频流视频不变慢，播放进度按原速度推进。
+- [x] 切换布局、添加新流、Start All/Pause All/Stop All 后降帧设置仍保持一致。
+
+**测试流程**：
+- [x] 静态检查：`git diff --check -- src\infrastructure\videoframescheduler.h src\infrastructure\videoframescheduler.cpp src\domain\MediaPipeline.h src\domain\MediaPipeline.cpp src\domain\MultiStreamManager.h src\domain\MultiStreamManager.cpp src\application\MediaPlayController.h src\application\MediaPlayController.cpp src\ui\mainwindow.h src\ui\mainwindow.cpp src\ui\mainwindow.ui doc\Phase3_14TODO.md`
+- [x] 人工运行建议：用 4 路混合视频对比“原始帧率”和“降帧预览”的 `uploads`、GPU 占用和主观流畅度。
+- [x] 人工验收结果：开启降帧预览后 CPU 约降低 3%，GPU 约降低 5%，功能判定通过。
+- [x] 验收报告：`doc/Phase3_14_预览降帧验收报告.md`
+
+**Commit message**：
+```text
+perf: 增加用户可控的多路预览降帧
+
+- 在 VideoFrameScheduler 中按 PTS 间隔跳过预览帧
+- 保持同步判断和取帧职责在单路调度器内
+- 通过 Controller/Manager/Pipeline 逐层下发降帧设置
+- 在主窗口增加原始帧率和降帧预览单选项
+- 更新 Phase3.14 TODO，记录预览降帧验收流程
+```
+
+## 3.14.6 多路性能基线验收
 
 **目标**：形成 4 路播放性能基线，并给出 9/16 路扩容准入判断。
 
@@ -289,3 +340,4 @@ docs: 增加多路渲染性能优化验收报告
 - 如果 4K 转换成本过高，Phase 3.15 扩容时需要限制 4K 多路数量或引入降级策略。
 - 如果后续确实需要 PBO / 异步上传，应单独设计，不应在本阶段临时塞入 paint 路径。
 - `VideoFrameConverter` 日志只用于确认转换类型，不作为逐帧转换次数统计来源。
+- 本轮预览降帧发生在 `VideoFrameScheduler`，只能减少转换、上传和绘制压力；解码、硬件帧下载和前置转换仍会消耗资源。后续如果要继续降低 9/16 路压力，应单独设计“解码输出/硬件帧转换前降载”专题。
