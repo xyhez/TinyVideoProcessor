@@ -35,7 +35,7 @@ set(FFMPEG_LIBS
     ${FFMPEG_LIB_DIR}/avdevice.lib
 )
 
-file(GLOB_RECURSE PROJECT_SOURCES
+file(GLOB_RECURSE PROJECT_SOURCES CONFIGURE_DEPENDS
     src/*.cpp src/*.h src/*.ui doc/*.md
     Lib/TinyLogLibrary/src/*.cpp
     Lib/TinyLogLibrary/include/tiny_log/src/*.cpp

@@ -7,7 +7,9 @@
   - Phase 3.12 已完成 `Single` / `2x2` / `3x3` / `4x4` 布局与双击聚焦交互。
   - 当前 `MultiViewRenderer` 已能绘制基础 `YUV420P` 帧。
   - Phase 3.13.1 已为 `MultiViewRenderer` 补充格式签名诊断日志，并形成静态诊断报告。
+  - Phase 3.13.2 已完成渲染输入格式适配方案设计，推荐新增 `VideoFrameConverter` 收口可显示帧格式边界。
   - Phase 3.13.3 已修正硬解 transfer 后固定按 `NV12` 转换的问题，改为按实际软件帧格式转换。
+  - Phase 3.13.3 已新增 `VideoFrameConverter`，并在 `MultiViewRenderer::PresentFrame()` 前归一化可显示帧格式。
 - 未完成：
   - 真实异常样本日志尚未收集，需要人工运行非 `YUV420P` / 4K MKV 样本后补充。
   - 非 `YUV420P` 视频帧的稳定显示。
@@ -127,26 +129,26 @@ docs: 梳理渲染格式异常样本
 
 **任务清单**：
 
-- [ ] 对比三种方案：解码器输出统一格式、sink 适配格式、渲染器内部格式适配。
-- [ ] 明确第一版推荐方案：渲染前建立统一可显示帧格式边界。
-- [ ] 明确是否新增类似 `VideoFrameConverter` 的基础设施类。
-- [ ] 明确第一版目标格式是否统一转为 `YUV420P` 或 `RGB`。
-- [ ] 明确 `NV12`、`YUVJ420P`、`YUV422P`、`P010` 的处理策略。
-- [ ] 明确 `AVFrame*` 转换后的所有权归属。
-- [ ] 明确转换失败时的日志和降级行为。
-- [ ] 明确不在本阶段引入 GPU shader 多格式矩阵。
+- [x] 对比三种方案：解码器输出统一格式、sink 适配格式、渲染器内部格式适配。
+- [x] 明确第一版推荐方案：渲染前建立统一可显示帧格式边界。
+- [x] 明确是否新增类似 `VideoFrameConverter` 的基础设施类。
+- [x] 明确第一版目标格式是否统一转为 `YUV420P` 或 `RGB`。
+- [x] 明确 `NV12`、`YUVJ420P`、`YUV422P`、`P010` 的处理策略。
+- [x] 明确 `AVFrame*` 转换后的所有权归属。
+- [x] 明确转换失败时的日志和降级行为。
+- [x] 明确不在本阶段引入 GPU shader 多格式矩阵。
 
 **验收标准**：
 
-- [ ] 能说明格式转换不属于 UI。
-- [ ] 能说明为什么不把转换塞进 `VideoFrameScheduler`。
-- [ ] 能说明转换前后 `AVFrame*` 谁负责释放。
-- [ ] 能说明第一版支持格式和暂不支持格式。
+- [x] 能说明格式转换不属于 UI。
+- [x] 能说明为什么不把转换塞进 `VideoFrameScheduler`。
+- [x] 能说明转换前后 `AVFrame*` 谁负责释放。
+- [x] 能说明第一版支持格式和暂不支持格式。
 
 **测试流程**：
 
-- [ ] 本任务为方案文档，不运行程序。
-- [ ] 静态检查：`git diff --check -- doc\Phase3_13_渲染输入格式适配方案.md doc\Phase3_13TODO.md`
+- [x] 本任务为方案文档，不运行程序。
+- [x] 静态检查：`git diff --check -- doc\Phase3_13_渲染输入格式适配方案.md doc\Phase3_13TODO.md`
 
 **Commit message**：
 
@@ -175,29 +177,29 @@ docs: 设计渲染输入格式适配方案
 
 **任务清单**：
 
-- [ ] 新增或收口可显示帧格式转换入口。
+- [x] 新增或收口可显示帧格式转换入口。
 - [x] 修正硬解 transfer 后误把实际软件帧格式固定当作 `NV12` 的问题。
 - [x] 硬解转换路径使用 `AVFrame::format` 作为 `sws_getCachedContext()` 输入格式。
 - [x] 硬解转换输出帧复制原帧时间戳、SAR 和色彩元数据。
-- [ ] 支持 `YUV420P` 原样通过。
-- [ ] 支持 `YUVJ420P` 按 full range 处理或转换。
-- [ ] 支持常见非 `YUV420P` 格式转换到当前 renderer 可绘制格式。
-- [ ] 转换时正确处理 `linesize`。
-- [ ] 转换失败时释放中间资源，不泄漏。
-- [ ] 保持 `PresentFrame()` 所有权语义清晰。
-- [ ] 避免每帧重复创建昂贵上下文，必要时缓存转换上下文。
+- [x] 支持 `YUV420P` 原样通过。
+- [x] 支持 `YUVJ420P` 等格式转换到当前 renderer 可绘制格式，full range 精确显示留到 3.13.4。
+- [x] 支持常见非 `YUV420P` 格式转换到当前 renderer 可绘制格式。
+- [x] 转换时正确处理 `linesize`。
+- [x] 转换失败时释放中间资源，不泄漏。
+- [x] 保持 `PresentFrame()` 所有权语义清晰。
+- [x] 避免每帧重复创建昂贵上下文，必要时缓存转换上下文。
 
 **验收标准**：
 
 - [ ] `YUV420P` 旧视频播放不退化。
 - [ ] 非 `YUV420P` 样本不黑屏。
-- [ ] 不支持格式有明确日志，不崩溃。
-- [ ] `AVFrame*` 不重复释放、不泄漏。
+- [x] 不支持格式有明确日志，不崩溃。
+- [x] `AVFrame*` 不重复释放、不泄漏。
 
 **测试流程**：
 
-- [x] 静态检查：`git diff --check -- src\infrastructure\decoder.cpp src\infrastructure\multiviewrenderer.h src\infrastructure\multiviewrenderer.cpp doc\Phase3_13TODO.md`
-- [ ] 定向搜索：`rg -n "sws_|AV_PIX_FMT|color_range|linesize|VideoFrameConverter|PresentFrame" src\infrastructure doc\Phase3_13TODO.md`
+- [x] 静态检查：`git diff --check -- CMakeLists.txt src\infrastructure\decoder.cpp src\infrastructure\multiviewrenderer.h src\infrastructure\multiviewrenderer.cpp src\infrastructure\videoframeconverter.h src\infrastructure\videoframeconverter.cpp doc\Phase3_13TODO.md`
+- [x] 定向搜索：`rg -n "sws_|AV_PIX_FMT|color_range|linesize|VideoFrameConverter|PresentFrame" src\infrastructure doc\Phase3_13TODO.md`
 - [ ] 人工运行建议：普通 MP4、非 `YUV420P` 视频、4K MKV、无音频视频。
 
 **Commit message**：

@@ -184,11 +184,16 @@ void MultiViewRenderer::PresentFrame(StreamId streamId, AVFramePtr frame) {
         return;
     }
 
+    AVFramePtr displayFrame = frameConverter_.ConvertToDisplayFrame(std::move(frame));
+    if (!displayFrame) {
+        return;
+    }
+
     QMutexLocker locker(&renderStateMutex_);
     StreamRenderState& state = renderStates_[streamId];
     ReleaseCurrentFrame(state);
-    AVFrame* rawFrame = frame.get();
-    state.currentFrame = std::move(frame);
+    AVFrame* rawFrame = displayFrame.get();
+    state.currentFrame = std::move(displayFrame);
     state.videoWidth = rawFrame->width;
     state.videoHeight = rawFrame->height;
     state.sampleAspectRatio = rawFrame->sample_aspect_ratio;

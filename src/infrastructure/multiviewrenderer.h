@@ -13,6 +13,7 @@
 #include <map>
 
 #include "core/ffmpeg_raii.h"
+#include "infrastructure/videoframeconverter.h"
 
 extern "C" {
 #include <libavutil/frame.h>
@@ -352,6 +353,7 @@ private:
     std::map<StreamId, StreamRenderState> renderStates_;	///< 每路渲染状态
     StreamId activeStreamId_ = InvalidStreamId;	///< 当前活动显示流
     QOpenGLShaderProgram frameShader_;	///< 视频帧绘制 shader
+    VideoFrameConverter frameConverter_;	///< 可显示帧格式转换器
     QMutex renderStateMutex_;	///< 渲染状态互斥锁
     bool glInitialized_ = false;	///< OpenGL 是否已初始化
 };
