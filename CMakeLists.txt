@@ -35,6 +35,20 @@ set(FFMPEG_LIBS
     ${FFMPEG_LIB_DIR}/avdevice.lib
 )
 
+# OpenCV 随项目发布，统一放在 ${PROJECT_SOURCE_DIR}/Lib/opencv
+set(OPENCV_ROOT        "${CMAKE_CURRENT_SOURCE_DIR}/Lib/opencv")
+set(OPENCV_INCLUDE_DIR "${OPENCV_ROOT}/include")
+set(OPENCV_LIB_DIR     "${OPENCV_ROOT}/lib")
+set(OPENCV_BIN_DIR     "${OPENCV_ROOT}/bin")
+
+include_directories(${OPENCV_INCLUDE_DIR})
+link_directories(${OPENCV_LIB_DIR})
+
+set(OPENCV_LIBS
+    optimized ${OPENCV_LIB_DIR}/opencv_world4100.lib
+    debug ${OPENCV_LIB_DIR}/opencv_world4100d.lib
+)
+
 file(GLOB_RECURSE PROJECT_SOURCES CONFIGURE_DEPENDS
     src/*.cpp src/*.h src/*.ui doc/*.md
     Lib/TinyLogLibrary/src/*.cpp
@@ -72,7 +86,7 @@ target_compile_definitions(modernFFplay PRIVATE
     TINY_LOG_PROJECT_ROOT="${CMAKE_SOURCE_DIR}"
 )
 
-target_link_libraries(modernFFplay PRIVATE Qt${QT_VERSION_MAJOR}::Widgets ${FFMPEG_LIBS} Qt${QT_VERSION_MAJOR}::Multimedia Qt${QT_VERSION_MAJOR}::OpenGLWidgets)
+target_link_libraries(modernFFplay PRIVATE Qt${QT_VERSION_MAJOR}::Widgets ${FFMPEG_LIBS} ${OPENCV_LIBS} Qt${QT_VERSION_MAJOR}::Multimedia Qt${QT_VERSION_MAJOR}::OpenGLWidgets)
 
 # 构建后将 FFmpeg DLL 拷贝到可执行文件目录，免去手动复制
 if(WIN32)
@@ -82,6 +96,15 @@ if(WIN32)
                 ${FFMPEG_DLLS}
                 $<TARGET_FILE_DIR:modernFFplay>
         COMMENT "Copying FFmpeg DLLs to output directory"
+    )
+
+    # 构建后将 OpenCV DLL 拷贝到可执行文件目录
+    file(GLOB OPENCV_DLLS "${OPENCV_BIN_DIR}/*.dll")
+    add_custom_command(TARGET modernFFplay POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${OPENCV_DLLS}
+                $<TARGET_FILE_DIR:modernFFplay>
+        COMMENT "Copying OpenCV DLLs to output directory"
     )
 endif()
 
