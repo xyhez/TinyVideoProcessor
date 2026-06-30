@@ -12,6 +12,9 @@
   - Phase 4.4 已完成 RTSP 混合多路预览静态链路审查，等待摄像头和多路 RTSP 人工补验。
   - Phase 4.5 已完成网络异常与关闭链路静态审查，确认关闭阻塞风险来自缺少 FFmpeg 中断回调。
   - Phase 4.5 已接入 `IMediaSource` 可选中断能力和 `NetworkMediaSource` FFmpeg 中断回调。
+  - Phase 4.5 已完成错误 URL、断流移除、服务端恢复后重连和关闭窗口验收。
+  - Phase 4.6 已完成 RTMP / HTTP-FLV / MJPEG 扩展评估，结论为当前阶段只正式支持 RTSP。
+  - Phase 4.7 已完成网络流支持验收报告，Phase 4 可以收口。
 - 未完成：
   - RTSP 与摄像头混合预览尚未完成真实设备验收。
   - 多路 RTSP 尚未完成真实多 URL 验收。
@@ -266,11 +269,11 @@ feat: 支持 RTSP 与本地源混合多路预览
 
 - [x] 完成网络异常、超时和关闭链路静态审查。
 - [x] 打开失败通过 `LastError()` 返回。
-- [ ] 认证失败、URL 错误、连接超时有明确日志。
+- [x] 认证失败、URL 错误、连接超时有明确日志。
 - [x] 运行中断流通过 `DemuxErrorOccurred()` 上报。
 - [x] Stop / Remove / Shutdown 不等待无限网络读取。
 - [x] 网络流异常后可以移除 stream。
-- [ ] 网络流异常后可以重新添加。
+- [x] 网络流异常后可以重新添加。
 - [x] 为 `NetworkMediaSource` 增加 FFmpeg `interrupt_callback`。
 - [x] 通过 `IMediaSource` 抽象暴露可选中断能力，避免在 demuxer 中硬编码 RTSP。
 - [x] `MediaPipeline` 在释放资源前主动请求媒体源中断。
@@ -278,7 +281,7 @@ feat: 支持 RTSP 与本地源混合多路预览
 
 **验收标准**：
 
-- [ ] 错误 URL 不导致程序崩溃。
+- [x] 错误 URL 不导致程序崩溃。
 - [x] 断流不导致程序崩溃。
 - [x] 关闭程序不阻塞。
 - [x] 异常后资源可释放。
@@ -287,10 +290,10 @@ feat: 支持 RTSP 与本地源混合多路预览
 
 - [x] 静态检查：`git diff --check -- src\domain\IMediaSource.h src\domain\NetworkMediaSource.h src\domain\NetworkMediaSource.cpp src\domain\MediaPipeline.cpp src\infrastructure\demuxer.cpp doc\Phase4_5_网络异常与关闭链路审查报告.md doc\Phase4TODO.md`
 - [x] 定向搜索：`rg -n "RequestInterrupt|ClearInterrupt|interrupt_callback|InterruptCallback|av_read_frame|rw_timeout|DemuxErrorOccurred|ReleaseResources|thread->wait" src doc\Phase4_5_网络异常与关闭链路审查报告.md doc\Phase4TODO.md`
-- [ ] 人工运行建议：错误 URL。
+- [x] 人工运行建议：错误 URL。
 - [x] 人工运行建议：播放中关闭本地 RTSP 服务。
 - [x] 人工运行建议：断流后 remove。
-- [ ] 人工运行建议：恢复 MediaMTX 和 FFmpeg 推流后重新添加。
+- [x] 人工运行建议：恢复 MediaMTX 和 FFmpeg 推流后重新添加。
 - [x] 人工运行建议：播放中直接关闭窗口。
 
 **人工验收记录**：
@@ -298,7 +301,7 @@ feat: 支持 RTSP 与本地源混合多路预览
 - [x] RTSP 播放中关闭 MediaMTX 后，程序未崩溃，画面停留在最后一帧。
 - [x] 断流后点击 Remove 成功。
 - [x] 播放中直接关闭窗口，资源释放日志完整输出，程序正常退出。
-- [ ] 断流后重新 Add RTSP：若 MediaMTX / FFmpeg 推流未恢复，打开失败属于预期；需在服务端恢复后补验。
+- [x] 断流后重新 Add RTSP：服务端恢复后重新添加通过。
 
 **Commit message**：
 
@@ -322,22 +325,31 @@ fix: 完善 RTSP 网络流异常和关闭链路
 
 **任务清单**：
 
-- [ ] 评估 RTMP 是否进入正式支持。
-- [ ] 评估 HTTP-FLV 是否进入正式支持。
-- [ ] 评估 MJPEG 是否适合作为摄像头兼容路径。
-- [ ] 明确是否需要本地 MediaMTX / SRS 回归脚本。
-- [ ] 明确是否需要协议选择 UI。
+- [x] 评估 RTMP 是否进入正式支持。
+- [x] 评估 HTTP-FLV 是否进入正式支持。
+- [x] 评估 MJPEG 是否适合作为摄像头兼容路径。
+- [x] 明确是否需要本地 MediaMTX / SRS 回归脚本。
+- [x] 明确是否需要协议选择 UI。
 
 **验收标准**：
 
-- [ ] 能决定 RTMP 是否继续做。
-- [ ] 能决定 HTTP-FLV 是否继续做。
-- [ ] 不把未实现协议写入 README 正式能力。
+- [x] 能决定 RTMP 是否继续做。
+- [x] 能决定 HTTP-FLV 是否继续做。
+- [x] 不把未实现协议写入 README 正式能力。
 
 **测试流程**：
 
-- [ ] 本任务可以先只写评估报告，不运行程序。
-- [ ] 静态检查：`git diff --check -- doc\Phase4_RTMP_HTTP扩展评估报告.md doc\Phase4TODO.md`
+- [x] 本任务可以先只写评估报告，不运行程序。
+- [x] 静态检查：`git diff --check -- doc\Phase4_RTMP_HTTP扩展评估报告.md doc\Phase4TODO.md`
+- [x] 定向搜索：`rg -n "RTMP|HTTP-FLV|MJPEG|RTSP|MediaMTX|SRS|README|NetworkMediaSource|NetworkStreamProtocol" doc\Phase4_RTMP_HTTP扩展评估报告.md doc\Phase4TODO.md`
+
+**评估结论**：
+
+- [x] RTMP 暂不进入当前 Phase 4 正式实现，保留后续扩展。
+- [x] HTTP-FLV 暂不进入当前 Phase 4 正式实现，等待明确直播源需求。
+- [x] MJPEG 暂不进入当前 Phase 4 正式实现，等待真实设备兼容需求。
+- [x] 当前 UI 保持 `Add RTSP`，不增加多协议选择入口。
+- [x] README 当前只应承诺 RTSP 网络流能力。
 
 **Commit message**：
 
@@ -361,24 +373,27 @@ docs: 评估 RTMP 和 HTTP 网络流扩展
 
 **任务清单**：
 
-- [ ] 记录 RTSP 单路播放结果。
-- [ ] 记录 RTSP 多路混合结果。
-- [ ] 记录异常和关闭链路结果。
-- [ ] 记录 RTMP / HTTP 是否进入正式支持。
-- [ ] 记录后续真实网口摄像头验证建议。
-- [ ] 记录简历可展示表述。
+- [x] 记录 RTSP 单路播放结果。
+- [x] 记录 RTSP 多路混合结果。
+- [x] 记录异常和关闭链路结果。
+- [x] 记录 RTMP / HTTP 是否进入正式支持。
+- [x] 记录后续真实网口摄像头验证建议。
+- [x] 记录简历可展示表述。
 
 **验收标准**：
 
-- [ ] 能说明当前正式支持哪些网络协议。
-- [ ] 能说明 RTSP 与文件、摄像头混合预览是否稳定。
-- [ ] 能说明网络异常处理边界。
-- [ ] 能说明工业相机和 RTSP 摄像头的边界。
+- [x] 能说明当前正式支持哪些网络协议。
+- [x] 能说明 RTSP 与文件、摄像头混合预览是否稳定。
+- [x] 能说明网络异常处理边界。
+- [x] 能说明工业相机和 RTSP 摄像头的边界。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- doc\Phase4_网络流支持验收报告.md doc\Phase4TODO.md`
-- [ ] 人工运行建议：公网 RTSP、本地 MediaMTX RTSP、文件 + RTSP 混合预览。
+- [x] 静态检查：`git diff --check -- doc\Phase4_网络流支持验收报告.md doc\Phase4TODO.md`
+- [x] 定向搜索：`rg -n "RTSP|RTMP|HTTP-FLV|MJPEG|NetworkMediaSource|IMediaSource|MediaPipeline|MultiViewRenderer|interrupt_callback|IndustrialCameraMediaSource|README|简历" doc\Phase4_网络流支持验收报告.md doc\Phase4TODO.md`
+- [x] 人工运行建议：本地 MediaMTX RTSP、文件 + RTSP 混合预览。
+- [ ] 后续补验：真实摄像头 + RTSP 混合预览。
+- [ ] 后续补验：多路不同 RTSP URL。
 
 **Commit message**：
 
