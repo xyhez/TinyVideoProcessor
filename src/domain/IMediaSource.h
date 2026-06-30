@@ -11,7 +11,7 @@ extern "C" {
 enum class MediaSourceType {
     File,
     Camera,
-    NetWork
+    Network
 };
 
 struct Fileinfo {
