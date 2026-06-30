@@ -6,6 +6,8 @@
 #include "IMediaSource.h"
 #include "NetworkTypes.h"
 
+#include <atomic>
+
 /**
  * @brief NetworkMediaSource 网络流媒体源实现
  *
@@ -99,6 +101,16 @@ public:
     bool AllowsDuplicateOpen() const override;
 
     /**
+     * @brief RequestInterrupt 请求中断当前网络阻塞读
+     */
+    void RequestInterrupt() override;
+
+    /**
+     * @brief ClearInterrupt 清除网络阻塞读中断请求
+     */
+    void ClearInterrupt() override;
+
+    /**
      * @brief IsSeekable 网络实时流默认不支持 seek
      * @return false
      */
@@ -136,10 +148,18 @@ private:
      */
     void ConfigureOpenOptions(AVDictionary** dictionary) const;
 
+    /**
+     * @brief InterruptCallback FFmpeg 阻塞操作中断回调
+     * @param opaque NetworkMediaSource 实例指针
+     * @return 1 请求中断，0 继续等待
+     */
+    static int InterruptCallback(void* opaque);
+
     AVFormatContext* formatContext_ = nullptr;	///< FFmpeg 格式上下文
     Fileinfo sourceInfo_;	///< 网络媒体源信息
     NetworkOpenOptions options_;	///< 网络流打开参数
     QString lastError_;	///< 最近一次错误信息
+    std::atomic<bool> interruptRequested_ = false;	///< 是否请求中断 FFmpeg 阻塞操作
 };
 
 #endif // TINYVIDEOPROCESSOR_NETWORKMEDIASOURCE_H

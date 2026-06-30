@@ -130,6 +130,24 @@ public:
     }
 
     /**
+     * @brief RequestInterrupt 请求中断媒体源当前阻塞操作
+     *
+     * 默认空实现。网络流可以用它打断 FFmpeg 阻塞读，文件源和普通设备源可不处理。
+     */
+    virtual void RequestInterrupt()
+    {
+    }
+
+    /**
+     * @brief ClearInterrupt 清除媒体源中断请求
+     *
+     * 默认空实现。用于重新打开或恢复实时源读取前清理中断状态。
+     */
+    virtual void ClearInterrupt()
+    {
+    }
+
+    /**
      * @brief IsSeekable 媒体源是否支持 seek
      * @return true 支持 seek，false 不支持
      *

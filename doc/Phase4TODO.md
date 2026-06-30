@@ -8,9 +8,13 @@
   - Phase 3.16 量化验收已作为项目完结阶段参考 TODO 暂缓。
   - Phase 4.1 已完成网络流输入预研和任务拆分。
   - Phase 4.2 已完成 `NetworkMediaSource` 空壳与参数模型，新增网络流实时源语义。
-  - Phase 4.3 已完成 RTSP 单路 MVP 代码接入，等待人工播放验收。
+  - Phase 4.3 已完成 RTSP 单路 MVP 代码接入和本地 MediaMTX 人工播放验收。
+  - Phase 4.4 已完成 RTSP 混合多路预览静态链路审查，等待摄像头和多路 RTSP 人工补验。
+  - Phase 4.5 已完成网络异常与关闭链路静态审查，确认关闭阻塞风险来自缺少 FFmpeg 中断回调。
+  - Phase 4.5 已接入 `IMediaSource` 可选中断能力和 `NetworkMediaSource` FFmpeg 中断回调。
 - 未完成：
-  - RTSP MVP 尚未完成运行验收。
+  - RTSP 与摄像头混合预览尚未完成真实设备验收。
+  - 多路 RTSP 尚未完成真实多 URL 验收。
   - RTMP / HTTP-FLV / MJPEG 尚未实现。
 - 本阶段范围：
   - 优先接入 RTSP 网络流。
@@ -172,17 +176,17 @@ feat: 新增网络流媒体源基础模型
 
 **验收标准**：
 
-- [ ] 单路 RTSP 可以打开。
-- [ ] 单路 RTSP 可以显示画面。
-- [ ] Stop / Remove / Close 不阻塞。
-- [ ] 文件播放不回归。
+- [x] 单路 RTSP 可以打开。
+- [x] 单路 RTSP 可以显示画面。
+- [x] Stop / Remove / Close 不阻塞。
+- [x] 文件播放不回归。
 - [ ] 摄像头播放不回归。
 
 **测试流程**：
 
 - [x] 静态检查：`git diff --check -- src\application\MediaPlayController.h src\application\MediaPlayController.cpp src\ui\mainwindow.h src\ui\mainwindow.cpp src\ui\mainwindow.ui doc\Phase4TODO.md`
 - [x] 定向搜索：`rg -n "AddNetwork|NetworkMediaSource|rtsp|NetworkOpenOptions|IsRealtime|LIVE" src doc\Phase4TODO.md`
-- [ ] 人工运行建议：使用公网 RTSP 冒烟流或本地 MediaMTX RTSP 流。
+- [x] 人工运行建议：使用公网 RTSP 冒烟流或本地 MediaMTX RTSP 流。
 
 **Commit message**：
 
@@ -208,26 +212,29 @@ feat: 支持单路 RTSP 网络流播放
 
 **任务清单**：
 
-- [ ] 验证文件 + RTSP 混合添加。
+- [x] 验证文件 + RTSP 混合添加。
 - [ ] 验证摄像头 + RTSP 混合添加。
 - [ ] 验证多路 RTSP 添加。
-- [ ] 验证 active stream 切换。
-- [ ] 验证 active audio stream 仍然最多一路输出。
+- [x] 验证 active stream 切换。
+- [x] 验证 active audio stream 仍然最多一路输出。
 - [ ] 验证 2x2 下 4 路混合预览。
 - [ ] 验证 3x3 下 RTSP 与文件混合显示。
+- [x] 完成静态链路审查：文件、摄像头、RTSP 均复用 `AddStreamWithFrameSinkFactory()`、`BindStreamToVideoSlot()` 和 `MultiViewRenderer`。
 
 **验收标准**：
 
-- [ ] 混合源不破坏 stream-slot 映射。
-- [ ] RTSP 不破坏文件 seek 能力。
-- [ ] 文件源不被实时源语义误伤。
-- [ ] 多路关闭不阻塞。
+- [x] 混合源不破坏 stream-slot 映射。
+- [x] RTSP 不破坏文件 seek 能力。
+- [x] 文件源不被实时源语义误伤。
+- [x] 多路关闭不阻塞。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- <本任务修改文件>`
+- [x] 静态检查：`git diff --check -- doc\Phase4TODO.md`
+- [x] 定向搜索：`rg -n "AddStreamWithFrameSinkFactory|AddNetworkStream|AddMultiStreamFiles|AddCameraStream|BindStreamToVideoSlot|SetActiveAudioStream|IsActiveStreamRealtime" src\ui\mainwindow.cpp src\application\MediaPlayController.cpp src\domain\MultiStreamManager.cpp doc\Phase4TODO.md`
 - [ ] 人工运行建议：1 路文件 + 1 路摄像头 + 1 路 RTSP。
 - [ ] 人工运行建议：4 路混合源 start / pause / stop / remove / close。
+- [ ] 人工运行建议：多路 RTSP 使用不同 URL；相同 URL 当前会按 `AllowsDuplicateOpen=false` 拒绝重复添加。
 
 **Commit message**：
 
@@ -246,6 +253,7 @@ feat: 支持 RTSP 与本地源混合多路预览
 
 **预计修改文件**：
 
+- `doc/Phase4_5_网络异常与关闭链路审查报告.md`
 - `src/domain/NetworkMediaSource.h`
 - `src/domain/NetworkMediaSource.cpp`
 - `src/infrastructure/demuxer.cpp`
@@ -256,26 +264,41 @@ feat: 支持 RTSP 与本地源混合多路预览
 
 **任务清单**：
 
-- [ ] 打开失败通过 `LastError()` 返回。
+- [x] 完成网络异常、超时和关闭链路静态审查。
+- [x] 打开失败通过 `LastError()` 返回。
 - [ ] 认证失败、URL 错误、连接超时有明确日志。
-- [ ] 运行中断流通过 `DemuxErrorOccurred()` 上报。
-- [ ] Stop / Remove / Shutdown 不等待无限网络读取。
-- [ ] 网络流异常后可以移除 stream。
+- [x] 运行中断流通过 `DemuxErrorOccurred()` 上报。
+- [x] Stop / Remove / Shutdown 不等待无限网络读取。
+- [x] 网络流异常后可以移除 stream。
 - [ ] 网络流异常后可以重新添加。
+- [x] 为 `NetworkMediaSource` 增加 FFmpeg `interrupt_callback`。
+- [x] 通过 `IMediaSource` 抽象暴露可选中断能力，避免在 demuxer 中硬编码 RTSP。
+- [x] `MediaPipeline` 在释放资源前主动请求媒体源中断。
+- [x] `demuxer` 在 `av_read_frame()` 被中断返回后优先响应 stop / suspend。
 
 **验收标准**：
 
 - [ ] 错误 URL 不导致程序崩溃。
-- [ ] 断流不导致程序崩溃。
-- [ ] 关闭程序不阻塞。
-- [ ] 异常后资源可释放。
+- [x] 断流不导致程序崩溃。
+- [x] 关闭程序不阻塞。
+- [x] 异常后资源可释放。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- <本任务修改文件>`
+- [x] 静态检查：`git diff --check -- src\domain\IMediaSource.h src\domain\NetworkMediaSource.h src\domain\NetworkMediaSource.cpp src\domain\MediaPipeline.cpp src\infrastructure\demuxer.cpp doc\Phase4_5_网络异常与关闭链路审查报告.md doc\Phase4TODO.md`
+- [x] 定向搜索：`rg -n "RequestInterrupt|ClearInterrupt|interrupt_callback|InterruptCallback|av_read_frame|rw_timeout|DemuxErrorOccurred|ReleaseResources|thread->wait" src doc\Phase4_5_网络异常与关闭链路审查报告.md doc\Phase4TODO.md`
 - [ ] 人工运行建议：错误 URL。
-- [ ] 人工运行建议：播放中关闭本地 RTSP 服务。
-- [ ] 人工运行建议：断流后 remove，再重新添加。
+- [x] 人工运行建议：播放中关闭本地 RTSP 服务。
+- [x] 人工运行建议：断流后 remove。
+- [ ] 人工运行建议：恢复 MediaMTX 和 FFmpeg 推流后重新添加。
+- [x] 人工运行建议：播放中直接关闭窗口。
+
+**人工验收记录**：
+
+- [x] RTSP 播放中关闭 MediaMTX 后，程序未崩溃，画面停留在最后一帧。
+- [x] 断流后点击 Remove 成功。
+- [x] 播放中直接关闭窗口，资源释放日志完整输出，程序正常退出。
+- [ ] 断流后重新 Add RTSP：若 MediaMTX / FFmpeg 推流未恢复，打开失败属于预期；需在服务端恢复后补验。
 
 **Commit message**：
 

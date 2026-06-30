@@ -172,6 +172,17 @@ int demuxer::StartDemuxer()
         }
 
         if (ret < 0) {
+            {
+                QMutexLocker locker(&mutex);
+                if (stop_flag) {
+                    break;
+                }
+            }
+
+            if (IsSuspendRequested()) {
+                continue;
+            }
+
             if (ret == AVERROR_EOF) {
                 APP_LOG_DEBUG("Demuxing finished (EOF)");
                 reachedEof = true;

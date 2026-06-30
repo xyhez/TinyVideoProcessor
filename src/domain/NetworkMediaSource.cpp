@@ -58,6 +58,7 @@ bool NetworkMediaSource::Open()
     if (formatContext_) {
         Close();
     }
+    ClearInterrupt();
 
     options_.url = options_.url.trimmed();
     sourceInfo_.filepath_ = options_.url;
@@ -74,6 +75,15 @@ bool NetworkMediaSource::Open()
 
     AVDictionary* openOptions = nullptr;
     ConfigureOpenOptions(&openOptions);
+
+    formatContext_ = avformat_alloc_context();
+    if (!formatContext_) {
+        av_dict_free(&openOptions);
+        SetLastError("创建网络流上下文失败");
+        return false;
+    }
+    formatContext_->interrupt_callback.callback = &NetworkMediaSource::InterruptCallback;
+    formatContext_->interrupt_callback.opaque = this;
 
     APP_LOG_DEBUG("NetworkMediaSource::Open() - open url:", options_.url);
     const int openRet = avformat_open_input(&formatContext_,
@@ -141,6 +151,7 @@ bool NetworkMediaSource::Open()
 
 bool NetworkMediaSource::Close()
 {
+    RequestInterrupt();
     if (formatContext_) {
         APP_LOG_DEBUG("NetworkMediaSource::Close() - close network stream");
         avformat_close_input(&formatContext_);
@@ -191,6 +202,16 @@ QString NetworkMediaSource::SourceIdentity() const
 bool NetworkMediaSource::AllowsDuplicateOpen() const
 {
     return false;
+}
+
+void NetworkMediaSource::RequestInterrupt()
+{
+    interruptRequested_.store(true);
+}
+
+void NetworkMediaSource::ClearInterrupt()
+{
+    interruptRequested_.store(false);
 }
 
 bool NetworkMediaSource::IsSeekable() const
@@ -250,4 +271,14 @@ void NetworkMediaSource::ConfigureOpenOptions(AVDictionary** dictionary) const
         av_dict_set(dictionary, "fflags", "nobuffer", 0);
         av_dict_set(dictionary, "flags", "low_delay", 0);
     }
+}
+
+int NetworkMediaSource::InterruptCallback(void* opaque)
+{
+    auto* source = static_cast<NetworkMediaSource*>(opaque);
+    if (!source) {
+        return 0;
+    }
+
+    return source->interruptRequested_.load() ? 1 : 0;
 }

@@ -126,10 +126,22 @@ void MediaPipeline::Stop()
         return;
     }
 
+    const bool realtimeSource = mediaSource_ && mediaSource_->IsRealtime();
+    if (realtimeSource) {
+        mediaSource_->RequestInterrupt();
+    }
+
     if (!SuspendPipelineAndWait()) {
+        if (realtimeSource) {
+            mediaSource_->ClearInterrupt();
+        }
         APP_LOG_WARN("MediaPipeline stop failed: playback pipeline suspend failed");
         emit ErrorOccurred("Playback pipeline suspend failed");
         return;
+    }
+
+    if (realtimeSource) {
+        mediaSource_->ClearInterrupt();
     }
 
     emit PositionChanged(0.0);
@@ -395,6 +407,11 @@ void MediaPipeline::ReleaseResources()
     if (positionTimer_) {
         APP_LOG_DEBUG("MediaPipeline release: stop position timer");
         positionTimer_->stop();
+    }
+
+    if (mediaSource_) {
+        APP_LOG_DEBUG("MediaPipeline release: request media source interrupt");
+        mediaSource_->RequestInterrupt();
     }
 
     APP_LOG_DEBUG("MediaPipeline release: request queues stop");
