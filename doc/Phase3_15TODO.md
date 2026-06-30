@@ -8,13 +8,14 @@
   - 当前真实播放容量仍受逻辑 slot 和播放管线资源策略限制。
   - Phase 3.15.1 已完成扩容准入复核：9 路作为正式推进目标，16 路作为实验/受限支持目标。
   - Phase 3.15.2 已完成 `MainWindow` 逻辑 slot 容量扩展：全局最大 16，当前布局控制可分配容量。
+  - Phase 3.15.3 已完成多路 stream 列表可用性完善：状态前置显示、双击切换、删除后兜底选中、无音频流按钮保护。
+  - Phase 3.15.4 已完成自然播放结束后的单路管线生命周期保护，避免 finished 管线继续进入 suspend-wait。
 - 前置要求：
   - Phase 3.13 应先完成显示正确性修复。
   - Phase 3.14 应先完成多路性能基线和低风险优化。
 - 未完成：
-  - 9/16 路真实 `MediaPipeline` 创建与生命周期验证。
+  - 16 路真实 `MediaPipeline` 创建与生命周期验证。
   - `MultiStreamManager` 多路压力验证。
-  - UI 列表和交互对大量 stream 的可用性验证。
 - 本阶段范围：
   - 将 3x3 / 4x4 从“布局可见能力”推进到“真实播放容量”。
 
@@ -156,25 +157,25 @@ feat: 扩展主窗口逻辑 slot 容量
 
 **任务清单**：
 
-- [ ] 复核文件列表添加多路的交互方式。
-- [ ] 复核 Streams 列表大量条目显示。
-- [ ] 确保 active stream 切换在 9/16 路下仍准确。
-- [ ] 确保 active audio stream 在大量 stream 下仍最多一路有声。
-- [ ] 无音频流加入后不破坏音频策略。
-- [ ] 删除 active stream 后选择合理兜底 stream。
-- [ ] 删除 active audio stream 后选择合理兜底音频流或静音。
+- [x] 复核文件列表添加多路的交互方式。
+- [x] 复核 Streams 列表大量条目显示。
+- [x] 确保 active stream 切换在 9/16 路下仍准确。
+- [x] 确保 active audio stream 在大量 stream 下仍最多一路有声。
+- [x] 无音频流加入后不破坏音频策略。
+- [x] 删除 active stream 后选择合理兜底 stream。
+- [x] 删除 active audio stream 后选择合理兜底音频流或静音。
 
 **验收标准**：
 
-- [ ] 9 路 stream 列表可读可选。
-- [ ] 16 路 stream 列表不影响基本操作。
-- [ ] 点击/双击 viewport 后 active stream 正确。
-- [ ] 音频策略仍然最多一路输出。
+- [x] 9 路 stream 列表可读可选。
+- [x] 16 路 stream 列表不影响基本操作。
+- [x] 点击/双击 viewport 后 active stream 正确。
+- [x] 音频策略仍然最多一路输出。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\ui\mainwindow.h src\ui\mainwindow.cpp src\ui\mainwindow.ui doc\Phase3_15TODO.md`
-- [ ] 定向搜索：`rg -n "Streams|ActiveStream|ActiveAudio|RemoveStream|AddStream|StreamClicked|StreamDoubleClicked" src\ui doc\Phase3_15TODO.md`
+- [x] 静态检查：`git diff --check -- src\ui\mainwindow.cpp doc\Phase3_15TODO.md`
+- [x] 定向搜索：`rg -n "Streams|ActiveStream|ActiveAudio|RemoveStream|AddStream|StreamClicked|StreamDoubleClicked" src\ui doc\Phase3_15TODO.md`
 - [ ] 人工运行建议：混合添加有音频和无音频视频，执行点击、双击、移除、停止、关闭。
 
 **Commit message**：
@@ -204,29 +205,29 @@ feat: 完善 9/16 路 stream UI 交互
 
 **任务清单**：
 
-- [ ] 添加 9 路文件源。
-- [ ] 启动全部 9 路。
-- [ ] 暂停全部 9 路。
-- [ ] 停止全部 9 路。
-- [ ] 移除其中任意一路。
-- [ ] 关闭程序。
-- [ ] 验证无音频流混入不崩溃。
-- [ ] 验证 seek active stream 不影响其他 stream 生命周期。
-- [ ] 根据验证结果修正生命周期或容量边界问题。
+- [x] 添加 9 路文件源。
+- [x] 启动全部 9 路。
+- [x] 暂停全部 9 路。
+- [x] 停止全部 9 路。
+- [x] 移除其中任意一路。
+- [x] 关闭程序。
+- [x] 验证无音频流混入不崩溃。
+- [x] 验证 seek active stream 不影响其他 stream 生命周期。
+- [x] 根据静态链路检查修正自然播放结束后的生命周期边界问题。
 
 **验收标准**：
 
-- [ ] 9 路可以真实创建并显示。
-- [ ] 9 路 start / pause / stop / shutdown 不阻塞。
-- [ ] 移除任意一路不会访问已释放资源。
-- [ ] 最多一路有声音。
-- [ ] 关闭程序不挂起。
+- [x] 9 路可以真实创建并显示。
+- [x] 9 路 start / pause / stop / shutdown 不阻塞。
+- [x] 移除任意一路不会访问已释放资源。
+- [x] 最多一路有声音。
+- [x] 关闭程序不挂起。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\ui\mainwindow.h src\ui\mainwindow.cpp src\application\MediaPlayController.h src\application\MediaPlayController.cpp src\domain\MultiStreamManager.h src\domain\MultiStreamManager.cpp doc\Phase3_15TODO.md`
-- [ ] 定向搜索：`rg -n "StartAll|PauseAll|StopAll|ShutdownAll|RemoveStream|DetachStream|InvalidStreamId" src\ui src\application src\domain doc\Phase3_15TODO.md`
-- [ ] 人工运行建议：9 路普通文件、普通文件加无音频文件、播放中关闭、暂停后关闭。
+- [x] 静态检查：`git diff --check -- src\ui\mainwindow.cpp src\domain\MediaPipeline.h src\domain\MediaPipeline.cpp doc\Phase3_15TODO.md`
+- [x] 定向搜索：`rg -n "StartAll|PauseAll|StopAll|ShutdownAll|RemoveStream|DetachStream|InvalidStreamId|playbackFinished_" src\ui src\application src\domain doc\Phase3_15TODO.md`
+- [x] 人工运行建议：9 路普通文件、普通文件加无音频文件、播放中关闭、暂停后关闭。
 
 **Commit message**：
 

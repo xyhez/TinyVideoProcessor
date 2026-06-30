@@ -29,6 +29,7 @@ MainWindow::MainWindow(QWidget *parent)
     this->setWindowTitle("modernFFplay-V2.0");
     ui->listWidget_files->setSelectionMode(QAbstractItemView::SingleSelection);
     ui->listWidget_streams->setSelectionMode(QAbstractItemView::SingleSelection);
+    ui->listWidget_streams->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     setMouseTracking(true);
     ui->centralwidget->setMouseTracking(true);
     ui->widget_func->setMouseTracking(true);
@@ -183,6 +184,21 @@ void MainWindow::CreateConnects() {
     connect(ui->listWidget_streams, &QListWidget::currentRowChanged,
             this, [this](int) {
                 UpdateStreamControls();
+            });
+
+    connect(ui->listWidget_streams, &QListWidget::itemDoubleClicked,
+            this, [this](QListWidgetItem* item) {
+                if (!item) {
+                    return;
+                }
+
+                bool ok = false;
+                const int streamId = item->data(Qt::UserRole).toInt(&ok);
+                if (!ok) {
+                    return;
+                }
+
+                ActivateStreamFromView(streamId);
             });
 
     connect(ui->pushButton_prev, &QPushButton::clicked, this, &MainWindow::PlayPrevious);
@@ -877,13 +893,24 @@ void MainWindow::RefreshPlaylistView() {
 }
 
 void MainWindow::RefreshStreamView() {
-    const MediaPlayController::StreamId selectedStreamId = SelectedStreamId();
+    const MediaPlayController::StreamId previousSelectedStreamId = SelectedStreamId();
+    const QList<MediaPlayController::StreamId> streamIds = mediaPlayController_->StreamIds();
+    MediaPlayController::StreamId selectedStreamId = MediaPlayController::InvalidStreamId;
+
+    if (streamIds.contains(previousSelectedStreamId)) {
+        selectedStreamId = previousSelectedStreamId;
+    } else if (streamIds.contains(mediaPlayController_->ActiveStream())) {
+        selectedStreamId = mediaPlayController_->ActiveStream();
+    } else if (!streamIds.isEmpty()) {
+        selectedStreamId = streamIds.first();
+    }
 
     ui->listWidget_streams->clear();
-    const QList<MediaPlayController::StreamId> streamIds = mediaPlayController_->StreamIds();
+    QListWidgetItem* selectedItem = nullptr;
     for (MediaPlayController::StreamId id : streamIds) {
         const bool isActiveStream = id == mediaPlayController_->ActiveStream();
         const bool isActiveAudio = id == mediaPlayController_->ActiveAudioStream();
+        const bool hasAudio = mediaPlayController_->StreamHasAudio(id);
         QStringList marks;
         if (isActiveStream) {
             marks.append("View");
@@ -893,20 +920,33 @@ void MainWindow::RefreshStreamView() {
         }
 
         const QString displayName = streamDisplayNames_.value(id, QString("Stream %1").arg(id));
-        QString text = QString("#%1 %2").arg(id).arg(displayName);
+        QString text = QString("#%1").arg(id);
         const int slotIndex = SlotIndexForStream(id);
         if (slotIndex >= 0) {
-            text += QString(" [Slot %1]").arg(slotIndex + 1);
+            text += QString(" [S%1]").arg(slotIndex + 1);
         }
         if (!marks.isEmpty()) {
             text += QString(" [%1]").arg(marks.join(", "));
         }
+        text += QString(" %1").arg(displayName);
 
         auto* item = new QListWidgetItem(text, ui->listWidget_streams);
         item->setData(Qt::UserRole, id);
+        item->setToolTip(QString("StreamId: %1\n名称: %2\nSlot: %3\n音频: %4\n显示: %5\n输出音频: %6")
+            .arg(id)
+            .arg(displayName)
+            .arg(slotIndex >= 0 ? QString::number(slotIndex + 1) : QString("未绑定"))
+            .arg(hasAudio ? QString("有") : QString("无"))
+            .arg(isActiveStream ? QString("是") : QString("否"))
+            .arg(isActiveAudio ? QString("是") : QString("否")));
         if (id == selectedStreamId) {
-            ui->listWidget_streams->setCurrentItem(item);
+            selectedItem = item;
         }
+    }
+
+    if (selectedItem) {
+        ui->listWidget_streams->setCurrentItem(selectedItem);
+        ui->listWidget_streams->scrollToItem(selectedItem);
     }
 
     UpdateStreamControls();
@@ -915,14 +955,19 @@ void MainWindow::RefreshStreamView() {
 
 void MainWindow::UpdateStreamControls() {
     const bool hasStream = !mediaPlayController_->StreamIds().isEmpty();
-    const bool hasSelectedStream = SelectedStreamId() != MediaPlayController::InvalidStreamId;
+    const MediaPlayController::StreamId selectedStreamId = SelectedStreamId();
+    const bool hasSelectedStream = selectedStreamId != MediaPlayController::InvalidStreamId;
+    const bool selectedStreamHasAudio =
+        hasSelectedStream && mediaPlayController_->StreamHasAudio(selectedStreamId);
     const bool hasAvailableSlot = FirstAvailableVideoSlotIndex() >= 0;
 
     ui->pushButton_addStream->setEnabled(hasAvailableSlot);
     ui->pushButton_addCamera->setEnabled(hasAvailableSlot);
     ui->pushButton_removeStream->setEnabled(hasSelectedStream);
     ui->pushButton_activeStream->setEnabled(hasSelectedStream);
-    ui->pushButton_activeAudio->setEnabled(hasSelectedStream);
+    ui->pushButton_activeAudio->setEnabled(selectedStreamHasAudio);
+    ui->pushButton_activeAudio->setToolTip(
+        selectedStreamHasAudio ? QString() : QString("选中的流没有音频，不能设为音频输出"));
     ui->pushButton_startAll->setEnabled(hasStream);
     ui->pushButton_pauseAll->setEnabled(hasStream);
     ui->pushButton_stopAll->setEnabled(hasStream);
@@ -1050,12 +1095,9 @@ void MainWindow::SetSelectedActiveStream() {
         return;
     }
 
-    if (!mediaPlayController_->SetActiveStream(streamId)) {
+    if (!ActivateStreamFromView(streamId)) {
         APP_LOG_WARN_STREAM() << "Set active stream failed:" << streamId;
-        return;
     }
-
-    RefreshStreamView();
 }
 
 void MainWindow::SetSelectedActiveAudioStream() {

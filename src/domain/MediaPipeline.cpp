@@ -45,6 +45,11 @@ void MediaPipeline::Shutdown()
 
 void MediaPipeline::Start()
 {
+    if (playbackFinished_) {
+        APP_LOG_WARN("MediaPipeline start rejected: playback has finished, recreate pipeline to replay");
+        return;
+    }
+
     if (!demuxer_ || !Vdecoder_ || !videoFrameScheduler_ || !activeVideoFrameSink_ ||
         !positionTimer_ || !demuxerTH_ || !VdecoderTH_) {
         APP_LOG_WARN("MediaPipeline start failed: playback pipeline is not initialized");
@@ -106,6 +111,21 @@ void MediaPipeline::Stop()
         return;
     }
 
+    if (playbackFinished_) {
+        emit PositionChanged(0.0);
+        positionTimer_->stop();
+        if (videoFrameScheduler_) {
+            videoFrameScheduler_->Stop();
+            videoFrameScheduler_->ClearOutputFrame();
+        }
+        if (audioplay_) {
+            audioplay_->Pause();
+        }
+        ClearQueues();
+        syncManager_->SeekTo(0.0);
+        return;
+    }
+
     if (!SuspendPipelineAndWait()) {
         APP_LOG_WARN("MediaPipeline stop failed: playback pipeline suspend failed");
         emit ErrorOccurred("Playback pipeline suspend failed");
@@ -128,6 +148,11 @@ bool MediaPipeline::SeekTo(double seconds)
     if (!demuxer_ || !Vdecoder_ || !syncManager_) {
         APP_LOG_WARN("MediaPipeline seek failed: playback pipeline is not initialized");
         emit ErrorOccurred("Playback pipeline is not initialized");
+        return false;
+    }
+
+    if (playbackFinished_) {
+        APP_LOG_WARN("MediaPipeline seek rejected: playback has finished, recreate pipeline to seek");
         return false;
     }
 
@@ -447,14 +472,28 @@ void MediaPipeline::ReleaseResources()
 
 void MediaPipeline::HandleDemuxFinished()
 {
+    playbackFinished_ = true;
+
     if (APacket_) {
         APacket_->RequestStop();
     }
     if (VPacket_) {
         VPacket_->RequestStop();
     }
+    if (AFrame_) {
+        AFrame_->RequestStop();
+    }
+    if (VFrame_) {
+        VFrame_->RequestStop();
+    }
     if (positionTimer_) {
         positionTimer_->stop();
+    }
+    if (audioplay_) {
+        audioplay_->Pause();
+    }
+    if (videoFrameScheduler_) {
+        videoFrameScheduler_->Stop();
     }
 
     emit PositionChanged(Duration());
@@ -535,6 +574,8 @@ bool MediaPipeline::SuspendPipelineAndWait()
 
 void MediaPipeline::ResetPipelineToStart()
 {
+    playbackFinished_ = false;
+
     if (videoFrameScheduler_) {
         videoFrameScheduler_->Stop();
         videoFrameScheduler_->ClearOutputFrame();
@@ -552,6 +593,8 @@ void MediaPipeline::ResetPipelineToStart()
 
 void MediaPipeline::ResetRealtimePipelineStop()
 {
+    playbackFinished_ = false;
+
     if (videoFrameScheduler_) {
         videoFrameScheduler_->Stop();
         videoFrameScheduler_->ClearOutputFrame();

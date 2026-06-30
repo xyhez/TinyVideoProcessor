@@ -250,6 +250,7 @@ private:
     std::unique_ptr<QThread> audioplayTH_;	///< 音频播放线程
 
     std::unique_ptr<QTimer> positionTimer_;	///< 播放位置刷新定时器
+    bool playbackFinished_ = false;	///< 当前管线是否已自然播放结束
 };
 
 #endif // TINYVIDEOPROCESSOR_MEDIAPIPELINE_H
