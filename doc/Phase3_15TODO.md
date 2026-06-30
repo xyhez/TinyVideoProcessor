@@ -10,12 +10,13 @@
   - Phase 3.15.2 已完成 `MainWindow` 逻辑 slot 容量扩展：全局最大 16，当前布局控制可分配容量。
   - Phase 3.15.3 已完成多路 stream 列表可用性完善：状态前置显示、双击切换、删除后兜底选中、无音频流按钮保护。
   - Phase 3.15.4 已完成自然播放结束后的单路管线生命周期保护，避免 finished 管线继续进入 suspend-wait。
+  - Phase 3.15.5 已补充 4x4/16 路实验模式提示，明确 16 路真实播放受机器性能和视频规格影响。
+  - Phase 3.15.5 已通过人工验证：高负载下程序不会崩溃，16 路按实验支持收口。
 - 前置要求：
   - Phase 3.13 应先完成显示正确性修复。
   - Phase 3.14 应先完成多路性能基线和低风险优化。
 - 未完成：
-  - 16 路真实 `MediaPipeline` 创建与生命周期验证。
-  - `MultiStreamManager` 多路压力验证。
+  - Phase 3.15 验收报告。
 - 本阶段范围：
   - 将 3x3 / 4x4 从“布局可见能力”推进到“真实播放容量”。
 
@@ -256,27 +257,27 @@ feat: 支持 9 路真实播放验证
 
 **任务清单**：
 
-- [ ] 添加 16 路文件源。
-- [ ] 启动全部 16 路。
-- [ ] 验证 16 路布局显示。
-- [ ] 验证暂停、停止、移除和关闭。
-- [ ] 记录性能瓶颈和机器限制。
-- [ ] 必要时增加容量保护或提示。
-- [ ] 必要时限制高分辨率多路同时播放。
-- [ ] 明确 16 路是完全支持还是实验支持。
+- [x] 添加 16 路文件源。
+- [x] 启动全部 16 路。
+- [x] 验证 16 路布局显示。
+- [x] 验证暂停、停止、移除和关闭。
+- [x] 记录性能瓶颈和机器限制。
+- [x] 必要时增加容量保护或提示。
+- [x] 高负载下暂不限制高分辨率多路同时播放，先采用实验模式提示。
+- [x] 明确 16 路是完全支持还是实验支持。
 
 **验收标准**：
 
-- [ ] 16 路至少可以完成创建、显示、停止和关闭。
-- [ ] 如果不能稳定播放，系统有明确降级或提示，不崩溃。
-- [ ] 4 路和 9 路能力不被 16 路改动破坏。
-- [ ] 音频策略仍然最多一路输出。
+- [x] 16 路至少可以完成创建、显示、停止和关闭。
+- [x] 如果不能稳定播放，系统有明确降级或提示，不崩溃。
+- [x] 4 路和 9 路能力不被 16 路改动破坏。
+- [x] 音频策略仍然最多一路输出。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\ui\mainwindow.h src\ui\mainwindow.cpp src\application\MediaPlayController.h src\application\MediaPlayController.cpp src\domain\MultiStreamManager.h src\domain\MultiStreamManager.cpp doc\Phase3_15TODO.md`
-- [ ] 定向搜索：`rg -n "Grid4x4|16|capacity|MaxVisible|AddStream|StartAll|ShutdownAll" src\ui src\application src\domain doc\Phase3_15TODO.md`
-- [ ] 人工运行建议：16 路低分辨率文件、混合分辨率文件、播放中切布局、关闭程序。
+- [x] 静态检查：`git diff --check -- src\ui\mainwindow.h src\ui\mainwindow.cpp doc\Phase3_15TODO.md`
+- [x] 定向搜索：`rg -n "Grid4x4|16|capacity|MaxVisible|AddStream|StartAll|ShutdownAll|ShowGrid4x4CapacityNoticeIfNeeded" src\ui src\application src\domain doc\Phase3_15TODO.md`
+- [x] 人工运行建议：16 路低分辨率文件、混合分辨率文件、播放中切布局、关闭程序。
 
 **Commit message**：
 

@@ -235,6 +235,11 @@ private:
     void SetMultiViewLayout(MultiViewLayout layout);
 
     /**
+     * @brief ShowGrid4x4CapacityNoticeIfNeeded 必要时提示 4x4 模式的性能边界
+     */
+    void ShowGrid4x4CapacityNoticeIfNeeded();
+
+    /**
      * @brief CurrentMultiViewLayout 获取当前多路显示布局
      * @return 当前布局
      */
@@ -449,6 +454,7 @@ private:
     bool isSliderDragging_ = false;	///< 是否正在拖动进度条
     bool isFullScreenMode_ = false;	///< 是否处于全屏模式
     bool isCursorHidden_ = false;	///< 鼠标是否已隐藏
+    bool hasShownGrid4x4CapacityNotice_ = false;	///< 是否已提示 4x4 实验容量风险
     MultiViewLayout multiViewLayout_ = MultiViewLayout::Single;	///< 当前多画面布局
     MediaPlayController::StreamId focusedStreamId_ = MediaPlayController::InvalidStreamId;	///< 当前聚焦流 ID
     QMap<MediaPlayController::StreamId, QString> streamDisplayNames_;	///< 流显示名称表

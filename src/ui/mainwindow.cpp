@@ -618,10 +618,24 @@ void MainWindow::SetMultiViewLayout(MultiViewLayout layout) {
     multiViewLayout_ = layout;
     UpdateLayoutComboBox(multiViewLayout_);
     RefreshMultiViewLayout();
+    ShowGrid4x4CapacityNoticeIfNeeded();
     APP_LOG_INFO_STREAM()
         << "Multi view layout changed, visible slots:" << MaxVisibleStreams()
         << "assignable slots:" << CurrentVideoSlotCapacity()
         << "max logical slots:" << MaxVideoSlots();
+}
+
+void MainWindow::ShowGrid4x4CapacityNoticeIfNeeded() {
+    if (multiViewLayout_ != MultiViewLayout::Grid4x4 || hasShownGrid4x4CapacityNotice_) {
+        return;
+    }
+
+    hasShownGrid4x4CapacityNotice_ = true;
+    QMessageBox::information(
+        this,
+        "16 路实验模式",
+        "4x4 布局允许添加最多 16 路媒体源，但 16 路真实播放受 CPU/GPU、视频分辨率、编码格式和硬解能力影响。"
+        "建议优先使用低分辨率视频，并在压力较高时启用降帧预览。");
 }
 
 MainWindow::MultiViewLayout MainWindow::CurrentMultiViewLayout() const {
