@@ -12,12 +12,15 @@
 #include <QEvent>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QInputDialog>
+#include <QLineEdit>
 #include <QListWidgetItem>
 #include <QMessageBox>
 #include <QRadioButton>
 #include <QSignalBlocker>
 #include <QStringList>
 #include <QTimer>
+#include <QUrl>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -256,6 +259,9 @@ void MainWindow::CreateConnects() {
 
     connect(ui->pushButton_addCamera, &QPushButton::clicked,
             this, &MainWindow::AddCameraStream);
+
+    connect(ui->pushButton_addNetwork, &QPushButton::clicked,
+            this, &MainWindow::AddNetworkStream);
 
     connect(ui->pushButton_removeStream, &QPushButton::clicked,
             this, &MainWindow::RemoveSelectedStream);
@@ -977,6 +983,7 @@ void MainWindow::UpdateStreamControls() {
 
     ui->pushButton_addStream->setEnabled(hasAvailableSlot);
     ui->pushButton_addCamera->setEnabled(hasAvailableSlot);
+    ui->pushButton_addNetwork->setEnabled(hasAvailableSlot);
     ui->pushButton_removeStream->setEnabled(hasSelectedStream);
     ui->pushButton_activeStream->setEnabled(hasSelectedStream);
     ui->pushButton_activeAudio->setEnabled(selectedStreamHasAudio);
@@ -1090,6 +1097,74 @@ void MainWindow::AddCameraStream() {
     RefreshStreamView();
 
     APP_LOG_DEBUG_STREAM() << "MainWindow::AddCameraStream() - 摄像头添加成功, StreamId:" << streamId;
+}
+
+void MainWindow::AddNetworkStream() {
+    const int slotIndex = FirstAvailableVideoSlotIndex();
+    if (slotIndex < 0) {
+        APP_LOG_WARN_STREAM() << "Add network stream failed: no available video slot";
+        return;
+    }
+
+    bool accepted = false;
+    const QString url = QInputDialog::getText(
+        this,
+        "添加 RTSP 网络流",
+        "RTSP URL:",
+        QLineEdit::Normal,
+        "rtsp://",
+        &accepted).trimmed();
+    if (!accepted) {
+        return;
+    }
+
+    if (url.isEmpty()) {
+        QMessageBox::warning(this, "网络流错误", "RTSP URL 不能为空");
+        return;
+    }
+
+    if (!url.startsWith("rtsp://", Qt::CaseInsensitive)) {
+        QMessageBox::warning(this, "网络流错误", "当前阶段只支持 rtsp:// 网络流");
+        return;
+    }
+
+    NetworkOpenOptions options;
+    options.url = url;
+    options.protocol = NetworkStreamProtocol::Rtsp;
+    options.rtspTransport = "tcp";
+    options.openTimeoutMs = 5000;
+    options.readTimeoutMs = 5000;
+
+    const MediaPlayController::FrameSinkFactory frameSinkFactory =
+        CreateMultiViewFrameSinkFactory();
+    QWidget* fallbackRendererContainer = frameSinkFactory ? nullptr : FallbackRendererContainer();
+    if (!frameSinkFactory && !fallbackRendererContainer) {
+        APP_LOG_WARN_STREAM() << "Add network stream failed: fallback video container missing";
+        return;
+    }
+
+    MediaPlayController::StreamId streamId = MediaPlayController::InvalidStreamId;
+    if (frameSinkFactory) {
+        streamId = mediaPlayController_->AddNetworkStreamWithFrameSinkFactory(
+            options,
+            fallbackRendererContainer,
+            frameSinkFactory);
+    } else {
+        streamId = mediaPlayController_->AddNetworkStream(options, fallbackRendererContainer);
+    }
+
+    if (streamId == MediaPlayController::InvalidStreamId) {
+        APP_LOG_WARN_STREAM() << "Add network stream failed:" << url;
+        return;
+    }
+
+    const QUrl parsedUrl(url);
+    const QString displayName = parsedUrl.host().isEmpty()
+        ? url
+        : QString("RTSP %1").arg(parsedUrl.host());
+    BindStreamToVideoSlot(streamId, slotIndex);
+    streamDisplayNames_.insert(streamId, displayName);
+    RefreshStreamView();
 }
 
 void MainWindow::RemoveSelectedStream() {

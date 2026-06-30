@@ -422,6 +422,11 @@ private:
     void AddCameraStream();
 
     /**
+     * @brief AddNetworkStream 添加 RTSP 网络流
+     */
+    void AddNetworkStream();
+
+    /**
      * @brief RemoveSelectedStream 移除当前选中的流
      */
     void RemoveSelectedStream();

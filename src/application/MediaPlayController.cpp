@@ -5,6 +5,7 @@
 #include "MediaPlayController.h"
 #include "core/AppLog.h"
 #include "domain/MultiStreamManager.h"
+#include "domain/NetworkMediaSource.h"
 
 #include <algorithm>
 #include <cmath>
@@ -144,6 +145,25 @@ MediaPlayController::StreamId MediaPlayController::AddStreamWithFrameSinkFactory
         kPreviewFrameRateLimitFps);
 
     return streamId;
+}
+
+MediaPlayController::StreamId MediaPlayController::AddNetworkStream(
+    const NetworkOpenOptions& options,
+    QWidget* rendererContainer)
+{
+    return AddNetworkStreamWithFrameSinkFactory(options, rendererContainer, {});
+}
+
+MediaPlayController::StreamId MediaPlayController::AddNetworkStreamWithFrameSinkFactory(
+    const NetworkOpenOptions& options,
+    QWidget* rendererContainer,
+    FrameSinkFactory frameSinkFactory)
+{
+    auto mediaSource = std::make_shared<NetworkMediaSource>(options);
+    return AddStreamWithFrameSinkFactory(
+        mediaSource,
+        rendererContainer,
+        std::move(frameSinkFactory));
 }
 
 bool MediaPlayController::RemoveStream(StreamId id)

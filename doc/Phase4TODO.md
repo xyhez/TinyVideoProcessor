@@ -8,8 +8,9 @@
   - Phase 3.16 量化验收已作为项目完结阶段参考 TODO 暂缓。
   - Phase 4.1 已完成网络流输入预研和任务拆分。
   - Phase 4.2 已完成 `NetworkMediaSource` 空壳与参数模型，新增网络流实时源语义。
+  - Phase 4.3 已完成 RTSP 单路 MVP 代码接入，等待人工播放验收。
 - 未完成：
-  - RTSP MVP 尚未接入。
+  - RTSP MVP 尚未完成运行验收。
   - RTMP / HTTP-FLV / MJPEG 尚未实现。
 - 本阶段范围：
   - 优先接入 RTSP 网络流。
@@ -151,8 +152,6 @@ feat: 新增网络流媒体源基础模型
 
 **预计修改文件**：
 
-- `src/domain/NetworkMediaSource.h`
-- `src/domain/NetworkMediaSource.cpp`
 - `src/application/MediaPlayController.h`
 - `src/application/MediaPlayController.cpp`
 - `src/ui/mainwindow.h`
@@ -162,14 +161,14 @@ feat: 新增网络流媒体源基础模型
 
 **任务清单**：
 
-- [ ] 在 Controller 增加添加网络流入口。
-- [ ] 在 MainWindow 增加最小 URL 输入入口。
-- [ ] 使用 `NetworkOpenOptions` 构造 `NetworkMediaSource`。
-- [ ] 默认 RTSP over TCP。
-- [ ] 设置打开超时和读取超时。
-- [ ] 成功后复用现有 `AddStream()` 链路。
-- [ ] RTSP 显示为实时源，禁用 seek。
-- [ ] 无音频 RTSP 保持静音。
+- [x] 在 Controller 增加添加网络流入口。
+- [x] 在 MainWindow 增加最小 URL 输入入口。
+- [x] 使用 `NetworkOpenOptions` 构造 `NetworkMediaSource`。
+- [x] 默认 RTSP over TCP。
+- [x] 设置打开超时和读取超时。
+- [x] 成功后复用现有 `AddStream()` 链路。
+- [x] RTSP 显示为实时源，禁用 seek。
+- [x] 无音频 RTSP 保持静音。
 
 **验收标准**：
 
@@ -181,8 +180,8 @@ feat: 新增网络流媒体源基础模型
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- <本任务修改文件>`
-- [ ] 定向搜索：`rg -n "AddNetwork|NetworkMediaSource|rtsp|NetworkOpenOptions|IsRealtime|LIVE" src doc\Phase4TODO.md`
+- [x] 静态检查：`git diff --check -- src\application\MediaPlayController.h src\application\MediaPlayController.cpp src\ui\mainwindow.h src\ui\mainwindow.cpp src\ui\mainwindow.ui doc\Phase4TODO.md`
+- [x] 定向搜索：`rg -n "AddNetwork|NetworkMediaSource|rtsp|NetworkOpenOptions|IsRealtime|LIVE" src doc\Phase4TODO.md`
 - [ ] 人工运行建议：使用公网 RTSP 冒烟流或本地 MediaMTX RTSP 流。
 
 **Commit message**：

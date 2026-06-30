@@ -9,6 +9,7 @@
 #include <memory>
 
 #include "domain/IMediaSource.h"
+#include "domain/NetworkTypes.h"
 #include "infrastructure/ivideoframesink.h"
 
 class MultiStreamManager;
@@ -101,6 +102,26 @@ public:
     StreamId AddStreamWithFrameSinkFactory(std::shared_ptr<IMediaSource> mediaSource,
                                            QWidget* rendererContainer,
                                            FrameSinkFactory frameSinkFactory);
+
+    /**
+     * @brief AddNetworkStream 添加一路网络媒体流
+     * @param options 网络流打开参数
+     * @param rendererContainer 视频渲染容器
+     * @return 新增流 ID，失败返回 InvalidStreamId
+     */
+    StreamId AddNetworkStream(const NetworkOpenOptions& options,
+                              QWidget* rendererContainer);
+
+    /**
+     * @brief AddNetworkStreamWithFrameSinkFactory 添加一路使用外部视频帧 sink 的网络媒体流
+     * @param options 网络流打开参数
+     * @param rendererContainer 默认渲染容器，保留回退路径
+     * @param frameSinkFactory 根据 StreamId 创建外部 sink 的工厂
+     * @return 新增流 ID，失败返回 InvalidStreamId
+     */
+    StreamId AddNetworkStreamWithFrameSinkFactory(const NetworkOpenOptions& options,
+                                                  QWidget* rendererContainer,
+                                                  FrameSinkFactory frameSinkFactory);
 
     /**
      * @brief RemoveStream 移除一路媒体源
