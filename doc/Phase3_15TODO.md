@@ -6,12 +6,13 @@
   - `MultiViewRenderer` 已支持 `Grid3x3` 和 `Grid4x4` 可见 viewport。
   - 当前布局已经能显示 9/16 个逻辑区域。
   - 当前真实播放容量仍受逻辑 slot 和播放管线资源策略限制。
+  - Phase 3.15.1 已完成扩容准入复核：9 路作为正式推进目标，16 路作为实验/受限支持目标。
+  - Phase 3.15.2 已完成 `MainWindow` 逻辑 slot 容量扩展：全局最大 16，当前布局控制可分配容量。
 - 前置要求：
   - Phase 3.13 应先完成显示正确性修复。
   - Phase 3.14 应先完成多路性能基线和低风险优化。
 - 未完成：
   - 9/16 路真实 `MediaPipeline` 创建与生命周期验证。
-  - `MainWindow` 逻辑 slot 容量扩展。
   - `MultiStreamManager` 多路压力验证。
   - UI 列表和交互对大量 stream 的可用性验证。
 - 本阶段范围：
@@ -52,6 +53,7 @@ MainWindow 逻辑 slot
 - `doc/Phase3_13TODO.md`
 - `doc/Phase3_14TODO.md`
 - `doc/Phase3_14_多路性能优化验收报告.md`
+- `doc/Phase3_15_扩容准入复核报告.md`
 
 ## 3.15.1 扩容准入复核
 
@@ -64,24 +66,25 @@ MainWindow 逻辑 slot
 
 **任务清单**：
 
-- [ ] 确认 Phase 3.13 显示正确性问题已收口。
-- [ ] 确认 Phase 3.14 已形成 4 路性能基线。
-- [ ] 确认 9 路扩容目标视频规格。
-- [ ] 确认 16 路扩容目标视频规格。
-- [ ] 明确默认扩容顺序：先 9 路，再 16 路。
-- [ ] 明确低配机器的降级策略。
-- [ ] 明确是否允许限制单路分辨率或帧率。
+- [x] 确认 Phase 3.13 显示正确性问题已收口。
+- [x] 确认 Phase 3.14 已形成 4 路性能基线。
+- [x] 确认 9 路扩容目标视频规格。
+- [x] 确认 16 路扩容目标视频规格。
+- [x] 明确默认扩容顺序：先 9 路，再 16 路。
+- [x] 明确低配机器的降级策略。
+- [x] 明确是否允许限制单路分辨率或帧率。
 
 **验收标准**：
 
-- [ ] 能说明是否可以进入 9 路真实播放扩容。
-- [ ] 能说明 16 路是否作为同阶段目标还是后续目标。
-- [ ] 能说明扩容验收视频规格。
+- [x] 能说明是否可以进入 9 路真实播放扩容。
+- [x] 能说明 16 路是否作为同阶段目标还是后续目标。
+- [x] 能说明扩容验收视频规格。
 
 **测试流程**：
 
-- [ ] 本任务为复核报告，不运行程序。
-- [ ] 静态检查：`git diff --check -- doc\Phase3_15_扩容准入复核报告.md doc\Phase3_15TODO.md`
+- [x] 本任务为复核报告，不运行程序。
+- [x] 静态检查：`git diff --check -- doc\Phase3_15_扩容准入复核报告.md doc\Phase3_15TODO.md`
+- [x] 复核报告：`doc/Phase3_15_扩容准入复核报告.md`
 
 **Commit message**：
 
@@ -106,27 +109,27 @@ docs: 复核 9/16 路播放扩容准入条件
 
 **任务清单**：
 
-- [ ] 复核当前 `kVideoSlotCount` 或等价容量限制。
-- [ ] 将逻辑 slot 容量与当前布局最大可见 slot 区分。
-- [ ] `Grid3x3` 下允许分配 9 个逻辑 slot。
-- [ ] `Grid4x4` 下允许分配 16 个逻辑 slot。
-- [ ] `Single` 下不销毁其他 stream，只改变可见策略。
-- [ ] 添加 stream 时根据当前布局和容量策略决定是否允许。
-- [ ] 移除 stream 后释放对应逻辑 slot。
-- [ ] 布局切换后重新同步 `MultiViewRenderer::SetViewSlots()`。
+- [x] 复核当前 `kVideoSlotCount` 或等价容量限制。
+- [x] 将逻辑 slot 容量与当前布局最大可见 slot 区分。
+- [x] `Grid3x3` 下允许分配 9 个逻辑 slot。
+- [x] `Grid4x4` 下允许分配 16 个逻辑 slot。
+- [x] `Single` 下不销毁其他 stream，只改变可见策略。
+- [x] 添加 stream 时根据当前布局和容量策略决定是否允许。
+- [x] 移除 stream 后释放对应逻辑 slot。
+- [x] 布局切换后重新同步 `MultiViewRenderer::SetViewSlots()`。
 
 **验收标准**：
 
-- [ ] 选择 3x3 后可以添加超过 4 路。
-- [ ] 选择 4x4 后可以添加超过 9 路。
-- [ ] slot 分配不重复、不泄漏。
-- [ ] 移除一路后 slot 可复用。
-- [ ] `MultiViewRenderer` 仍不决定 slot 绑定。
+- [x] 选择 3x3 后可以添加超过 4 路。
+- [x] 选择 4x4 后可以添加超过 9 路。
+- [x] slot 分配不重复、不泄漏。
+- [x] 移除一路后 slot 可复用。
+- [x] `MultiViewRenderer` 仍不决定 slot 绑定。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\ui\mainwindow.h src\ui\mainwindow.cpp doc\Phase3_15TODO.md`
-- [ ] 定向搜索：`rg -n "kVideoSlotCount|MaxVisibleStreams|Assign|Release|viewSlots|Grid3x3|Grid4x4" src\ui doc\Phase3_15TODO.md`
+- [x] 静态检查：`git diff --check -- src\ui\mainwindow.h src\ui\mainwindow.cpp doc\Phase3_15TODO.md`
+- [x] 定向搜索：`rg -n "kMaxVideoSlotCount|MaxVisibleStreams|CurrentVideoSlotCapacity|Release|viewSlots|Grid3x3|Grid4x4" src\ui doc\Phase3_15TODO.md`
 - [ ] 人工运行建议：在 3x3 下添加 5-9 路，在 4x4 下添加 10-16 路。
 
 **Commit message**：

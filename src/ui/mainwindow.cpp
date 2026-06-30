@@ -604,7 +604,8 @@ void MainWindow::SetMultiViewLayout(MultiViewLayout layout) {
     RefreshMultiViewLayout();
     APP_LOG_INFO_STREAM()
         << "Multi view layout changed, visible slots:" << MaxVisibleStreams()
-        << "playable slots:" << MaxVideoSlots();
+        << "assignable slots:" << CurrentVideoSlotCapacity()
+        << "max logical slots:" << MaxVideoSlots();
 }
 
 MainWindow::MultiViewLayout MainWindow::CurrentMultiViewLayout() const {
@@ -631,7 +632,13 @@ int MainWindow::MaxVisibleStreams() const {
 }
 
 int MainWindow::MaxVideoSlots() const {
-    return kVideoSlotCount;
+    return kMaxVideoSlotCount;
+}
+
+int MainWindow::CurrentVideoSlotCapacity() const {
+    const int visibleSlots = MaxVisibleStreams();
+    const int maxSlots = MaxVideoSlots();
+    return visibleSlots < maxSlots ? visibleSlots : maxSlots;
 }
 
 QWidget* MainWindow::FallbackRendererContainer() const {
@@ -639,7 +646,7 @@ QWidget* MainWindow::FallbackRendererContainer() const {
 }
 
 int MainWindow::FirstAvailableVideoSlotIndex() const {
-    for (int index = 0; index < MaxVideoSlots(); ++index) {
+    for (int index = 0; index < CurrentVideoSlotCapacity(); ++index) {
         if (!streamSlotIndexes_.values().contains(index)) {
             return index;
         }

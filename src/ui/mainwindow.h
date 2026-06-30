@@ -116,7 +116,7 @@ private slots:
     void on_pushButton_pause_clicked();
 
 private:
-    static constexpr int kVideoSlotCount = 4;	///< 当前可用逻辑视频 slot 数
+    static constexpr int kMaxVideoSlotCount = 16;	///< 主窗口支持的最大逻辑视频 slot 数
 
     enum class MultiViewLayout {
         Single,
@@ -255,9 +255,15 @@ private:
 
     /**
      * @brief MaxVideoSlots 获取主窗口可用逻辑视频 slot 数量
-     * @return 可用逻辑 slot 数量
+     * @return 最大逻辑 slot 数量
      */
     int MaxVideoSlots() const;
+
+    /**
+     * @brief CurrentVideoSlotCapacity 获取当前布局允许分配的逻辑视频 slot 数量
+     * @return 当前布局可分配 slot 数量
+     */
+    int CurrentVideoSlotCapacity() const;
 
     /**
      * @brief FallbackRendererContainer 获取默认 VideoRender fallback 容器
