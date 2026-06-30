@@ -39,55 +39,64 @@ TinyVideoProcessor 是一个渐进式演进的视频处理框架，遵循清晰�
 - ✅ 本地文件播放、播放列表、上一个/下一个、循环模式
 - ✅ 播放、暂停、停止、Seek、快进/快退、播放速度控制
 - ✅ 音量调节、静音控制、无音频流视频兼容
-- ✅ `IMediaSource` 媒体源抽象，已支持文件源和摄像头源基础接入
+- ✅ `IMediaSource` 媒体源抽象，已支持文件源、摄像头源和 RTSP 网络流
 - ✅ 单路 `MediaPipeline` 播放管线，解耦 UI 与底层解码播放链路
 - ✅ `MultiStreamManager` 多路播放管理，支持 active stream / active audio stream
 - ✅ `VideoFrameScheduler` 视频帧调度，负责取帧、同步判断、丢帧和调度
 - ✅ `MultiViewRenderer` 统一 OpenGL 多画面渲染，支持 `Single` / `2x2` / `3x3` / `4x4`
-- ✅ 多路文件/摄像头混合预览基础能力
+- ✅ 多路文件、摄像头、RTSP 混合预览基础能力
 - ✅ 双击单路聚焦与恢复
+- ✅ 非 `YUV420P` / 4K MKV 显示格式适配，统一进入可显示帧格式边界
+- ✅ 9 路真实播放正式支持，16 路真实播放实验支持
+- ✅ RTSP 打开失败、断流、移除、重连和关闭窗口生命周期处理
+- ✅ 队列 RAII 所有权重构，`AVPacket` / `AVFrame` 队列使用 `unique_ptr` 管理
 - ✅ 多线程解码、音视频同步、硬件解码基础支持
 
 ### 规划中的功能
 
 #### Phase 1: 完善播放器
-- [x] 进度条拖动（Seek）
-- [x] 播放列表管理
-- [x] 播放速度控制
-- [x] 快进/快退
-- [x] 全屏模式
-- [ ] 配置持久化
+- ✅ 进度条拖动（Seek）
+- ✅ 播放列表管理
+- ✅ 播放速度控制
+- ✅ 快进/快退
+- ✅ 全屏模式
+- 📋 配置持久化
 
 #### Phase 2: 摄像头支持
-- [x] USB 摄像头采集 MVP
-- [x] 设备枚举与选择
-- [x] 分辨率/帧率设置
-- [x] 实时预览基础链路
-- [ ] 摄像头参数持久化
-- [ ] 摄像头截图功能
+- ✅ USB 摄像头采集 MVP
+- ✅ 设备枚举与选择
+- ✅ 分辨率/帧率设置
+- ✅ 实时预览基础链路
+- 📋 摄像头参数持久化
+- 📋 摄像头截图功能
 
 #### Phase 3: 多路视频
-- [x] 多路播放管理
-- [x] 统一 `MultiViewRenderer` 多画面渲染
-- [x] 灵活布局（Single, 2x2, 3x3, 4x4）
-- [x] active stream / active audio stream 策略
-- [x] 单路聚焦与恢复
-- [ ] 非 YUV420P / 4K MKV 显示质量完善
-- [ ] 多路渲染性能优化
-- [ ] 9/16 路真实播放扩容
+- ✅ 多路播放管理
+- ✅ 统一 `MultiViewRenderer` 多画面渲染
+- ✅ 灵活布局（Single, 2x2, 3x3, 4x4）
+- ✅ active stream / active audio stream 策略
+- ✅ 单路聚焦与恢复
+- ✅ 非 YUV420P / 4K MKV 显示质量完善
+- ✅ 多路渲染性能优化
+- ✅ 9 路真实播放扩容
+- ✅ 16 路实验播放扩容
 
 #### Phase 4: 网络流
-- [ ] RTSP 流播放
-- [ ] RTMP 流播放
-- [ ] HTTP-FLV 支持
-- [ ] 断线重连
+- ✅ RTSP 流播放
+- ✅ RTSP 网络异常、断流移除和关闭中断处理
+- ✅ RTSP 与文件源、摄像头源复用同一套播放管线和多视口渲染体系
+- 📋 RTMP 流播放
+- 📋 HTTP-FLV 支持
+- 📋 自动断线重连
 
 #### Phase 5-6: 图像处理与分析
-- [ ] 实时图像处理（灰度化、二值化、边缘检测）
-- [ ] 插件式处理器架构
-- [ ] 目标检测与识别
-- [ ] 尺寸测量
-- [ ] 运动检测与跟踪
+- ✅ Phase 5 图像处理基础预研和任务拆分
+- 📋 OpenCV 依赖接入
+- 📋 实时图像处理（灰度化、二值化、边缘检测）
+- 📋 插件式处理器架构
+- 📋 目标检测与识别
+- 📋 尺寸测量
+- 📋 运动检测与跟踪
 
 ---
 
@@ -133,12 +142,10 @@ TinyVideoProcessor 是一个渐进式演进的视频处理框架，遵循清晰�
 │  │ 媒体源抽象接口         │        │ 播放列表状态与播放顺序                 │    │
 │  └──────────┬───────────┘        └──────────────────────────────────────┘    │
 │             │                                                                │
-│      ┌──────┴─────────────┐                                                  │
-│      │                    │                                                  │
-│  ┌───▼───────────┐   ┌────▼────────────┐                                     │
-│  │ FileMediaSource│   │ CameraMediaSource│                                    │
-│  │ 本地文件源      │   │ USB 摄像头源      │                                    │
-│  └───────────────┘   └─────────────────┘                                     │
+│      ┌────────────────┐  ┌──────────────────┐  ┌──────────────────┐         │
+│      │ FileMediaSource│  │ CameraMediaSource│  │ NetworkMediaSource│         │
+│      │ 本地文件源      │  │ USB 摄像头源      │  │ RTSP 网络流        │         │
+│      └────────────────┘  └──────────────────┘  └──────────────────┘         │
 │                                                                              │
 │  ┌──────────────────────── MultiStreamManager ────────────────────────────┐  │
 │  │ - 分配和管理 StreamId                                                   │  │
@@ -177,6 +184,11 @@ TinyVideoProcessor 是一个渐进式演进的视频处理框架，遵循清晰�
 │                         │ 音视频同步基准  │                     │            │
 │                         └────────────────┘                     ▼            │
 │                                                     ┌─────────────────────┐  │
+│                                                     │ VideoFrameConverter │  │
+│                                                     │ 可显示格式转换       │  │
+│                                                     └──────────┬──────────┘  │
+│                                                                ▼             │
+│                                                     ┌─────────────────────┐  │
 │                                                     │ SingleStreamFrame   │  │
 │                                                     │ SinkAdapter         │  │
 │                                                     │ StreamId 绑定适配    │  │
@@ -213,8 +225,9 @@ IMediaSource
         -> VideoFrameQueue
           -> VideoFrameScheduler
             -> IVideoFrameSink
-              -> SingleStreamFrameSinkAdapter
-                -> MultiViewRenderer
+              -> VideoFrameConverter
+                -> SingleStreamFrameSinkAdapter
+                  -> MultiViewRenderer
 
 音频与同步流：
 
@@ -254,7 +267,7 @@ class IMediaSource {
 // 不同的媒体源实现
 class FileMediaSource : public IMediaSource { };
 class CameraMediaSource : public IMediaSource { };
-// NetworkMediaSource 预留给后续网络流阶段
+class NetworkMediaSource : public IMediaSource { };
 ```
 
 **2. 管道模式 - 单路播放流程**
@@ -379,7 +392,12 @@ TinyVideoProcessor/
 │   ├── Phase3_12*.md             # MultiViewRenderer 布局与交互文档
 │   ├── Phase3_13TODO.md          # 渲染输入格式与显示质量计划
 │   ├── Phase3_14TODO.md          # 多路性能优化计划
-│   └── Phase3_15TODO.md          # 9/16 路真实播放扩容计划
+│   ├── Phase3_15TODO.md          # 9/16 路真实播放扩容计划
+│   ├── Phase4TODO.md             # 网络流支持计划
+│   ├── Phase4_*.md               # RTSP 网络流预研、异常链路和验收文档
+│   ├── Phase5TODO.md             # 图像处理基础计划
+│   ├── Phase5_*.md               # 图像处理基础预研文档
+│   └── TODO-队列RAII重构.md       # 队列 RAII 重构计划
 └── src/
     ├── ui/
     │   ├── main.cpp              # 程序入口
@@ -393,6 +411,8 @@ TinyVideoProcessor/
     │   ├── FileMediaSource.h/cpp # 文件媒体源
     │   ├── CameraMediaSource.h/cpp # 摄像头媒体源
     │   ├── CameraTypes.h         # 摄像头设备与参数类型
+    │   ├── NetworkMediaSource.h/cpp # RTSP 网络流媒体源
+    │   ├── NetworkTypes.h        # 网络流协议与打开参数
     │   ├── MediaPipeline.h/cpp   # 单路播放管线
     │   ├── MultiStreamManager.h/cpp # 多路播放管理
     │   └── PlaylistManager.h/cpp # 播放列表管理
@@ -402,12 +422,14 @@ TinyVideoProcessor/
     │   ├── audioplayer.h/cpp     # 音频播放
     │   ├── syncmanager.h/cpp     # 音视频同步
     │   ├── videoframescheduler.h/cpp # 视频帧调度
+    │   ├── videoframeconverter.h/cpp # 可显示帧格式转换
     │   ├── ivideoframesink.h     # 可显示帧消费接口
     │   ├── singlestreamframesinkadapter.h/cpp # 单路帧 sink 适配器
     │   ├── multiviewrenderer.h/cpp # 统一多画面 OpenGL 渲染器
     │   ├── videorender.h/cpp     # 旧单路渲染 fallback
     │   └── CameraDeviceEnumerator.h/cpp # 摄像头设备枚举
     └── core/
+        ├── ffmpeg_raii.h         # FFmpeg AVPacket/AVFrame RAII 类型
         ├── queue.h               # 线程安全队列
         └── AppLog.h              # 应用日志封装
 ```
@@ -422,11 +444,12 @@ TinyVideoProcessor/
 | Phase 1 | ✅ 已完成 | 播放控制、播放列表、音量、UI 完善 | 已完成 |
 | Phase 2 | ✅ 阶段性完成 | 摄像头源接入、设备枚举、实时预览基础链路 | 已完成 |
 | Phase 3.1-3.12 | ✅ 已完成 | 多路管理、统一渲染、布局与聚焦交互 | 已完成 |
-| Phase 3.13 | 📋 计划中 | 非 YUV420P / 4K MKV 显示质量完善 | 待开发 |
-| Phase 3.14 | 📋 计划中 | 多路渲染性能优化 | 待开发 |
-| Phase 3.15 | 📋 计划中 | 9/16 路真实播放扩容 | 待开发 |
-| Phase 4 | 📋 计划中 | 网络流支持 | 1 周 |
-| Phase 5 | 📋 计划中 | 图像处理基础 | 2 周 |
+| Phase 3.13 | ✅ 已完成 | 非 YUV420P / 4K MKV 显示质量完善 | 已完成 |
+| Phase 3.14 | ✅ 已完成 | 多路渲染性能优化 | 已完成 |
+| Phase 3.15 | ✅ 已完成 | 9/16 路真实播放扩容 | 已完成 |
+| Phase 4 | ✅ 已完成 | RTSP 网络流支持 | 已完成 |
+| Phase 5.1 | ✅ 已完成 | 图像处理基础预研和任务拆分 | 已完成 |
+| Phase 5.2+ | 📋 计划中 | OpenCV 接入、基础处理器、active stream 处理预览 | 待开发 |
 | Phase 6 | 📋 计划中 | 高级图像分析 | 2 周 |
 
 详细规划请参考：[架构指导.md](doc/架构指导.md)
@@ -459,19 +482,21 @@ TinyVideoProcessor/
 ### 当前版本
 
 - **视频解码**: 1080P@30fps
-- **播放能力**: 本地文件、无音频流视频、USB 摄像头基础预览
-- **多路显示**: 当前以 4 路真实播放为稳定基线，`3x3` / `4x4` 已具备布局显示能力
+- **播放能力**: 本地文件、无音频流视频、USB 摄像头基础预览、RTSP 网络流
+- **多路显示**: 9 路真实播放为正式能力，16 路真实播放为实验能力
 - **统一渲染**: 单个 `MultiViewRenderer` 承载多路画面
 - **同步链路**: `VideoFrameScheduler` 负责视频帧同步调度，`SyncManager` 维护音视频时钟
-- **已知限制**: 非 `YUV420P` / 4K MKV 显示质量、多路性能和 9/16 路真实播放仍在后续阶段完善
+- **格式适配**: `VideoFrameConverter` 将非 `YUV420P` 软件帧转换为当前渲染器可显示格式
+- **网络流**: RTSP 支持打开失败、断流移除、服务恢复后重加和关闭中断处理
+- **已知限制**: 16 路播放性能依赖机器配置和视频规格；RTMP / HTTP-FLV / 自动重连尚未实现；图像处理尚处于 Phase 5 规划阶段
 
 ### 目标性能
 
-- **多路播放**: 4 路 1080P@30fps
+- **多路播放**: 4 路 1080P@30fps 稳定预览，9 路真实播放，16 路实验播放
 - **CPU 占用**: < 30%
 - **内存占用**: < 500MB
 - **渲染延迟**: < 100ms
-- **后续目标**: 在 Phase 3.14 完成性能基线后，再评估 9/16 路真实播放能力
+- **后续目标**: 接入 Phase 5 active stream 图像处理预览，并补充更完整的量化性能表
 
 ---
 
@@ -503,7 +528,9 @@ TinyVideoProcessor/
 - ✅ 完成 `VideoFrameScheduler` 抽取，明确视频帧同步调度边界
 - ✅ 完成主显示区域迁移到 `MultiViewRenderer`
 - ✅ 完成 `Single` / `2x2` / `3x3` / `4x4` 布局与单路聚焦交互
-- 📋 拆分 Phase 3.13 / 3.14 / 3.15 后续任务
+- ✅ 完成 Phase 3.13 / 3.14 / 3.15，支持格式适配、多路性能优化和 9/16 路扩容
+- ✅ 完成 Phase 4 RTSP 网络流支持和异常关闭链路处理
+- ✅ 完成 Phase 5 图像处理基础预研和任务拆分
 
 ### 2026-06
 - ✅ 完成 Phase 1 播放器基础功能完善
