@@ -39,7 +39,7 @@ bool CameraMediaSource::Open()
     }
 
     if (deviceName_.trimmed().isEmpty()) {
-        SetLastError("摄像头设备名为空");
+        SetLastError("Camera device name is empty");
         return false;
     }
 
@@ -53,7 +53,7 @@ bool CameraMediaSource::Open()
     // 查找 dshow input format
     const AVInputFormat* inputFormat = av_find_input_format("dshow");
     if (!inputFormat) {
-        SetLastError("无法找到 FFmpeg dshow input format");
+        SetLastError("FFmpeg dshow input format was not found");
         return false;
     }
 
@@ -91,7 +91,7 @@ bool CameraMediaSource::Open()
     if (ret != 0) {
         char errbuf[AV_ERROR_MAX_STRING_SIZE] = {0};
         av_strerror(ret, errbuf, AV_ERROR_MAX_STRING_SIZE);
-        SetLastError(QString("打开摄像头失败：%1。设备可能不存在、被占用，或所选参数不受支持。")
+        SetLastError(QString("Open camera failed: %1. The device may not exist, may be in use, or may not support the selected options.")
                          .arg(QString::fromLocal8Bit(errbuf)));
         if (formatContext_) {
             avformat_close_input(&formatContext_);
@@ -101,7 +101,7 @@ bool CameraMediaSource::Open()
 
     // 获取流信息
     if (avformat_find_stream_info(formatContext_, nullptr) < 0) {
-        SetLastError("无法获取摄像头流信息");
+        SetLastError("Failed to read camera stream information");
         avformat_close_input(&formatContext_);
         return false;
     }
@@ -133,16 +133,16 @@ bool CameraMediaSource::Open()
             sourceInfo_.V_timeBase = av_q2d(stream->time_base);
 
             APP_LOG_DEBUG("CameraMediaSource::Open() - video stream info:");
-            APP_LOG_DEBUG("  resolution:", sourceInfo_.width_, "x", sourceInfo_.height_);
-            APP_LOG_DEBUG("  frame rate:", sourceInfo_.FrameRate);
-            APP_LOG_DEBUG("  codec:", avcodec_get_name(sourceInfo_.videoCodecId_));
+            APP_LOG_DEBUG("resolution:", sourceInfo_.width_, "x", sourceInfo_.height_);
+            APP_LOG_DEBUG("frame rate:", sourceInfo_.FrameRate);
+            APP_LOG_DEBUG("codec:", avcodec_get_name(sourceInfo_.videoCodecId_));
 
             break;
         }
     }
 
     if (!sourceInfo_.hasVideo_) {
-        SetLastError("摄像头未找到可用视频流");
+        SetLastError("Camera did not provide a usable video stream");
         avformat_close_input(&formatContext_);
         return false;
     }

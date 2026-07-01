@@ -1,10 +1,12 @@
 #pragma once
 
+#include <filesystem>
 #include <sstream>
 #include <string>
 
 #include "Formatter.h"
 #include "Level.h"
+#include "detail/TimeUtils.h"
 
 namespace logging {
 
@@ -16,10 +18,13 @@ namespace logging {
 class SimpleFormatter : public Formatter {
 public:
     std::string Format(const Record& record) override {
+        const auto file = std::filesystem::path(record.GetSourceLocation().file).filename().string();
         std::ostringstream oss;
-        oss << "[" << ToString(record.GetLevel()) << "] "
-            << record.GetMessage()
-            << " [" << record.GetSourceLocation().file << ":" << record.GetSourceLocation().line << "]";
+        oss << "[" << detail::TimeToString(record.GetTime()) << "] "
+            << "[" << record.GetLoggerName() << "] "
+            << "[" << ToString(record.GetLevel()) << "] "
+            << "[" << file << ":" << record.GetSourceLocation().line << "] "
+            << record.GetMessage();
         return oss.str();
     }
 };

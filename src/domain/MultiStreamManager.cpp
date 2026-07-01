@@ -22,7 +22,7 @@ MultiStreamManager::StreamId MultiStreamManager::AddStream(std::shared_ptr<IMedi
                 continue;
             }
             if (stream.second.mediaSource->SourceIdentity() == sourceIdentity) {
-                emit StreamErrorOccurred(InvalidStreamId, "该媒体源已在使用，不能重复添加");
+                emit StreamErrorOccurred(InvalidStreamId, "This media source is already in use and cannot be added again");
                 return InvalidStreamId;
             }
         }

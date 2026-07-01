@@ -64,12 +64,12 @@ bool NetworkMediaSource::Open()
     sourceInfo_.filepath_ = options_.url;
 
     if (options_.url.isEmpty()) {
-        SetLastError("网络流 URL 为空");
+        SetLastError("Network stream URL is empty");
         return false;
     }
 
     if (!IsProtocolSupported()) {
-        SetLastError(QString("当前网络流协议暂未支持：%1").arg(ProtocolName(options_.protocol)));
+        SetLastError(QString("Network stream protocol is not supported: %1").arg(ProtocolName(options_.protocol)));
         return false;
     }
 
@@ -79,7 +79,7 @@ bool NetworkMediaSource::Open()
     formatContext_ = avformat_alloc_context();
     if (!formatContext_) {
         av_dict_free(&openOptions);
-        SetLastError("创建网络流上下文失败");
+        SetLastError("Failed to create network stream context");
         return false;
     }
     formatContext_->interrupt_callback.callback = &NetworkMediaSource::InterruptCallback;
@@ -94,7 +94,7 @@ bool NetworkMediaSource::Open()
     av_dict_free(&openOptions);
 
     if (openRet < 0) {
-        SetLastError(QString("打开网络流失败：%1").arg(AvErrorString(openRet)));
+        SetLastError(QString("Open network stream failed: %1").arg(AvErrorString(openRet)));
         if (formatContext_) {
             avformat_close_input(&formatContext_);
             formatContext_ = nullptr;
@@ -104,7 +104,7 @@ bool NetworkMediaSource::Open()
 
     const int streamInfoRet = avformat_find_stream_info(formatContext_, nullptr);
     if (streamInfoRet < 0) {
-        SetLastError(QString("获取网络流信息失败：%1").arg(AvErrorString(streamInfoRet)));
+        SetLastError(QString("Failed to read network stream information: %1").arg(AvErrorString(streamInfoRet)));
         avformat_close_input(&formatContext_);
         formatContext_ = nullptr;
         return false;
@@ -139,7 +139,7 @@ bool NetworkMediaSource::Open()
     }
 
     if (!sourceInfo_.hasVideo_) {
-        SetLastError("网络流未找到可用视频流");
+        SetLastError("Network stream did not provide a usable video stream");
         avformat_close_input(&formatContext_);
         formatContext_ = nullptr;
         return false;

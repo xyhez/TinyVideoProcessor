@@ -8,7 +8,11 @@ void logging::AsyncLogger::Print(Level level,
         return;
     if (level < detail::Registry::GetInstance()->GetGlobalLevel())
         return;
-    Record record(level, message,std::chrono::system_clock::now(),source_location);
+    Record record(level,
+                  message,
+                  name_.empty() ? "default" : name_,
+                  std::chrono::system_clock::now(),
+                  source_location);
 
     auto sinks_snapshot = sinks_;
     Level flush_level = flush_on_level_;

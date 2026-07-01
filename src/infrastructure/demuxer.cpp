@@ -52,10 +52,10 @@ demuxer::demuxer(std::shared_ptr<IMediaSource> mediaSource,
                               .arg(codecParameters->height)
                               .arg(avcodec_get_name(codecParameters->codec_id))
                               .arg(ic->duration / 1000000));
-            APP_LOG_DEBUG(QString("  frame rate: %1 fps").arg(av_q2d(stream->avg_frame_rate)));
-            APP_LOG_DEBUG(QString("  frame duration: %1 ms")
+            APP_LOG_DEBUG(QString("frame rate: %1 fps").arg(av_q2d(stream->avg_frame_rate)));
+            APP_LOG_DEBUG(QString("frame duration: %1 ms")
                               .arg(1.0 / av_q2d(stream->avg_frame_rate) * 1000));
-            APP_LOG_DEBUG("  video time_base:", av_q2d(stream->time_base));
+            APP_LOG_DEBUG("video time_base:", av_q2d(stream->time_base));
 
             m_videoStreamIndex = i;
             m_V_coderPar = codecParameters;
@@ -82,7 +82,7 @@ demuxer::demuxer(std::shared_ptr<IMediaSource> mediaSource,
                               .arg(codecParameters->bit_rate)
                               .arg(avcodec_get_name(codecParameters->codec_id))
                               .arg(ic->duration / 1000000));
-            APP_LOG_DEBUG("  audio time_base:", av_q2d(stream->time_base));
+            APP_LOG_DEBUG("audio time_base:", av_q2d(stream->time_base));
 
             m_audioStreamIndex = i;
             m_A_coderPar = codecParameters;

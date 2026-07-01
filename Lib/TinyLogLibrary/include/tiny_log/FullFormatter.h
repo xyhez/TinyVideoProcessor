@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <sstream>
 #include <string>
 
@@ -17,11 +18,12 @@ namespace logging {
 class FullFormatter : public Formatter {
 public:
     std::string Format(const Record& record) override {
+        const auto file = std::filesystem::path(record.GetSourceLocation().file).filename().string();
         std::ostringstream oss;
         oss << "[" << detail::TimeToString(record.GetTime()) << "] "
-            << "[" << record.GetSourceLocation().file << ":" << record.GetSourceLocation().line
-            << " " << record.GetSourceLocation().function << "] "
+            << "[" << record.GetLoggerName() << "] "
             << "[" << ToString(record.GetLevel()) << "] "
+            << "[" << file << ":" << record.GetSourceLocation().line << "] "
             << record.GetMessage();
         return oss.str();
     }

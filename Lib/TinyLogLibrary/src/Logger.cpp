@@ -20,6 +20,7 @@ void Logger::Print(Level level,
 
     Record record(level,
                   message,
+                  name_.empty() ? "default" : name_,
                   std::chrono::system_clock::now(),
                   sourceLocation);
     for (auto& sink : sinks_) {

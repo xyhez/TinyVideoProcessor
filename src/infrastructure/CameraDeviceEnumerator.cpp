@@ -48,13 +48,13 @@ QList<CameraDeviceInfo> CameraDeviceEnumerator::EnumerateDevices()
         info.friendlyName = QString::fromUtf8(device->device_description);
         info.description = info.friendlyName;
 
-        APP_LOG_DEBUG("  Device", i, ":", info.deviceName);
-        APP_LOG_DEBUG("    PnP Path:", QString::fromUtf8(device->device_name));
-        APP_LOG_DEBUG("    Description:", info.friendlyName);
+        APP_LOG_DEBUG("Device", i, ":", info.deviceName);
+        APP_LOG_DEBUG("PnP Path:", QString::fromUtf8(device->device_name));
+        APP_LOG_DEBUG("Description:", info.friendlyName);
 
         // 查询设备格式选项
         info.formats = EnumerateDeviceFormats(info.deviceName);
-        APP_LOG_DEBUG("    Formats:", info.formats.size());
+        APP_LOG_DEBUG("Formats:", info.formats.size());
 
         devices.append(info);
     }

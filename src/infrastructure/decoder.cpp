@@ -20,7 +20,7 @@ decoder::~decoder() {
     if (m_hwDeviceCtx) {
         av_buffer_unref(&m_hwDeviceCtx);
     }
-    APP_LOG_DEBUG_STREAM() << decoder_type << "瑙ｇ爜鍣ㄨ祫婧愬凡娓呯悊";
+    APP_LOG_DEBUG_STREAM() << decoder_type << "decoder resources released";
 }
 
 void decoder::CreateConnect() {
@@ -176,11 +176,11 @@ int decoder::InitDecoder(std::shared_ptr<SyncQueue<AVPacketPtr>> packetVec
 
     // 鍏堢‘瀹氳В鐮佸櫒绫诲瀷
     if (par->codec_type == AVMEDIA_TYPE_VIDEO) {
-        decoder_type = "瑙嗛";
+        decoder_type = "Video";
         // 瑙嗛灏濊瘯纭В鐮?
         InitHWDecoder();
     } else {
-        decoder_type = "闊抽";
+        decoder_type = "Audio";
         // 闊抽寮哄埗杞В
         m_isHWDecoder = false;
         m_hwDeviceCtx = nullptr;
@@ -271,7 +271,7 @@ int decoder::StartDecoder() {
             // 澶勭悊甯э紙鍖哄垎瑙嗛纭В/瑙嗛杞В/闊抽锛?
             AVFramePtr outFrame;
 
-            if (decoder_type == "瑙嗛" && m_isHWDecoder &&
+            if (decoder_type == "Video" && m_isHWDecoder &&
                 frame->format == m_hwPixFmt) {
                 // 瑙嗛纭В甯э細闇€瑕佽浆鎹?
                 outFrame = TransferHWFrame(frame);
@@ -298,7 +298,7 @@ int decoder::StartDecoder() {
             }
 
             // 楠岃瘉杈撳嚭甯?
-            if (decoder_type == "瑙嗛" && (outFrame->width <= 0 || outFrame->height <= 0)) {
+            if (decoder_type == "Video" && (outFrame->width <= 0 || outFrame->height <= 0)) {
                 APP_LOG_DEBUG_STREAM() << "Invalid video frame size, dropping";
                 continue;
             }

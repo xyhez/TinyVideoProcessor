@@ -56,7 +56,7 @@ MainWindow::MainWindow(QWidget *parent)
     QString filepath = "../../resource/动物发现自己被绿.mp4";
     playlistManager_->AddFile(filepath);
     if (!SwitchToPlaylistIndex(playlistManager_->CurrentIndex(), false)) {
-        APP_LOG_CRITICAL_STREAM() << "Controller 初始化失败";
+        APP_LOG_CRITICAL_STREAM() << "Controller initialization failed";
         return;
     }
 
@@ -1052,7 +1052,7 @@ void MainWindow::AddCameraStream() {
         return;
     }
 
-    APP_LOG_DEBUG_STREAM() << "MainWindow::AddCameraStream() - 添加摄像头:" << options.Description();
+    APP_LOG_DEBUG_STREAM() << "MainWindow::AddCameraStream() - add camera:" << options.Description();
 
     // 查找可用的逻辑视频 slot，默认 VideoRender 回退时复用主视频区域容器。
     const int slotIndex = FirstAvailableVideoSlotIndex();
@@ -1096,7 +1096,7 @@ void MainWindow::AddCameraStream() {
 
     RefreshStreamView();
 
-    APP_LOG_DEBUG_STREAM() << "MainWindow::AddCameraStream() - 摄像头添加成功, StreamId:" << streamId;
+    APP_LOG_DEBUG_STREAM() << "MainWindow::AddCameraStream() - camera added, StreamId:" << streamId;
 }
 
 void MainWindow::AddNetworkStream() {
