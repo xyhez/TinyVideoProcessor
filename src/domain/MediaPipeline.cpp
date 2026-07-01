@@ -1,5 +1,5 @@
 #include "MediaPipeline.h"
-#include "core/AppLog.h"
+#include "tiny_log/Logging.h"
 
 #include <algorithm>
 #include <QVBoxLayout>
@@ -24,7 +24,7 @@ bool MediaPipeline::Initialize(std::shared_ptr<IMediaSource> mediaSource,
                                IVideoFrameSink* videoFrameSink)
 {
     if (!mediaSource) {
-        APP_LOG_CRITICAL("MediaPipeline initialize failed: media source is null");
+        LOG_CRITICAL("MediaPipeline initialize failed: media source is null");
         return false;
     }
 
@@ -46,20 +46,20 @@ void MediaPipeline::Shutdown()
 void MediaPipeline::Start()
 {
     if (playbackFinished_) {
-        APP_LOG_WARN("MediaPipeline start rejected: playback has finished, recreate pipeline to replay");
+        LOG_WARN("MediaPipeline start rejected: playback has finished, recreate pipeline to replay");
         return;
     }
 
     if (!demuxer_ || !Vdecoder_ || !videoFrameScheduler_ || !activeVideoFrameSink_ ||
         !positionTimer_ || !demuxerTH_ || !VdecoderTH_) {
-        APP_LOG_WARN("MediaPipeline start failed: playback pipeline is not initialized");
+        LOG_WARN("MediaPipeline start failed: playback pipeline is not initialized");
         emit ErrorOccurred("Playback pipeline is not initialized");
         return;
     }
 
     const bool hasAudio = Adecoder_ || audioplay_ || AdecoderTH_ || audioplayTH_;
     if (hasAudio && (!Adecoder_ || !audioplay_ || !AdecoderTH_ || !audioplayTH_)) {
-        APP_LOG_WARN("MediaPipeline start failed: audio pipeline is incomplete");
+        LOG_WARN("MediaPipeline start failed: audio pipeline is incomplete");
         emit ErrorOccurred("Audio pipeline is incomplete");
         return;
     }
@@ -87,7 +87,7 @@ void MediaPipeline::Start()
 void MediaPipeline::Pause()
 {
     if (!demuxer_ || !Vdecoder_ || !videoFrameScheduler_ || !positionTimer_) {
-        APP_LOG_WARN("MediaPipeline pause failed: playback pipeline is not initialized");
+        LOG_WARN("MediaPipeline pause failed: playback pipeline is not initialized");
         emit ErrorOccurred("Playback pipeline is not initialized");
         return;
     }
@@ -135,7 +135,7 @@ void MediaPipeline::Stop()
         if (realtimeSource) {
             mediaSource_->ClearInterrupt();
         }
-        APP_LOG_WARN("MediaPipeline stop failed: playback pipeline suspend failed");
+        LOG_WARN("MediaPipeline stop failed: playback pipeline suspend failed");
         emit ErrorOccurred("Playback pipeline suspend failed");
         return;
     }
@@ -158,19 +158,19 @@ void MediaPipeline::Stop()
 bool MediaPipeline::SeekTo(double seconds)
 {
     if (!demuxer_ || !Vdecoder_ || !syncManager_) {
-        APP_LOG_WARN("MediaPipeline seek failed: playback pipeline is not initialized");
+        LOG_WARN("MediaPipeline seek failed: playback pipeline is not initialized");
         emit ErrorOccurred("Playback pipeline is not initialized");
         return false;
     }
 
     if (playbackFinished_) {
-        APP_LOG_WARN("MediaPipeline seek rejected: playback has finished, recreate pipeline to seek");
+        LOG_WARN("MediaPipeline seek rejected: playback has finished, recreate pipeline to seek");
         return false;
     }
 
     // 检查媒体源是否支持 seek
     if (mediaSource_ && !mediaSource_->IsSeekable()) {
-        APP_LOG_WARN("MediaPipeline seek rejected: media source is not seekable");
+        LOG_WARN("MediaPipeline seek rejected: media source is not seekable");
         return false;
     }
 
@@ -185,7 +185,7 @@ bool MediaPipeline::SeekTo(double seconds)
     }
 
     if (!SuspendPipelineAndWait()) {
-        APP_LOG_WARN("MediaPipeline seek failed: playback pipeline suspend failed");
+        LOG_WARN("MediaPipeline seek failed: playback pipeline suspend failed");
         emit ErrorOccurred("Playback pipeline suspend failed");
         return false;
     }
@@ -198,7 +198,7 @@ bool MediaPipeline::SeekTo(double seconds)
 
     const int seekResult = demuxer_->SeekTo(targetSeconds);
     if (seekResult != 0) {
-        APP_LOG_WARN("MediaPipeline seek failed: demuxer rejected target", targetSeconds);
+        LOG_WARN("MediaPipeline seek failed: demuxer rejected target", targetSeconds);
         emit ErrorOccurred("Demuxer rejected seek target");
         return false;
     }
@@ -216,14 +216,14 @@ bool MediaPipeline::SeekTo(double seconds)
 bool MediaPipeline::SeekRelative(double seconds)
 {
     if (!demuxer_) {
-        APP_LOG_WARN("MediaPipeline seek failed: demuxer is not initialized");
+        LOG_WARN("MediaPipeline seek failed: demuxer is not initialized");
         emit ErrorOccurred("Demuxer is not initialized");
         return false;
     }
 
     // 检查媒体源是否支持 seek
     if (mediaSource_ && !mediaSource_->IsSeekable()) {
-        APP_LOG_WARN("MediaPipeline seek rejected: media source is not seekable");
+        LOG_WARN("MediaPipeline seek rejected: media source is not seekable");
         return false;
     }
 
@@ -351,7 +351,7 @@ bool MediaPipeline::CreatePipelineResources(std::shared_ptr<IMediaSource> mediaS
 
     activeVideoFrameSink_ = videoFrameSink ? videoFrameSink : videoRender_;
     if (!activeVideoFrameSink_) {
-        APP_LOG_CRITICAL("MediaPipeline create resources failed: video frame sink is null");
+        LOG_CRITICAL("MediaPipeline create resources failed: video frame sink is null");
         return false;
     }
 
@@ -402,42 +402,42 @@ void MediaPipeline::CreateConnects()
 
 void MediaPipeline::ReleaseResources()
 {
-    APP_LOG_DEBUG("MediaPipeline release resources begin");
+    LOG_DEBUG("MediaPipeline release resources begin");
 
     if (positionTimer_) {
-        APP_LOG_DEBUG("MediaPipeline release: stop position timer");
+        LOG_DEBUG("MediaPipeline release: stop position timer");
         positionTimer_->stop();
     }
 
     if (mediaSource_) {
-        APP_LOG_DEBUG("MediaPipeline release: request media source interrupt");
+        LOG_DEBUG("MediaPipeline release: request media source interrupt");
         mediaSource_->RequestInterrupt();
     }
 
-    APP_LOG_DEBUG("MediaPipeline release: request queues stop");
+    LOG_DEBUG("MediaPipeline release: request queues stop");
     if (APacket_) { APacket_->RequestStop(); }
     if (VPacket_) { VPacket_->RequestStop(); }
     if (AFrame_)  { AFrame_->RequestStop();  }
     if (VFrame_)  { VFrame_->RequestStop();  }
 
     if (demuxer_) {
-        APP_LOG_DEBUG("MediaPipeline release: stop demuxer");
+        LOG_DEBUG("MediaPipeline release: stop demuxer");
         demuxer_->Stop();
     }
     if (Adecoder_) {
-        APP_LOG_DEBUG("MediaPipeline release: stop audio decoder");
+        LOG_DEBUG("MediaPipeline release: stop audio decoder");
         Adecoder_->Stop();
     }
     if (Vdecoder_) {
-        APP_LOG_DEBUG("MediaPipeline release: stop video decoder");
+        LOG_DEBUG("MediaPipeline release: stop video decoder");
         Vdecoder_->Stop();
     }
     if (audioplay_) {
-        APP_LOG_DEBUG("MediaPipeline release: stop audio player");
+        LOG_DEBUG("MediaPipeline release: stop audio player");
         audioplay_->Stop();
     }
     if (videoFrameScheduler_) {
-        APP_LOG_DEBUG("MediaPipeline release: stop video frame scheduler");
+        LOG_DEBUG("MediaPipeline release: stop video frame scheduler");
         videoFrameScheduler_->Stop();
         videoFrameScheduler_->ClearOutputFrame();
         videoFrameScheduler_->SetFrameSink(nullptr);
@@ -445,12 +445,12 @@ void MediaPipeline::ReleaseResources()
 
     auto stopThread = [](const char* name, std::unique_ptr<QThread>& thread) {
         if (thread) {
-            APP_LOG_DEBUG("MediaPipeline release: quit thread", name,
+            LOG_DEBUG("MediaPipeline release: quit thread", name,
                           "running =", thread->isRunning());
             thread->quit();
-            APP_LOG_DEBUG("MediaPipeline release: wait thread begin", name);
+            LOG_DEBUG("MediaPipeline release: wait thread begin", name);
             thread->wait();
-            APP_LOG_DEBUG("MediaPipeline release: wait thread finished", name);
+            LOG_DEBUG("MediaPipeline release: wait thread finished", name);
             thread.reset();
         }
     };
@@ -459,32 +459,32 @@ void MediaPipeline::ReleaseResources()
     stopThread("video decoder", VdecoderTH_);
     stopThread("audio player", audioplayTH_);
 
-    APP_LOG_DEBUG("MediaPipeline release: reset infrastructure objects");
+    LOG_DEBUG("MediaPipeline release: reset infrastructure objects");
     demuxer_.reset();
     Adecoder_.reset();
     Vdecoder_.reset();
     audioplay_.reset();
     videoFrameScheduler_.reset();
     if (videoRender_) {
-        APP_LOG_DEBUG("MediaPipeline release: delete video render");
+        LOG_DEBUG("MediaPipeline release: delete video render");
         delete videoRender_;
         videoRender_ = nullptr;
     }
     activeVideoFrameSink_ = nullptr;
 
-    APP_LOG_DEBUG("MediaPipeline release: reset queues and sync manager");
+    LOG_DEBUG("MediaPipeline release: reset queues and sync manager");
     APacket_.reset();
     VPacket_.reset();
     AFrame_.reset();
     VFrame_.reset();
     syncManager_.reset();
     if (mediaSource_) {
-        APP_LOG_DEBUG("MediaPipeline release: close media source");
+        LOG_DEBUG("MediaPipeline release: close media source");
         mediaSource_->Close();
     }
     mediaSource_.reset();
     positionTimer_.reset();
-    APP_LOG_DEBUG("MediaPipeline release resources finished");
+    LOG_DEBUG("MediaPipeline release resources finished");
 }
 
 void MediaPipeline::HandleDemuxFinished()
@@ -557,35 +557,35 @@ void MediaPipeline::HandleDemuxError(const QString& message)
 
 bool MediaPipeline::SuspendPipelineAndWait()
 {
-    APP_LOG_DEBUG("MediaPipeline suspend begin");
+    LOG_DEBUG("MediaPipeline suspend begin");
 
     if (videoFrameScheduler_) {
-        APP_LOG_DEBUG("MediaPipeline suspend: pause video frame scheduler");
+        LOG_DEBUG("MediaPipeline suspend: pause video frame scheduler");
         videoFrameScheduler_->Pause();
     }
     if (audioplay_) {
-        APP_LOG_DEBUG("MediaPipeline suspend: pause audio player");
+        LOG_DEBUG("MediaPipeline suspend: pause audio player");
         audioplay_->Pause();
     }
 
     bool suspended = true;
     if (demuxer_ && demuxerTH_ && demuxerTH_->isRunning()) {
-        APP_LOG_DEBUG("MediaPipeline suspend: demuxer wait begin");
+        LOG_DEBUG("MediaPipeline suspend: demuxer wait begin");
         suspended = demuxer_->SuspendAndWait() == 0 && suspended;
-        APP_LOG_DEBUG("MediaPipeline suspend: demuxer wait finished", "result =", suspended);
+        LOG_DEBUG("MediaPipeline suspend: demuxer wait finished", "result =", suspended);
     }
     if (Adecoder_ && AdecoderTH_ && AdecoderTH_->isRunning()) {
-        APP_LOG_DEBUG("MediaPipeline suspend: audio decoder wait begin");
+        LOG_DEBUG("MediaPipeline suspend: audio decoder wait begin");
         suspended = Adecoder_->SuspendAndWait() == 0 && suspended;
-        APP_LOG_DEBUG("MediaPipeline suspend: audio decoder wait finished", "result =", suspended);
+        LOG_DEBUG("MediaPipeline suspend: audio decoder wait finished", "result =", suspended);
     }
     if (Vdecoder_ && VdecoderTH_ && VdecoderTH_->isRunning()) {
-        APP_LOG_DEBUG("MediaPipeline suspend: video decoder wait begin");
+        LOG_DEBUG("MediaPipeline suspend: video decoder wait begin");
         suspended = Vdecoder_->SuspendAndWait() == 0 && suspended;
-        APP_LOG_DEBUG("MediaPipeline suspend: video decoder wait finished", "result =", suspended);
+        LOG_DEBUG("MediaPipeline suspend: video decoder wait finished", "result =", suspended);
     }
 
-    APP_LOG_DEBUG("MediaPipeline suspend finished", "result =", suspended);
+    LOG_DEBUG("MediaPipeline suspend finished", "result =", suspended);
     return suspended;
 }
 

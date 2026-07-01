@@ -1,6 +1,6 @@
 #include "videoframeconverter.h"
 
-#include "core/AppLog.h"
+#include "tiny_log/Logging.h"
 
 #include <QString>
 #include <utility>
@@ -313,7 +313,7 @@ void VideoFrameConverter::LogConversionIfNeeded(AVPixelFormat sourceFormat,
     RememberConversionLogSignature(signature);
 
     if (success) {
-        APP_LOG_INFO_STREAM().noquote()
+        LOG_INFO_STREAM().noquote()
             << "VideoFrameConverter format conversion:"
             << PixelFormatName(sourceFormat)
             << "->" << PixelFormatName(kDisplayPixelFormat)
@@ -321,17 +321,17 @@ void VideoFrameConverter::LogConversionIfNeeded(AVPixelFormat sourceFormat,
             << QString("colorspace=%1->%2").arg(ColorSpaceName(sourceColorSpace), ColorSpaceName(kDisplayColorSpace))
             << QString("size=%1x%2").arg(width).arg(height);
         if (usedBt2020Fallback) {
-            APP_LOG_WARN_STREAM().noquote()
+            LOG_WARN_STREAM().noquote()
                 << "VideoFrameConverter BT.2020/HDR full restoration is not supported yet,"
                 << "fallback to SDR BT.709 input strategy.";
         } else if (usedFallback) {
-            APP_LOG_INFO_STREAM().noquote()
+            LOG_INFO_STREAM().noquote()
                 << "VideoFrameConverter used default SDR color strategy for unspecified frame metadata.";
         }
         return;
     }
 
-    APP_LOG_WARN_STREAM().noquote()
+    LOG_WARN_STREAM().noquote()
         << "VideoFrameConverter format conversion failed:"
         << PixelFormatName(sourceFormat)
         << "->" << PixelFormatName(kDisplayPixelFormat)

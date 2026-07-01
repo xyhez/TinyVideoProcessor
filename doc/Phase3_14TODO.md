@@ -103,7 +103,7 @@ docs: 设计 MultiViewRenderer 多路性能指标
 - `src/infrastructure/multiviewrenderer.cpp`
 - `src/infrastructure/decoder.h`
 - `src/infrastructure/decoder.cpp`
-- 可选：`src/core/AppLog.h`
+- 可选：`Lib/TinyLogLibrary/include/tiny_log/Logging.h`
 - `doc/Phase3_14TODO.md`
 
 **任务清单**：

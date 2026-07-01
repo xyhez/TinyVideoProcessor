@@ -1,11 +1,11 @@
-﻿#include "ui/mainwindow.h"
+#include "ui/mainwindow.h"
 #include "ui_mainwindow.h"
 #include "domain/FileMediaSource.h"
 #include "domain/CameraMediaSource.h"
 #include "infrastructure/multiviewrenderer.h"
 #include "infrastructure/singlestreamframesinkadapter.h"
 #include "ui/CameraSettingsDialog.h"
-#include "core/AppLog.h"
+#include "tiny_log/Logging.h"
 
 #include <QAbstractItemView>
 #include <QComboBox>
@@ -56,7 +56,7 @@ MainWindow::MainWindow(QWidget *parent)
     QString filepath = "../../resource/动物发现自己被绿.mp4";
     playlistManager_->AddFile(filepath);
     if (!SwitchToPlaylistIndex(playlistManager_->CurrentIndex(), false)) {
-        APP_LOG_CRITICAL_STREAM() << "Controller initialization failed";
+        LOG_CRITICAL_STREAM() << "Controller initialization failed";
         return;
     }
 
@@ -153,7 +153,7 @@ void MainWindow::CreateConnects() {
                 const QString errorMessage = message.isEmpty()
                     ? QString("未知错误")
                     : message;
-                APP_LOG_WARN_STREAM() << "Stream error:" << id << errorMessage;
+                LOG_WARN_STREAM() << "Stream error:" << id << errorMessage;
                 QMessageBox::warning(this, "媒体流错误", QString("%1：%2").arg(streamName, errorMessage));
             });
 
@@ -625,7 +625,7 @@ void MainWindow::SetMultiViewLayout(MultiViewLayout layout) {
     UpdateLayoutComboBox(multiViewLayout_);
     RefreshMultiViewLayout();
     ShowGrid4x4CapacityNoticeIfNeeded();
-    APP_LOG_INFO_STREAM()
+    LOG_INFO_STREAM()
         << "Multi view layout changed, visible slots:" << MaxVisibleStreams()
         << "assignable slots:" << CurrentVideoSlotCapacity()
         << "max logical slots:" << MaxVideoSlots();
@@ -730,7 +730,7 @@ bool MainWindow::ActivateStreamFromView(MediaPlayController::StreamId streamId) 
     }
 
     if (!mediaPlayController_->SetActiveStream(streamId)) {
-        APP_LOG_WARN_STREAM() << "Set active stream from view failed:" << streamId;
+        LOG_WARN_STREAM() << "Set active stream from view failed:" << streamId;
         return true;
     }
 
@@ -739,7 +739,7 @@ bool MainWindow::ActivateStreamFromView(MediaPlayController::StreamId streamId) 
             ? streamId
             : MediaPlayController::InvalidStreamId;
     if (!mediaPlayController_->SetActiveAudioStream(audioStreamId)) {
-        APP_LOG_WARN_STREAM() << "Set active audio stream from view failed:" << streamId;
+        LOG_WARN_STREAM() << "Set active audio stream from view failed:" << streamId;
     }
 
     RefreshStreamView();
@@ -1004,7 +1004,7 @@ void MainWindow::AddMultiStreamFiles() {
     for (const QString& filePath : filePaths) {
         const int slotIndex = FirstAvailableVideoSlotIndex();
         if (slotIndex < 0) {
-            APP_LOG_WARN_STREAM() << "Add stream failed: no available video slot";
+            LOG_WARN_STREAM() << "Add stream failed: no available video slot";
             break;
         }
 
@@ -1014,7 +1014,7 @@ void MainWindow::AddMultiStreamFiles() {
             CreateMultiViewFrameSinkFactory();
         QWidget* fallbackRendererContainer = frameSinkFactory ? nullptr : FallbackRendererContainer();
         if (!frameSinkFactory && !fallbackRendererContainer) {
-            APP_LOG_WARN_STREAM() << "Add stream failed: fallback video container missing";
+            LOG_WARN_STREAM() << "Add stream failed: fallback video container missing";
             break;
         }
 
@@ -1027,7 +1027,7 @@ void MainWindow::AddMultiStreamFiles() {
             streamId = mediaPlayController_->AddStream(mediaSource, fallbackRendererContainer);
         }
         if (streamId == MediaPlayController::InvalidStreamId) {
-            APP_LOG_WARN_STREAM() << "Add stream failed:" << filePath;
+            LOG_WARN_STREAM() << "Add stream failed:" << filePath;
             continue;
         }
 
@@ -1048,16 +1048,16 @@ void MainWindow::AddCameraStream() {
     // 获取用户选择的选项
     CameraOpenOptions options = dialog.GetSelectedOptions();
     if (!options.IsValid()) {
-        APP_LOG_WARN_STREAM() << "MainWindow::AddCameraStream() - Invalid camera options";
+        LOG_WARN_STREAM() << "MainWindow::AddCameraStream() - Invalid camera options";
         return;
     }
 
-    APP_LOG_DEBUG_STREAM() << "MainWindow::AddCameraStream() - add camera:" << options.Description();
+    LOG_DEBUG_STREAM() << "MainWindow::AddCameraStream() - add camera:" << options.Description();
 
     // 查找可用的逻辑视频 slot，默认 VideoRender 回退时复用主视频区域容器。
     const int slotIndex = FirstAvailableVideoSlotIndex();
     if (slotIndex < 0) {
-        APP_LOG_WARN_STREAM() << "Add camera failed: no available video slot";
+        LOG_WARN_STREAM() << "Add camera failed: no available video slot";
         return;
     }
 
@@ -1069,7 +1069,7 @@ void MainWindow::AddCameraStream() {
         CreateMultiViewFrameSinkFactory();
     QWidget* fallbackRendererContainer = frameSinkFactory ? nullptr : FallbackRendererContainer();
     if (!frameSinkFactory && !fallbackRendererContainer) {
-        APP_LOG_WARN_STREAM() << "Add camera failed: fallback video container missing";
+        LOG_WARN_STREAM() << "Add camera failed: fallback video container missing";
         return;
     }
 
@@ -1083,7 +1083,7 @@ void MainWindow::AddCameraStream() {
     }
 
     if (streamId == MediaPlayController::InvalidStreamId) {
-        APP_LOG_WARN_STREAM() << "Add camera failed: could not add stream";
+        LOG_WARN_STREAM() << "Add camera failed: could not add stream";
         return;
     }
 
@@ -1096,13 +1096,13 @@ void MainWindow::AddCameraStream() {
 
     RefreshStreamView();
 
-    APP_LOG_DEBUG_STREAM() << "MainWindow::AddCameraStream() - camera added, StreamId:" << streamId;
+    LOG_DEBUG_STREAM() << "MainWindow::AddCameraStream() - camera added, StreamId:" << streamId;
 }
 
 void MainWindow::AddNetworkStream() {
     const int slotIndex = FirstAvailableVideoSlotIndex();
     if (slotIndex < 0) {
-        APP_LOG_WARN_STREAM() << "Add network stream failed: no available video slot";
+        LOG_WARN_STREAM() << "Add network stream failed: no available video slot";
         return;
     }
 
@@ -1139,7 +1139,7 @@ void MainWindow::AddNetworkStream() {
         CreateMultiViewFrameSinkFactory();
     QWidget* fallbackRendererContainer = frameSinkFactory ? nullptr : FallbackRendererContainer();
     if (!frameSinkFactory && !fallbackRendererContainer) {
-        APP_LOG_WARN_STREAM() << "Add network stream failed: fallback video container missing";
+        LOG_WARN_STREAM() << "Add network stream failed: fallback video container missing";
         return;
     }
 
@@ -1154,7 +1154,7 @@ void MainWindow::AddNetworkStream() {
     }
 
     if (streamId == MediaPlayController::InvalidStreamId) {
-        APP_LOG_WARN_STREAM() << "Add network stream failed:" << url;
+        LOG_WARN_STREAM() << "Add network stream failed:" << url;
         return;
     }
 
@@ -1174,7 +1174,7 @@ void MainWindow::RemoveSelectedStream() {
     }
 
     if (!mediaPlayController_->RemoveStream(streamId)) {
-        APP_LOG_WARN_STREAM() << "Remove stream failed:" << streamId;
+        LOG_WARN_STREAM() << "Remove stream failed:" << streamId;
     }
 }
 
@@ -1185,7 +1185,7 @@ void MainWindow::SetSelectedActiveStream() {
     }
 
     if (!ActivateStreamFromView(streamId)) {
-        APP_LOG_WARN_STREAM() << "Set active stream failed:" << streamId;
+        LOG_WARN_STREAM() << "Set active stream failed:" << streamId;
     }
 }
 
@@ -1196,7 +1196,7 @@ void MainWindow::SetSelectedActiveAudioStream() {
     }
 
     if (!mediaPlayController_->SetActiveAudioStream(streamId)) {
-        APP_LOG_WARN_STREAM() << "Set active audio stream failed:" << streamId;
+        LOG_WARN_STREAM() << "Set active audio stream failed:" << streamId;
         return;
     }
 
@@ -1238,7 +1238,7 @@ bool MainWindow::SwitchToPlaylistIndex(int index, bool autoStart) {
               frameSinkFactory)
         : mediaPlayController_->SwitchSource(mediaSource, fallbackRendererContainer, autoStart);
     if (!switched) {
-        APP_LOG_WARN_STREAM() << "Switch playlist item failed:" << item.filePath;
+        LOG_WARN_STREAM() << "Switch playlist item failed:" << item.filePath;
         if (previousIndex >= 0 && previousIndex < playlistManager_->Count()) {
             playlistManager_->SetCurrentIndex(previousIndex);
         }

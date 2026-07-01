@@ -3,7 +3,7 @@
 //
 
 #include "MediaPlayController.h"
-#include "core/AppLog.h"
+#include "tiny_log/Logging.h"
 #include "domain/MultiStreamManager.h"
 #include "domain/NetworkMediaSource.h"
 
@@ -41,13 +41,13 @@ MediaPlayController::~MediaPlayController() {
 bool MediaPlayController::Initialize(std::shared_ptr<IMediaSource> mediaSource, QWidget *rendererContainer) {
     const StreamId streamId = AddStream(mediaSource, rendererContainer);
     if (streamId == InvalidStreamId) {
-        APP_LOG_CRITICAL("Failed to initialize media stream");
+        LOG_CRITICAL("Failed to initialize media stream");
         SetState(PlaybackState::Stopped);
         return false;
     }
 
     if (!SetActiveStream(streamId)) {
-        APP_LOG_CRITICAL("Failed to set active stream");
+        LOG_CRITICAL("Failed to set active stream");
         RemoveStream(streamId);
         SetState(PlaybackState::Stopped);
         return false;
@@ -72,7 +72,7 @@ bool MediaPlayController::SwitchSourceWithFrameSinkFactory(
     bool autoStart,
     FrameSinkFactory frameSinkFactory) {
     if (!mediaSource) {
-        APP_LOG_WARN("SwitchSource failed: media source is null");
+        LOG_WARN("SwitchSource failed: media source is null");
         return false;
     }
 
@@ -83,7 +83,7 @@ bool MediaPlayController::SwitchSourceWithFrameSinkFactory(
     const StreamId streamId =
         AddStreamWithFrameSinkFactory(mediaSource, rendererContainer, std::move(frameSinkFactory));
     if (streamId == InvalidStreamId) {
-        APP_LOG_WARN("SwitchSource failed: initialize new media source failed");
+        LOG_WARN("SwitchSource failed: initialize new media source failed");
         SetState(PlaybackState::Stopped);
         emit DurationChanged(0.0);
         emit PositionChanged(0.0);
@@ -91,7 +91,7 @@ bool MediaPlayController::SwitchSourceWithFrameSinkFactory(
     }
 
     if (!SetActiveStream(streamId)) {
-        APP_LOG_WARN("SwitchSource failed: set active stream failed");
+        LOG_WARN("SwitchSource failed: set active stream failed");
         RemoveStream(streamId);
         SetState(PlaybackState::Stopped);
         emit DurationChanged(0.0);
@@ -123,12 +123,12 @@ MediaPlayController::StreamId MediaPlayController::AddStreamWithFrameSinkFactory
     FrameSinkFactory frameSinkFactory)
 {
     if (!multiStreamManager_) {
-        APP_LOG_WARN("AddStream failed: multi stream manager is not initialized");
+        LOG_WARN("AddStream failed: multi stream manager is not initialized");
         return InvalidStreamId;
     }
 
     if (!mediaSource) {
-        APP_LOG_WARN("AddStream failed: media source is null");
+        LOG_WARN("AddStream failed: media source is null");
         return InvalidStreamId;
     }
 
@@ -259,7 +259,7 @@ bool MediaPlayController::IsActiveStreamRealtime() const
 void MediaPlayController::StartAll()
 {
     if (!multiStreamManager_ || multiStreamManager_->StreamIds().isEmpty()) {
-        APP_LOG_WARN("StartAll failed: no media streams");
+        LOG_WARN("StartAll failed: no media streams");
         return;
     }
 
@@ -270,7 +270,7 @@ void MediaPlayController::StartAll()
 void MediaPlayController::PauseAll()
 {
     if (!multiStreamManager_ || multiStreamManager_->StreamIds().isEmpty()) {
-        APP_LOG_WARN("PauseAll failed: no media streams");
+        LOG_WARN("PauseAll failed: no media streams");
         return;
     }
 
@@ -432,7 +432,7 @@ bool MediaPlayController::IsPreviewFrameRateReductionEnabled() const {
 
 void MediaPlayController::SetPlaybackSpeed(double speed) {
     if (!std::isfinite(speed) || !IsSupportedPlaybackSpeed(speed)) {
-        APP_LOG_WARN("Unsupported playback speed:", speed);
+        LOG_WARN("Unsupported playback speed:", speed);
         return;
     }
 
@@ -463,12 +463,12 @@ void MediaPlayController::SetState(PlaybackState state) {
 void MediaPlayController::Start() {
     if (!multiStreamManager_
         || multiStreamManager_->ActiveStream() == MultiStreamManager::InvalidStreamId) {
-        APP_LOG_WARN("Start failed: playback pipeline is not initialized");
+        LOG_WARN("Start failed: playback pipeline is not initialized");
         return;
     }
 
     if (!multiStreamManager_->StartStream(multiStreamManager_->ActiveStream())) {
-        APP_LOG_WARN("Start failed: active stream is invalid");
+        LOG_WARN("Start failed: active stream is invalid");
         return;
     }
 
@@ -500,12 +500,12 @@ void MediaPlayController::Shutdown() {
 void MediaPlayController::Pause() {
     if (!multiStreamManager_
         || multiStreamManager_->ActiveStream() == MultiStreamManager::InvalidStreamId) {
-        APP_LOG_WARN("Pause failed: playback pipeline is not initialized");
+        LOG_WARN("Pause failed: playback pipeline is not initialized");
         return;
     }
 
     if (!multiStreamManager_->PauseStream(multiStreamManager_->ActiveStream())) {
-        APP_LOG_WARN("Pause failed: active stream is invalid");
+        LOG_WARN("Pause failed: active stream is invalid");
         return;
     }
 
@@ -556,13 +556,13 @@ bool MediaPlayController::IsMuted() const {
 void MediaPlayController::SeekTo(double seconds) {
     if (!multiStreamManager_
         || multiStreamManager_->ActiveStream() == MultiStreamManager::InvalidStreamId) {
-        APP_LOG_WARN("Seek failed: playback pipeline is not initialized");
+        LOG_WARN("Seek failed: playback pipeline is not initialized");
         return;
     }
 
     // 检查 active stream 是否支持 seek
     if (!multiStreamManager_->IsActiveStreamSeekable()) {
-        APP_LOG_WARN("Seek rejected: active stream is not seekable");
+        LOG_WARN("Seek rejected: active stream is not seekable");
         return;
     }
 
@@ -589,13 +589,13 @@ void MediaPlayController::SeekTo(double seconds) {
 void MediaPlayController::SeekRelative(double seconds) {
     if (!multiStreamManager_
         || multiStreamManager_->ActiveStream() == MultiStreamManager::InvalidStreamId) {
-        APP_LOG_WARN("Seek failed: playback pipeline is not initialized");
+        LOG_WARN("Seek failed: playback pipeline is not initialized");
         return;
     }
 
     // 检查 active stream 是否支持 seek
     if (!multiStreamManager_->IsActiveStreamSeekable()) {
-        APP_LOG_WARN("Seek rejected: active stream is not seekable");
+        LOG_WARN("Seek rejected: active stream is not seekable");
         return;
     }
 

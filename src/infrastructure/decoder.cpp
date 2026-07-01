@@ -1,5 +1,5 @@
-﻿#include "decoder.h"
-#include "core/AppLog.h"
+#include "decoder.h"
+#include "tiny_log/Logging.h"
 
 #include <QMutexLocker>
 #include <utility>
@@ -20,7 +20,7 @@ decoder::~decoder() {
     if (m_hwDeviceCtx) {
         av_buffer_unref(&m_hwDeviceCtx);
     }
-    APP_LOG_DEBUG_STREAM() << decoder_type << "decoder resources released";
+    LOG_DEBUG_STREAM() << decoder_type << "decoder resources released";
 }
 
 void decoder::CreateConnect() {
@@ -30,11 +30,11 @@ void decoder::CreateConnect() {
 bool decoder::InitHWDecoder()
 {
     if (!kEnableHardwareDecoder) {
-        APP_LOG_DEBUG_STREAM() << "Video hardware decoding disabled, using software decoder";
+        LOG_DEBUG_STREAM() << "Video hardware decoding disabled, using software decoder";
         return false;
     }
     if (par->codec_type != AVMEDIA_TYPE_VIDEO) {
-        APP_LOG_DEBUG_STREAM() << "Audio stream uses software decoder";
+        LOG_DEBUG_STREAM() << "Audio stream uses software decoder";
         return false;
     }
 
@@ -46,7 +46,7 @@ bool decoder::InitHWDecoder()
         par->codec_id != AV_CODEC_ID_VP9 &&
         par->codec_id != AV_CODEC_ID_MPEG2VIDEO &&
         par->codec_id != AV_CODEC_ID_MPEG4) {
-        APP_LOG_DEBUG_STREAM() << "Video codec does not support hardware decoding:" << avcodec_get_name(par->codec_id);
+        LOG_DEBUG_STREAM() << "Video codec does not support hardware decoding:" << avcodec_get_name(par->codec_id);
         return false;
     }
 
@@ -77,7 +77,7 @@ bool decoder::InitHWDecoder()
                 if (ret < 0) {
                     char errBuf[256];
                     av_strerror(ret, errBuf, sizeof(errBuf));
-                    APP_LOG_DEBUG_STREAM() << "Create hardware device context failed:" << hwDevices[i] << "-" << errBuf;
+                    LOG_DEBUG_STREAM() << "Create hardware device context failed:" << hwDevices[i] << "-" << errBuf;
                     continue;
                 }
 
@@ -99,7 +99,7 @@ bool decoder::InitHWDecoder()
     m_hwDeviceCtx = nullptr;
     m_hwPixFmt = AV_PIX_FMT_NONE;
     m_swPixFmt = AV_PIX_FMT_NONE;
-    APP_LOG_DEBUG_STREAM() << "Video uses software decoder";
+    LOG_DEBUG_STREAM() << "Video uses software decoder";
     return false;
 }
 
@@ -112,7 +112,7 @@ AVFramePtr decoder::TransferHWFrame(AVFrame *hwFrame)
 
     AVFramePtr softwareFrame = MakeAVFrame();
     if (!softwareFrame) {
-        APP_LOG_DEBUG_STREAM() << "Allocate hardware transfer frame failed";
+        LOG_DEBUG_STREAM() << "Allocate hardware transfer frame failed";
         return {};
     }
 
@@ -120,7 +120,7 @@ AVFramePtr decoder::TransferHWFrame(AVFrame *hwFrame)
     if (ret < 0) {
         char errBuf[256];
         av_strerror(ret, errBuf, sizeof(errBuf));
-        APP_LOG_DEBUG_STREAM() << "Hardware frame transfer failed:" << errBuf;
+        LOG_DEBUG_STREAM() << "Hardware frame transfer failed:" << errBuf;
         return {};
     }
 
@@ -137,7 +137,7 @@ AVFramePtr decoder::TransferHWFrame(AVFrame *hwFrame)
     const AVPixelFormat transferFormat = static_cast<AVPixelFormat>(softwareFrame->format);
     if (m_lastLoggedTransferPixFmt != transferFormat) {
         m_lastLoggedTransferPixFmt = transferFormat;
-        APP_LOG_DEBUG_STREAM() << "Hardware transfer frame format:"
+        LOG_DEBUG_STREAM() << "Hardware transfer frame format:"
                                << av_get_pix_fmt_name(transferFormat);
     }
 
@@ -149,15 +149,15 @@ int decoder::InitDecoder(std::shared_ptr<SyncQueue<AVPacketPtr>> packetVec
                          , AVCodecParameters *coderPar
                          , AVRational time_base) {
     if (!coderPar) {
-        APP_LOG_WARN_STREAM() << "decoder init failed: codec parameters are null";
+        LOG_WARN_STREAM() << "decoder init failed: codec parameters are null";
         return -1;
     }
     if (!packetVec) {
-        APP_LOG_WARN_STREAM() << "decoder init failed: packet queue is null";
+        LOG_WARN_STREAM() << "decoder init failed: packet queue is null";
         return -1;
     }
     if (!framevec) {
-        APP_LOG_WARN_STREAM() << "decoder init failed: frame queue is null";
+        LOG_WARN_STREAM() << "decoder init failed: frame queue is null";
         return -1;
     }
 
@@ -191,22 +191,22 @@ int decoder::InitDecoder(std::shared_ptr<SyncQueue<AVPacketPtr>> packetVec
     if (ret < 0) {
         char errBuf[256];
         av_strerror(ret, errBuf, sizeof(errBuf));
-        APP_LOG_DEBUG_STREAM() << "avcodec_open2 failed:" << errBuf;
+        LOG_DEBUG_STREAM() << "avcodec_open2 failed:" << errBuf;
         return -1;
     }
 
-    APP_LOG_DEBUG_STREAM() << decoder_type << "decoder initialized"
+    LOG_DEBUG_STREAM() << decoder_type << "decoder initialized"
              << (m_isHWDecoder ? "(hardware)" : "(software)");
     return 0;
 }
 
 int decoder::StartDecoder() {
-    APP_LOG_DEBUG_STREAM() << decoder_type << "decoder thread started"
+    LOG_DEBUG_STREAM() << decoder_type << "decoder thread started"
              << (m_isHWDecoder ? "[hardware]" : "[software]");
 
     frame = av_frame_alloc();
     if (!frame) {
-        APP_LOG_DEBUG_STREAM() << "Allocate frame failed";
+        LOG_DEBUG_STREAM() << "Allocate frame failed";
         return -1;
     }
 
@@ -240,7 +240,7 @@ int decoder::StartDecoder() {
         if (ret < 0) {
             char errBuf[256];
             av_strerror(ret, errBuf, sizeof(errBuf));
-            APP_LOG_DEBUG_STREAM() << "Send packet failed:" << errBuf;
+            LOG_DEBUG_STREAM() << "Send packet failed:" << errBuf;
             continue;
         }
 
@@ -259,7 +259,7 @@ int decoder::StartDecoder() {
             if (ret < 0) {
                 char errBuf[256];
                 av_strerror(ret, errBuf, sizeof(errBuf));
-                APP_LOG_DEBUG_STREAM() << "Receive decoded frame failed:" << errBuf;
+                LOG_DEBUG_STREAM() << "Receive decoded frame failed:" << errBuf;
                 break;
             }
 
@@ -276,19 +276,19 @@ int decoder::StartDecoder() {
                 // 瑙嗛纭В甯э細闇€瑕佽浆鎹?
                 outFrame = TransferHWFrame(frame);
                 if (!outFrame) {
-                    APP_LOG_DEBUG_STREAM() << "Hardware frame transfer failed, skipping frame";
+                    LOG_DEBUG_STREAM() << "Hardware frame transfer failed, skipping frame";
                     continue;
                 }
             } else {
                 // 视频软解或音频：只引用解码输出帧，格式适配交给后续渲染边界
                 outFrame = MakeAVFrame();
                 if (!outFrame) {
-                    APP_LOG_DEBUG_STREAM() << "Allocate output frame failed";
+                    LOG_DEBUG_STREAM() << "Allocate output frame failed";
                     continue;
                 }
 
                 if (av_frame_ref(outFrame.get(), frame) < 0) {
-                    APP_LOG_DEBUG_STREAM() << "Reference frame failed";
+                    LOG_DEBUG_STREAM() << "Reference frame failed";
                     continue;
                 }
 
@@ -299,7 +299,7 @@ int decoder::StartDecoder() {
 
             // 楠岃瘉杈撳嚭甯?
             if (decoder_type == "Video" && (outFrame->width <= 0 || outFrame->height <= 0)) {
-                APP_LOG_DEBUG_STREAM() << "Invalid video frame size, dropping";
+                LOG_DEBUG_STREAM() << "Invalid video frame size, dropping";
                 continue;
             }
 
@@ -325,13 +325,13 @@ int decoder::StartDecoder() {
         }
     }
 
-    APP_LOG_DEBUG_STREAM() << decoder_type << "decoder thread finished";
+    LOG_DEBUG_STREAM() << decoder_type << "decoder thread finished";
     return 0;
 }
 
 int decoder::Flush() {
     if (!Ctx) {
-        APP_LOG_WARN_STREAM() << decoder_type << "decoder flush failed: context is null";
+        LOG_WARN_STREAM() << decoder_type << "decoder flush failed: context is null";
         return -1;
     }
 
@@ -340,7 +340,7 @@ int decoder::Flush() {
         avcodec_flush_buffers(Ctx);
     }
 
-    APP_LOG_DEBUG_STREAM() << decoder_type << "decoder flushed";
+    LOG_DEBUG_STREAM() << decoder_type << "decoder flushed";
     return 0;
 }
 
@@ -408,7 +408,7 @@ int decoder::Start() {
     mutex.lock();
     pause_flag = false;
     suspend_requested_ = false;
-    APP_LOG_DEBUG_STREAM() << decoder_type << "decoder thread started";
+    LOG_DEBUG_STREAM() << decoder_type << "decoder thread started";
     suspendCondition_.wakeAll();
     mutex.unlock();
 
@@ -427,7 +427,7 @@ int decoder::Stop() {
         QMutexLocker locker(&mutex);
         stop_flag = true;
         suspend_requested_ = false;
-        APP_LOG_DEBUG_STREAM() << decoder_type << "decoder thread stopped";
+        LOG_DEBUG_STREAM() << decoder_type << "decoder thread stopped";
         suspendCondition_.wakeAll();
     }
 
@@ -445,7 +445,7 @@ int decoder::Pause(){
     mutex.lock();
     pause_flag = true;
     suspend_requested_ = true;
-    APP_LOG_DEBUG_STREAM() << decoder_type << "decoder thread paused";
+    LOG_DEBUG_STREAM() << decoder_type << "decoder thread paused";
     suspendCondition_.wakeAll();
     mutex.unlock();
 

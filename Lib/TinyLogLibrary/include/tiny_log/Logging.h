@@ -3,6 +3,16 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <type_traits>
+#include <utility>
+
+#if __has_include(<QString>) && __has_include(<QByteArray>)
+#include <QByteArray>
+#include <QString>
+#define TINY_LOG_HAS_QT_TYPES 1
+#else
+#define TINY_LOG_HAS_QT_TYPES 0
+#endif
 
 #if __has_include(<format>)
 #include <format>
@@ -96,9 +106,61 @@ inline SourceLocation MakeLocation(const char* file, int line, const char* func)
     return sourceLocation;
 }
 
+inline void WriteArg(std::ostringstream& oss, const char* value) {
+    oss << (value ? value : "");
+}
+
+#if TINY_LOG_HAS_QT_TYPES
+template <typename T>
+inline std::enable_if_t<std::is_same_v<std::decay_t<T>, QString>, void>
+WriteArg(std::ostringstream& oss, T&& value) {
+    const QByteArray utf8 = value.toUtf8();
+    oss << utf8.constData();
+}
+
+template <typename T>
+inline std::enable_if_t<std::is_same_v<std::decay_t<T>, QByteArray>, void>
+WriteArg(std::ostringstream& oss, T&& value) {
+    oss << std::string(value.constData(), static_cast<std::size_t>(value.size()));
+}
+#endif
+
+template <typename T>
+inline std::enable_if_t<
+#if TINY_LOG_HAS_QT_TYPES
+    !std::is_same_v<std::decay_t<T>, QString> &&
+    !std::is_same_v<std::decay_t<T>, QByteArray> &&
+#endif
+    !std::is_same_v<std::decay_t<T>, const char*> &&
+    !std::is_same_v<std::decay_t<T>, char*>,
+    void>
+WriteArg(std::ostringstream& oss, T&& value) {
+    oss << std::forward<T>(value);
+}
+
+inline void AppendArgs(std::ostringstream&, bool&) {}
+
+template <typename T, typename... Args>
+inline void AppendArgs(std::ostringstream& oss, bool& first, T&& value, Args&&... args) {
+    if (!first) {
+        oss << ' ';
+    }
+    first = false;
+    WriteArg(oss, std::forward<T>(value));
+    AppendArgs(oss, first, std::forward<Args>(args)...);
+}
+
+template <typename... Args>
+inline std::string JoinArgs(Args&&... args) {
+    std::ostringstream oss;
+    bool first = true;
+    AppendArgs(oss, first, std::forward<Args>(args)...);
+    return oss.str();
+}
+
 template <typename T>
 inline void AppendFormatArg(std::ostringstream& oss, T&& value) {
-    oss << std::forward<T>(value);
+    WriteArg(oss, std::forward<T>(value));
 }
 
 inline void AppendFormatArgs(std::ostringstream&) {}
@@ -130,6 +192,61 @@ inline void PrintWithLocation(Level level,
     GetDefaultLogger()->Print(level, msg, MakeLocation(file, line, func));
 }
 
+class Stream {
+public:
+    Stream(Level level, const char* file, int line, const char* func)
+        : level_(level)
+        , file_(file)
+        , line_(line)
+        , func_(func)
+    {
+    }
+
+    Stream(Stream&& other) noexcept
+        : level_(other.level_)
+        , file_(other.file_)
+        , line_(other.line_)
+        , func_(other.func_)
+        , stream_(std::move(other.stream_))
+        , first_(other.first_)
+        , active_(other.active_)
+    {
+        other.active_ = false;
+    }
+
+    Stream(const Stream&) = delete;
+    Stream& operator=(const Stream&) = delete;
+
+    ~Stream() {
+        if (active_) {
+            PrintWithLocation(level_, stream_.str(), file_, line_, func_);
+        }
+    }
+
+    template <typename T>
+    Stream& operator<<(T&& value) {
+        if (!first_) {
+            stream_ << ' ';
+        }
+        first_ = false;
+        WriteArg(stream_, std::forward<T>(value));
+        return *this;
+    }
+
+    Stream& noquote() {
+        return *this;
+    }
+
+private:
+    Level level_;
+    const char* file_;
+    int line_;
+    const char* func_;
+    std::ostringstream stream_;
+    bool first_ = true;
+    bool active_ = true;
+};
+
 } // namespace detail
 } // namespace logging
 
@@ -141,23 +258,47 @@ inline void PrintWithLocation(Level level,
 // ============================================================
 
 // 使用默认的Logger
-#define LOG_TRACE(msg) \
-    ::logging::detail::PrintWithLocation(::logging::Level::Trace,    (msg), __FILE__, __LINE__, __func__)
+#define LOG_TRACE(...) \
+    ::logging::detail::PrintWithLocation(::logging::Level::Trace, \
+        ::logging::detail::JoinArgs(__VA_ARGS__), __FILE__, __LINE__, __func__)
 
-#define LOG_DEBUG(msg) \
-    ::logging::detail::PrintWithLocation(::logging::Level::Debug,    (msg), __FILE__, __LINE__, __func__)
+#define LOG_DEBUG(...) \
+    ::logging::detail::PrintWithLocation(::logging::Level::Debug, \
+        ::logging::detail::JoinArgs(__VA_ARGS__), __FILE__, __LINE__, __func__)
 
-#define LOG_INFO(msg) \
-    ::logging::detail::PrintWithLocation(::logging::Level::Info,     (msg), __FILE__, __LINE__, __func__)
+#define LOG_INFO(...) \
+    ::logging::detail::PrintWithLocation(::logging::Level::Info, \
+        ::logging::detail::JoinArgs(__VA_ARGS__), __FILE__, __LINE__, __func__)
 
-#define LOG_WARN(msg) \
-    ::logging::detail::PrintWithLocation(::logging::Level::Warn,     (msg), __FILE__, __LINE__, __func__)
+#define LOG_WARN(...) \
+    ::logging::detail::PrintWithLocation(::logging::Level::Warn, \
+        ::logging::detail::JoinArgs(__VA_ARGS__), __FILE__, __LINE__, __func__)
 
-#define LOG_ERROR(msg) \
-    ::logging::detail::PrintWithLocation(::logging::Level::Error,    (msg), __FILE__, __LINE__, __func__)
+#define LOG_ERROR(...) \
+    ::logging::detail::PrintWithLocation(::logging::Level::Error, \
+        ::logging::detail::JoinArgs(__VA_ARGS__), __FILE__, __LINE__, __func__)
 
-#define LOG_CRITICAL(msg) \
-    ::logging::detail::PrintWithLocation(::logging::Level::Critical, (msg), __FILE__, __LINE__, __func__)
+#define LOG_CRITICAL(...) \
+    ::logging::detail::PrintWithLocation(::logging::Level::Critical, \
+        ::logging::detail::JoinArgs(__VA_ARGS__), __FILE__, __LINE__, __func__)
+
+#define LOG_TRACE_STREAM() \
+    ::logging::detail::Stream(::logging::Level::Trace, __FILE__, __LINE__, __func__)
+
+#define LOG_DEBUG_STREAM() \
+    ::logging::detail::Stream(::logging::Level::Debug, __FILE__, __LINE__, __func__)
+
+#define LOG_INFO_STREAM() \
+    ::logging::detail::Stream(::logging::Level::Info, __FILE__, __LINE__, __func__)
+
+#define LOG_WARN_STREAM() \
+    ::logging::detail::Stream(::logging::Level::Warn, __FILE__, __LINE__, __func__)
+
+#define LOG_ERROR_STREAM() \
+    ::logging::detail::Stream(::logging::Level::Error, __FILE__, __LINE__, __func__)
+
+#define LOG_CRITICAL_STREAM() \
+    ::logging::detail::Stream(::logging::Level::Critical, __FILE__, __LINE__, __func__)
 
 
 

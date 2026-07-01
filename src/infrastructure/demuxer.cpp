@@ -1,5 +1,5 @@
 #include "demuxer.h"
-#include "core/AppLog.h"
+#include "tiny_log/Logging.h"
 
 #include <QMutexLocker>
 #include <utility>
@@ -31,13 +31,13 @@ demuxer::demuxer(std::shared_ptr<IMediaSource> mediaSource,
     , m_VFrame(VFrame)
 {
     if (!m_mediaSource) {
-        APP_LOG_CRITICAL("Demuxer media source is null");
+        LOG_CRITICAL("Demuxer media source is null");
         return;
     }
 
     AVFormatContext* ic = m_mediaSource->GetFormatContect();
     if (!ic) {
-        APP_LOG_CRITICAL("Demuxer format context is null");
+        LOG_CRITICAL("Demuxer format context is null");
         return;
     }
 
@@ -46,16 +46,16 @@ demuxer::demuxer(std::shared_ptr<IMediaSource> mediaSource,
         AVStream* stream = ic->streams[i];
         AVCodecParameters* codecParameters = stream->codecpar;
         if (codecParameters->codec_type == AVMEDIA_TYPE_VIDEO) {
-            APP_LOG_DEBUG(QString("Found video stream #%1: %2x%3, codec=%4, duration=%5s")
+            LOG_DEBUG(QString("Found video stream #%1: %2x%3, codec=%4, duration=%5s")
                               .arg(i)
                               .arg(codecParameters->width)
                               .arg(codecParameters->height)
                               .arg(avcodec_get_name(codecParameters->codec_id))
                               .arg(ic->duration / 1000000));
-            APP_LOG_DEBUG(QString("frame rate: %1 fps").arg(av_q2d(stream->avg_frame_rate)));
-            APP_LOG_DEBUG(QString("frame duration: %1 ms")
+            LOG_DEBUG(QString("frame rate: %1 fps").arg(av_q2d(stream->avg_frame_rate)));
+            LOG_DEBUG(QString("frame duration: %1 ms")
                               .arg(1.0 / av_q2d(stream->avg_frame_rate) * 1000));
-            APP_LOG_DEBUG("video time_base:", av_q2d(stream->time_base));
+            LOG_DEBUG("video time_base:", av_q2d(stream->time_base));
 
             m_videoStreamIndex = i;
             m_V_coderPar = codecParameters;
@@ -76,13 +76,13 @@ demuxer::demuxer(std::shared_ptr<IMediaSource> mediaSource,
                 info.duration_ = ic->duration / 1000000;
             }
         } else if (codecParameters->codec_type == AVMEDIA_TYPE_AUDIO) {
-            APP_LOG_DEBUG(QString("Found audio stream #%1: %2x%3, codec=%4, duration=%5s")
+            LOG_DEBUG(QString("Found audio stream #%1: %2x%3, codec=%4, duration=%5s")
                               .arg(i)
                               .arg(codecParameters->sample_rate)
                               .arg(codecParameters->bit_rate)
                               .arg(avcodec_get_name(codecParameters->codec_id))
                               .arg(ic->duration / 1000000));
-            APP_LOG_DEBUG("audio time_base:", av_q2d(stream->time_base));
+            LOG_DEBUG("audio time_base:", av_q2d(stream->time_base));
 
             m_audioStreamIndex = i;
             m_A_coderPar = codecParameters;
@@ -93,14 +93,14 @@ demuxer::demuxer(std::shared_ptr<IMediaSource> mediaSource,
             info.audioCodecId_ = codecParameters->codec_id;
             info.A_timeBase = av_q2d(stream->time_base);
         } else if (codecParameters->codec_type == AVMEDIA_TYPE_SUBTITLE) {
-            APP_LOG_DEBUG("Found subtitle stream");
+            LOG_DEBUG("Found subtitle stream");
         }
     }
 }
 
 demuxer::~demuxer()
 {
-    APP_LOG_DEBUG("Demuxer resources released");
+    LOG_DEBUG("Demuxer resources released");
 }
 
 AVCodecParameters* demuxer::ReAcoderPar()
@@ -133,16 +133,16 @@ AVRational demuxer::ReVtimebase()
 
 int demuxer::StartDemuxer()
 {
-    APP_LOG_DEBUG("Demuxer started");
+    LOG_DEBUG("Demuxer started");
 
     if (!m_mediaSource) {
-        APP_LOG_WARN("Demuxer media source is not initialized");
+        LOG_WARN("Demuxer media source is not initialized");
         return -1;
     }
 
     AVFormatContext* ic = m_mediaSource->GetFormatContect();
     if (!ic) {
-        APP_LOG_WARN("Demuxer format context is not initialized");
+        LOG_WARN("Demuxer format context is not initialized");
         return -1;
     }
 
@@ -184,7 +184,7 @@ int demuxer::StartDemuxer()
             }
 
             if (ret == AVERROR_EOF) {
-                APP_LOG_DEBUG("Demuxing finished (EOF)");
+                LOG_DEBUG("Demuxing finished (EOF)");
                 reachedEof = true;
                 break;
             }
@@ -196,7 +196,7 @@ int demuxer::StartDemuxer()
 
             ++consecutiveReadErrors;
             const QString ffmpegError = AvErrorString(ret);
-            APP_LOG_WARN("Demuxer read error:", ffmpegError,
+            LOG_WARN("Demuxer read error:", ffmpegError,
                          "consecutive errors:", consecutiveReadErrors);
 
             if (consecutiveReadErrors >= kMaxConsecutiveReadErrors) {
@@ -285,13 +285,13 @@ int demuxer::Forward()
 int demuxer::SeekTo(double seconds)
 {
     if (!m_mediaSource) {
-        APP_LOG_WARN("Seek failed: media source is null");
+        LOG_WARN("Seek failed: media source is null");
         return -1;
     }
 
     AVFormatContext* ic = m_mediaSource->GetFormatContect();
     if (!ic) {
-        APP_LOG_WARN("Seek failed: format context is null");
+        LOG_WARN("Seek failed: format context is null");
         return -1;
     }
 
@@ -313,14 +313,14 @@ int demuxer::SeekTo(double seconds)
     if (ret < 0) {
         char errBuf[256];
         av_strerror(ret, errBuf, sizeof(errBuf));
-        APP_LOG_WARN("Seek failed:", errBuf);
+        LOG_WARN("Seek failed:", errBuf);
         return -1;
     }
 
     m_AcurrentPTS = 0;
     m_VcurrentPTS = 0;
 
-    APP_LOG_DEBUG("Demuxer seek to", seconds, "seconds");
+    LOG_DEBUG("Demuxer seek to", seconds, "seconds");
     return 0;
 }
 
@@ -384,7 +384,7 @@ int demuxer::Start()
     mutex.lock();
     pause_flag = false;
     suspend_requested_ = false;
-    APP_LOG_DEBUG("Demuxer thread started");
+    LOG_DEBUG("Demuxer thread started");
     suspendCondition_.wakeAll();
     mutex.unlock();
 
@@ -403,7 +403,7 @@ int demuxer::Stop()
     mutex.lock();
     stop_flag = true;
     suspend_requested_ = false;
-    APP_LOG_DEBUG("Demuxer thread stopped");
+    LOG_DEBUG("Demuxer thread stopped");
     suspendCondition_.wakeAll();
     mutex.unlock();
 
@@ -415,7 +415,7 @@ int demuxer::Pause()
     mutex.lock();
     pause_flag = true;
     suspend_requested_ = true;
-    APP_LOG_DEBUG("Demuxer thread paused");
+    LOG_DEBUG("Demuxer thread paused");
     suspendCondition_.wakeAll();
     mutex.unlock();
 

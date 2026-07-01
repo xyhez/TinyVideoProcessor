@@ -1,5 +1,5 @@
-﻿#include "videorender.h"
-#include "core/AppLog.h"
+#include "videorender.h"
+#include "tiny_log/Logging.h"
 #include <QOpenGLPixelTransferOptions>
 #include <utility>
 
@@ -243,7 +243,7 @@ void VideoRender::LogFrameFormatIfNeeded(const AVFrame* frame, bool supported)
     const QString prefix = supported
         ? "VideoRender accepted frame format:"
         : "VideoRender unsupported frame format:";
-    APP_LOG_INFO_STREAM().noquote()
+    LOG_INFO_STREAM().noquote()
         << prefix
         << QString("pix_fmt=%1").arg(PixelFormatName(frame->format))
         << QString("size=%1x%2").arg(frame->width).arg(frame->height)

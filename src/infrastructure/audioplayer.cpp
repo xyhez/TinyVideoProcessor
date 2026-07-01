@@ -1,5 +1,5 @@
-﻿#include "audioplayer.h"
-#include "core/AppLog.h"
+#include "audioplayer.h"
+#include "tiny_log/Logging.h"
 
 #include <algorithm>
 #include <cmath>
@@ -131,7 +131,7 @@ void AudioPlayer::InitAudioPlay(AVCodecParameters* codecPar,
     m_dstRate = m_srcRate;
     m_dstChannels = 2;
 
-    APP_LOG_DEBUG("AudioPlayer initialized: source =", m_srcRate,
+    LOG_DEBUG("AudioPlayer initialized: source =", m_srcRate,
                   "Hz,", m_srcChannels, "channels");
 }
 
@@ -151,7 +151,7 @@ void AudioPlayer::InitAudioOutput()
 
     QAudioDevice dev = QMediaDevices::defaultAudioOutput();
     if (!dev.isFormatSupported(fmt)) {
-        APP_LOG_WARN("AudioPlayer: Requested format not supported, trying preferred output format");
+        LOG_WARN("AudioPlayer: Requested format not supported, trying preferred output format");
         QAudioFormat preferred = dev.preferredFormat();
         QAudioFormat preferredInt16 = preferred;
         preferredInt16.setSampleFormat(QAudioFormat::Int16);
@@ -166,7 +166,7 @@ void AudioPlayer::InitAudioOutput()
     m_audioSink = new QAudioSink(dev, fmt, this);
     ApplyOutputVolume();
 
-    APP_LOG_DEBUG("AudioPlayer: Audio output initialized -",
+    LOG_DEBUG("AudioPlayer: Audio output initialized -",
                   m_dstRate, "Hz,", m_dstChannels, "channels,",
                   QtSampleFormatName(fmt.sampleFormat()));
 }
@@ -290,7 +290,7 @@ bool AudioPlayer::WritePcmBuffer(const char* data,
         }
 
         if (!m_audioSink || m_audioSink->state() == QAudio::StoppedState) {
-            APP_LOG_WARN("AudioPlayer: Audio sink stopped unexpectedly!");
+            LOG_WARN("AudioPlayer: Audio sink stopped unexpectedly!");
             return false;
         }
 
@@ -319,7 +319,7 @@ bool AudioPlayer::WritePcmBuffer(const char* data,
                 m_syncManager->RefreshClock(frameStartClockMs + mediaElapsedMs);
             }
         } else if (written < 0) {
-            APP_LOG_WARN("AudioPlayer: Write error!");
+            LOG_WARN("AudioPlayer: Write error!");
             return false;
         } else {
             QThread::usleep(5 * 1000);
@@ -338,7 +338,7 @@ void AudioPlayer::StartAudioPlay()
     if (m_audioSink) {
         m_ioDevice = m_audioSink->start();
         if (!m_ioDevice) {
-            APP_LOG_CRITICAL("AudioPlayer: Failed to start audio sink!");
+            LOG_CRITICAL("AudioPlayer: Failed to start audio sink!");
             ReleaseAudioOutput();
             return;
         }
@@ -404,7 +404,7 @@ void AudioPlayer::Run()
                 ? tmp->ch_layout.nb_channels
                 : m_srcChannels;
             if (!CopyOrDefaultChannelLayout(&inLayout, tmp->ch_layout, fallbackInputChannels)) {
-                APP_LOG_WARN("AudioPlayer: Invalid input channel layout, skipping audio frame");
+                LOG_WARN("AudioPlayer: Invalid input channel layout, skipping audio frame");
                 continue;
             }
 
@@ -428,7 +428,7 @@ void AudioPlayer::Run()
                                           &inLayout, inFmt, inRate,
                                           0, nullptr);
             if (ret < 0 || !m_swr) {
-                APP_LOG_WARN("AudioPlayer: Resampler allocation failed:", AvErrorString(ret));
+                LOG_WARN("AudioPlayer: Resampler allocation failed:", AvErrorString(ret));
                 av_channel_layout_uninit(&inLayout);
                 av_channel_layout_uninit(&outLayout);
                 break;
@@ -436,7 +436,7 @@ void AudioPlayer::Run()
 
             ret = swr_init(m_swr);
             if (ret < 0) {
-                APP_LOG_WARN("AudioPlayer: Resampler init failed:", AvErrorString(ret));
+                LOG_WARN("AudioPlayer: Resampler init failed:", AvErrorString(ret));
                 swr_free(&m_swr);
                 av_channel_layout_uninit(&inLayout);
                 av_channel_layout_uninit(&outLayout);
@@ -444,7 +444,7 @@ void AudioPlayer::Run()
             }
 
             m_first = false;
-            APP_LOG_DEBUG("AudioPlayer: Resampler initialized - input:",
+            LOG_DEBUG("AudioPlayer: Resampler initialized - input:",
                           inRate, "Hz,", ChannelLayoutName(inLayout), ",",
                           av_get_sample_fmt_name(inFmt),
                           "-> output:", outRate, "Hz,",
@@ -456,7 +456,7 @@ void AudioPlayer::Run()
         }
 
         if (!m_swr) {
-            APP_LOG_WARN("AudioPlayer: Resampler is not initialized, stopping audio playback");
+            LOG_WARN("AudioPlayer: Resampler is not initialized, stopping audio playback");
             break;
         }
 
@@ -477,7 +477,7 @@ void AudioPlayer::Run()
                                     (const uint8_t **)tmp->data, tmp->nb_samples);
 
         if (converted <= 0) {
-            APP_LOG_WARN("AudioPlayer: Resampling failed, skipping frame");
+            LOG_WARN("AudioPlayer: Resampling failed, skipping frame");
             continue;
         }
 
@@ -506,7 +506,7 @@ void AudioPlayer::Run()
         double latency = CalculateHardwareLatency();
 
         if (m_statusTimer.elapsed() > statusInterval) {
-            APP_LOG_DEBUG("AudioPlayer: Status -",
+            LOG_DEBUG("AudioPlayer: Status -",
                           "Written:", (m_bytesWrittenTotal / 1024 / 1024), "MB",
                           "Clock:", (m_syncManager ? m_syncManager->GetClock() : 0.0),
                           "Latency:", QString::number(m_lastHardwareLatency, 'f', 3), "s");
@@ -514,25 +514,25 @@ void AudioPlayer::Run()
         }
     }
 
-    APP_LOG_DEBUG("AudioPlayer: Playback thread finished");
+    LOG_DEBUG("AudioPlayer: Playback thread finished");
 }
 
 void AudioPlayer::Start()
 {
     m_stopFlag.store(false);
     m_pauseFlag.store(false);
-    APP_LOG_DEBUG("AudioPlayer started");
+    LOG_DEBUG("AudioPlayer started");
 }
 
 void AudioPlayer::SetSpeed(double speed)
 {
     if (!std::isfinite(speed) || !IsSupportedSpeed(speed)) {
-        APP_LOG_WARN("AudioPlayer rejected unsupported speed:", speed);
+        LOG_WARN("AudioPlayer rejected unsupported speed:", speed);
         return;
     }
 
     m_speed.store(speed);
-    APP_LOG_DEBUG("AudioPlayer speed set to", speed);
+    LOG_DEBUG("AudioPlayer speed set to", speed);
 }
 
 void AudioPlayer::Stop()
@@ -543,7 +543,7 @@ void AudioPlayer::Stop()
         m_audioFrameQueue->RequestStop();
     }
 
-    APP_LOG_DEBUG("AudioPlayer stopped");
+    LOG_DEBUG("AudioPlayer stopped");
 }
 
 void AudioPlayer::Pause()
@@ -554,7 +554,7 @@ void AudioPlayer::Pause()
         m_audioFrameQueue->WakeAll();
     }
 
-    APP_LOG_DEBUG("AudioPlayer paused");
+    LOG_DEBUG("AudioPlayer paused");
 }
 
 void AudioPlayer::Forward() {

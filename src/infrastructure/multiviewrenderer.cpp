@@ -1,6 +1,6 @@
 #include "multiviewrenderer.h"
 
-#include "core/AppLog.h"
+#include "tiny_log/Logging.h"
 
 #include <algorithm>
 #include <QMutexLocker>
@@ -447,7 +447,7 @@ void MultiViewRenderer::InitializeFrameShader() {
         frameShader_.addShaderFromSourceCode(QOpenGLShader::Fragment, fragmentShader);
     const bool shaderLinked = frameShader_.link();
     if (!vertexShaderReady || !fragmentShaderReady || !shaderLinked) {
-        APP_LOG_WARN_STREAM().noquote()
+        LOG_WARN_STREAM().noquote()
             << "MultiViewRenderer frame shader init failed:"
             << frameShader_.log();
         return;
@@ -753,7 +753,7 @@ void MultiViewRenderer::LogFrameFormatIfNeeded(StreamId streamId,
     const QString prefix = supported
         ? "MultiViewRenderer accepted frame format:"
         : "MultiViewRenderer unsupported frame format:";
-    APP_LOG_INFO_STREAM().noquote()
+    LOG_INFO_STREAM().noquote()
         << prefix
         << QString("streamId=%1").arg(streamId)
         << QString("pix_fmt=%1").arg(PixelFormatName(static_cast<AVPixelFormat>(frame->format)))
@@ -850,7 +850,7 @@ void MultiViewRenderer::LogPerformanceStatsIfNeeded() {
         return;
     }
 
-    APP_LOG_INFO_STREAM().noquote()
+    LOG_INFO_STREAM().noquote()
         << "MultiViewRenderer perf:"
         << QString("paintFps=%1").arg(paintFps, 0, 'f', 1)
         << QString("paintCount=%1").arg(paintDelta)
@@ -862,7 +862,7 @@ void MultiViewRenderer::LogPerformanceStatsIfNeeded() {
         << QString("maxFrame=%1x%2").arg(maxFrameWidth).arg(maxFrameHeight);
 
     if (!streamSummaries.isEmpty()) {
-        APP_LOG_INFO_STREAM().noquote()
+        LOG_INFO_STREAM().noquote()
             << "MultiViewRenderer stream perf:"
             << streamSummaries.join(" | ");
     }

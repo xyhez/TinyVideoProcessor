@@ -1,5 +1,5 @@
 #include "NetworkMediaSource.h"
-#include "core/AppLog.h"
+#include "tiny_log/Logging.h"
 
 extern "C" {
 #include <libavutil/dict.h>
@@ -85,7 +85,7 @@ bool NetworkMediaSource::Open()
     formatContext_->interrupt_callback.callback = &NetworkMediaSource::InterruptCallback;
     formatContext_->interrupt_callback.opaque = this;
 
-    APP_LOG_DEBUG("NetworkMediaSource::Open() - open url:", options_.url);
+    LOG_DEBUG("NetworkMediaSource::Open() - open url:", options_.url);
     const int openRet = avformat_open_input(&formatContext_,
                                             options_.url.toUtf8().constData(),
                                             nullptr,
@@ -145,7 +145,7 @@ bool NetworkMediaSource::Open()
         return false;
     }
 
-    APP_LOG_DEBUG("NetworkMediaSource::Open() - network stream opened");
+    LOG_DEBUG("NetworkMediaSource::Open() - network stream opened");
     return true;
 }
 
@@ -153,7 +153,7 @@ bool NetworkMediaSource::Close()
 {
     RequestInterrupt();
     if (formatContext_) {
-        APP_LOG_DEBUG("NetworkMediaSource::Close() - close network stream");
+        LOG_DEBUG("NetworkMediaSource::Close() - close network stream");
         avformat_close_input(&formatContext_);
         formatContext_ = nullptr;
         return true;
@@ -232,7 +232,7 @@ bool NetworkMediaSource::IsRealtime() const
 void NetworkMediaSource::SetLastError(const QString& message)
 {
     lastError_ = message;
-    APP_LOG_WARN("NetworkMediaSource:", lastError_);
+    LOG_WARN("NetworkMediaSource:", lastError_);
 }
 
 bool NetworkMediaSource::IsProtocolSupported() const

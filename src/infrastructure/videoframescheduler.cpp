@@ -1,6 +1,6 @@
 #include "videoframescheduler.h"
 
-#include "core/AppLog.h"
+#include "tiny_log/Logging.h"
 
 #include <QTimer>
 #include <QtGlobal>
@@ -87,7 +87,7 @@ void VideoFrameScheduler::Pause()
 void VideoFrameScheduler::SetSpeed(double speed)
 {
     if (!std::isfinite(speed) || !IsSupportedSpeed(speed)) {
-        APP_LOG_WARN_STREAM() << "VideoFrameScheduler rejected unsupported speed:" << speed;
+        LOG_WARN_STREAM() << "VideoFrameScheduler rejected unsupported speed:" << speed;
         return;
     }
 

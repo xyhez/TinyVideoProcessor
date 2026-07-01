@@ -1,5 +1,5 @@
 #include "CameraMediaSource.h"
-#include "core/AppLog.h"
+#include "tiny_log/Logging.h"
 
 extern "C" {
 #include <libavdevice/avdevice.h>
@@ -59,7 +59,7 @@ bool CameraMediaSource::Open()
 
     // 构造 dshow 设备 URL: "video=设备名"
     QString deviceUrl = QString("video=%1").arg(deviceName_);
-    APP_LOG_DEBUG("CameraMediaSource::Open() - open camera:", deviceUrl);
+    LOG_DEBUG("CameraMediaSource::Open() - open camera:", deviceUrl);
 
     // 设置摄像头参数
     AVDictionary* options = nullptr;
@@ -132,10 +132,10 @@ bool CameraMediaSource::Open()
             // 计算 time_base
             sourceInfo_.V_timeBase = av_q2d(stream->time_base);
 
-            APP_LOG_DEBUG("CameraMediaSource::Open() - video stream info:");
-            APP_LOG_DEBUG("resolution:", sourceInfo_.width_, "x", sourceInfo_.height_);
-            APP_LOG_DEBUG("frame rate:", sourceInfo_.FrameRate);
-            APP_LOG_DEBUG("codec:", avcodec_get_name(sourceInfo_.videoCodecId_));
+            LOG_DEBUG("CameraMediaSource::Open() - video stream info:");
+            LOG_DEBUG("resolution:", sourceInfo_.width_, "x", sourceInfo_.height_);
+            LOG_DEBUG("frame rate:", sourceInfo_.FrameRate);
+            LOG_DEBUG("codec:", avcodec_get_name(sourceInfo_.videoCodecId_));
 
             break;
         }
@@ -147,14 +147,14 @@ bool CameraMediaSource::Open()
         return false;
     }
 
-    APP_LOG_DEBUG("CameraMediaSource::Open() - camera opened");
+    LOG_DEBUG("CameraMediaSource::Open() - camera opened");
     return true;
 }
 
 bool CameraMediaSource::Close()
 {
     if (formatContext_) {
-        APP_LOG_DEBUG("CameraMediaSource::Close() - close camera");
+        LOG_DEBUG("CameraMediaSource::Close() - close camera");
         avformat_close_input(&formatContext_);
         formatContext_ = nullptr;
         return true;
@@ -236,5 +236,5 @@ bool CameraMediaSource::IsRealtime() const {
 void CameraMediaSource::SetLastError(const QString& message)
 {
     lastError_ = message;
-    APP_LOG_WARN("CameraMediaSource:", lastError_);
+    LOG_WARN("CameraMediaSource:", lastError_);
 }

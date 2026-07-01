@@ -1,5 +1,5 @@
 #include "FileMediaSource.h"
-#include "core/AppLog.h"
+#include "tiny_log/Logging.h"
 
 #include <QDir>
 
@@ -12,12 +12,12 @@ FileMediaSource::~FileMediaSource() {
 
 bool FileMediaSource::Open() {
     if (avformat_open_input(&ic, FileInfo_.filepath_.toUtf8().constData(), nullptr, nullptr)) {
-        APP_LOG_WARN("FileMediaSource open failed:", FileInfo_.filepath_);
+        LOG_WARN("FileMediaSource open failed:", FileInfo_.filepath_);
         return false;
     }
 
     if (avformat_find_stream_info(ic, nullptr) < 0) {
-        APP_LOG_WARN("FileMediaSource stream info lookup failed:", FileInfo_.filepath_);
+        LOG_WARN("FileMediaSource stream info lookup failed:", FileInfo_.filepath_);
         avformat_close_input(&ic);
         ic = nullptr;
         return false;

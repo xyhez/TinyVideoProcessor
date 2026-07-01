@@ -200,7 +200,7 @@ TinyVideoProcessor 是一个渐进式演进的视频处理框架，遵循清晰�
 │                                                     │ Single/2x2/3x3/4x4  │  │
 │                                                     └─────────────────────┘  │
 │                                                                              │
-│  CameraDeviceEnumerator / VideoRender fallback / SyncQueue / AppLog          │
+│  CameraDeviceEnumerator / VideoRender fallback / SyncQueue / TinyLog         │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -430,8 +430,7 @@ TinyVideoProcessor/
     │   └── CameraDeviceEnumerator.h/cpp # 摄像头设备枚举
     └── core/
         ├── ffmpeg_raii.h         # FFmpeg AVPacket/AVFrame RAII 类型
-        ├── queue.h               # 线程安全队列
-        └── AppLog.h              # 应用日志封装
+        └── queue.h               # 线程安全队列
 ```
 
 ---
