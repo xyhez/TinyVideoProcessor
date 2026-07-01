@@ -6,8 +6,9 @@
   - Phase 4 网络流支持已完成收口。
   - Phase 5.1 已完成图像处理基础预研和任务拆分。
   - Phase 5.2 已完成 OpenCV 依赖接入预检查。
+  - Phase 5.3 已完成图像处理抽象空壳。
 - 未完成：
-  - 图像处理抽象空壳。
+  - 帧与 OpenCV Mat 转换边界。
   - active stream 处理链路接入。
   - 基础处理器实现。
   - 最小 UI 接入。
@@ -18,8 +19,9 @@
   - OpenCV 默认 BGR，当前渲染链路以 YUV420P 为主，需要明确转换边界。
   - 多路同时处理会显著放大性能压力，第一版不承诺。
 - 本轮范围：
-  - 完成 OpenCV 依赖接入报告。
-  - 不修改代码。
+  - 新增 `IImageProcessor` 图像处理器接口。
+  - 新增 `ImageProcessorPipeline` 图像处理器链空壳。
+  - 不接入播放链路。
   - 不新增图像处理算法。
 
 ## 阶段目标
@@ -161,35 +163,38 @@ docs: 预研 OpenCV 依赖接入方式
 - `src/infrastructure/iimageprocessor.h`
 - `src/infrastructure/imageprocessorpipeline.h`
 - `src/infrastructure/imageprocessorpipeline.cpp`
-- `CMakeLists.txt`
 - `doc/Phase5TODO.md`
 
 **任务清单**：
 
-- [ ] 新增 `IImageProcessor`。
-- [ ] 定义 `Name()`。
-- [ ] 定义 `Enabled()`。
-- [ ] 定义 `SetEnabled()`。
-- [ ] 定义 `Process()`。
-- [ ] 新增 `ImageProcessorPipeline`。
-- [ ] 支持添加处理器。
-- [ ] 支持清空处理器。
-- [ ] 支持按顺序执行已启用处理器。
-- [ ] 支持记录最近一次处理耗时。
-- [ ] 不接入 `MediaPipeline`。
-- [ ] 不接入 UI。
+- [x] 新增 `IImageProcessor`。
+- [x] 定义 `Name()`。
+- [x] 定义 `Enabled()`。
+- [x] 定义 `SetEnabled()`。
+- [x] 定义 `Process()`。
+- [x] 新增 `ImageProcessorPipeline`。
+- [x] 支持添加处理器。
+- [x] 支持清空处理器。
+- [x] 支持按顺序执行已启用处理器。
+- [x] 支持记录最近一次处理耗时。
+- [x] 不接入 `MediaPipeline`。
+- [x] 不接入 UI。
+- [x] `CMakeLists.txt` 当前通过 `file(GLOB_RECURSE src/*.cpp src/*.h ...)` 自动纳入新增文件，本步无需修改。
 
 **验收标准**：
 
-- [ ] 处理器抽象不依赖 UI。
-- [ ] 处理器管线不访问 `VFrame_`。
-- [ ] 处理器管线不访问 `SyncManager`。
-- [ ] 新增抽象职责单一。
+- [x] 处理器抽象不依赖 UI。
+- [x] 处理器管线不访问 `VFrame_`。
+- [x] 处理器管线不访问 `SyncManager`。
+- [x] 新增抽象职责单一。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\iimageprocessor.h src\infrastructure\imageprocessorpipeline.h src\infrastructure\imageprocessorpipeline.cpp CMakeLists.txt doc\Phase5TODO.md`
-- [ ] 定向搜索：`rg -n "IImageProcessor|ImageProcessorPipeline|Process|Enabled|SetEnabled" src doc\Phase5TODO.md`
+- [x] 静态检查：`git diff --check -- src\infrastructure\iimageprocessor.h src\infrastructure\imageprocessorpipeline.h src\infrastructure\imageprocessorpipeline.cpp doc\Phase5TODO.md`
+- [x] 新文件空白检查：`git diff --check --no-index -- NUL src\infrastructure\iimageprocessor.h`
+- [x] 新文件空白检查：`git diff --check --no-index -- NUL src\infrastructure\imageprocessorpipeline.h`
+- [x] 新文件空白检查：`git diff --check --no-index -- NUL src\infrastructure\imageprocessorpipeline.cpp`
+- [x] 定向搜索：`rg -n "IImageProcessor|ImageProcessorPipeline|Process|Enabled|SetEnabled|LastProcessElapsedMs|ProcessorCount" src doc\Phase5TODO.md`
 - [ ] 用户人工编译验证。
 
 **Commit message**：
