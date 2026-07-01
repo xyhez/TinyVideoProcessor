@@ -7,8 +7,8 @@
   - Phase 5.1 已完成图像处理基础预研和任务拆分。
   - Phase 5.2 已完成 OpenCV 依赖接入预检查。
   - Phase 5.3 已完成图像处理抽象空壳。
+  - Phase 5.4 已完成帧与 OpenCV Mat 转换边界。
 - 未完成：
-  - 帧与 OpenCV Mat 转换边界。
   - active stream 处理链路接入。
   - 基础处理器实现。
   - 最小 UI 接入。
@@ -19,8 +19,8 @@
   - OpenCV 默认 BGR，当前渲染链路以 YUV420P 为主，需要明确转换边界。
   - 多路同时处理会显著放大性能压力，第一版不承诺。
 - 本轮范围：
-  - 新增 `IImageProcessor` 图像处理器接口。
-  - 新增 `ImageProcessorPipeline` 图像处理器链空壳。
+  - 新增 `VideoFrameMatConverter`。
+  - 建立 `AVFramePtr <-> cv::Mat` 转换边界。
   - 不接入播放链路。
   - 不新增图像处理算法。
 
@@ -217,31 +217,33 @@ feat: 新增图像处理器基础抽象
 
 - `src/infrastructure/videoframematconverter.h`
 - `src/infrastructure/videoframematconverter.cpp`
-- `CMakeLists.txt`
 - `doc/Phase5TODO.md`
 
 **任务清单**：
 
-- [ ] 新增 `VideoFrameMatConverter`。
-- [ ] 支持 `AVFramePtr -> cv::Mat`。
-- [ ] 支持 `cv::Mat -> AVFramePtr`。
-- [ ] 明确第一版中间格式。
-- [ ] 复制必要时间戳和色彩属性。
-- [ ] 转换失败返回空帧。
-- [ ] 转换失败不停止播放。
-- [ ] 不让处理器保存帧内存指针。
+- [x] 新增 `VideoFrameMatConverter`。
+- [x] 支持 `AVFramePtr -> cv::Mat`。
+- [x] 支持 `cv::Mat -> AVFramePtr`。
+- [x] 明确第一版中间格式为 `BGR24` / `CV_8UC3`。
+- [x] 复制必要时间戳和色彩属性。
+- [x] 转换失败返回空帧或 false。
+- [x] 转换失败不停止播放。
+- [x] 不让处理器保存帧内存指针。
+- [x] `CMakeLists.txt` 当前通过 `file(GLOB_RECURSE src/*.cpp src/*.h ...)` 自动纳入新增文件，本步无需修改。
 
 **验收标准**：
 
-- [ ] 转换逻辑不在 UI。
-- [ ] 转换逻辑不在 `VideoFrameScheduler`。
-- [ ] 转换逻辑不在 `MultiViewRenderer`。
-- [ ] 所有权仍使用 `AVFramePtr`。
+- [x] 转换逻辑不在 UI。
+- [x] 转换逻辑不在 `VideoFrameScheduler`。
+- [x] 转换逻辑不在 `MultiViewRenderer`。
+- [x] 所有权仍使用 `AVFramePtr`。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\videoframematconverter.h src\infrastructure\videoframematconverter.cpp CMakeLists.txt doc\Phase5TODO.md`
-- [ ] 定向搜索：`rg -n "VideoFrameMatConverter|cv::Mat|AVFramePtr|av_frame_copy_props" src doc\Phase5TODO.md`
+- [x] 静态检查：`git diff --check -- src\infrastructure\videoframematconverter.h src\infrastructure\videoframematconverter.cpp doc\Phase5TODO.md`
+- [x] 新文件空白检查：`git diff --check --no-index -- NUL src\infrastructure\videoframematconverter.h`
+- [x] 新文件空白检查：`git diff --check --no-index -- NUL src\infrastructure\videoframematconverter.cpp`
+- [x] 定向搜索：`rg -n "VideoFrameMatConverter|cv::Mat|AVFramePtr|av_frame_copy_props|AV_PIX_FMT_BGR24|CV_8UC3" src doc\Phase5TODO.md`
 - [ ] 用户人工编译验证。
 
 **Commit message**：
