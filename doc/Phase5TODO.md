@@ -5,22 +5,22 @@
 - 已完成：
   - Phase 4 网络流支持已完成收口。
   - Phase 5.1 已完成图像处理基础预研和任务拆分。
+  - Phase 5.2 已完成 OpenCV 依赖接入预检查。
 - 未完成：
-  - OpenCV 依赖接入预检查。
   - 图像处理抽象空壳。
   - active stream 处理链路接入。
   - 基础处理器实现。
   - 最小 UI 接入。
   - 性能和关闭链路验收。
 - 已知风险：
-  - OpenCV 与当前 Qt kit / 编译器 ABI 可能不一致。
+  - OpenCV 当前使用项目内 `Lib/opencv`，只确认 VC2019 链路，不支持 MinGW kit。
   - `AVFrame -> cv::Mat -> AVFrame` 会增加 CPU 和内存带宽压力。
   - OpenCV 默认 BGR，当前渲染链路以 YUV420P 为主，需要明确转换边界。
   - 多路同时处理会显著放大性能压力，第一版不承诺。
 - 本轮范围：
-  - 只建立 Phase 5 预研报告和 TODO。
+  - 完成 OpenCV 依赖接入报告。
   - 不修改代码。
-  - 不接入 OpenCV。
+  - 不新增图像处理算法。
 
 ## 阶段目标
 
@@ -61,6 +61,7 @@ MainWindow
 - `doc/Phase3_13_渲染输入格式适配方案.md`
 - `doc/Phase3_14_多路性能优化验收报告.md`
 - `doc/Phase5_图像处理基础预研报告.md`
+- `doc/Phase5_2_OpenCV依赖接入报告.md`
 
 ## Phase 5.1 图像处理基础预研和任务拆分
 
@@ -116,29 +117,28 @@ docs: 增加 Phase 5 图像处理基础规划
 
 - `doc/Phase5_2_OpenCV依赖接入报告.md`
 - `doc/Phase5TODO.md`
-- 可能后续修改：`CMakeLists.txt`
 
 **任务清单**：
 
-- [ ] 确认当前主要 Qt kit 是 MinGW 还是 MSVC。
-- [ ] 确认本机 OpenCV 安装位置。
-- [ ] 确认 OpenCV 编译器 ABI 与 Qt kit 是否匹配。
-- [ ] 设计 `CMakeLists.txt` 接入方式。
-- [ ] 明确 Debug / Release 库路径风险。
-- [ ] 明确是否需要把 OpenCV 路径写死或改为用户配置。
-- [ ] 形成依赖接入报告。
+- [x] 确认当前主要 Qt kit 是 MSVC / VC2019。
+- [x] 确认本机 OpenCV 安装位置为 `Lib/opencv`。
+- [x] 确认 OpenCV 编译器 ABI 与 Qt kit 匹配：均为 VC2019。
+- [x] 复核 `CMakeLists.txt` 接入方式。
+- [x] 明确 Debug / Release 库路径风险。
+- [x] 明确当前使用项目内固定路径，不改为全局 `find_package(OpenCV)`。
+- [x] 形成依赖接入报告。
 
 **验收标准**：
 
-- [ ] 能说明当前应该使用哪套 OpenCV。
-- [ ] 能说明 CMake 接入方式。
-- [ ] 能说明依赖失败时不会影响已有代码的策略。
-- [ ] 不写图像处理算法。
+- [x] 能说明当前应该使用哪套 OpenCV。
+- [x] 能说明 CMake 接入方式。
+- [x] 能说明 Debug / Release 链接策略。
+- [x] 不写图像处理算法。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- doc\Phase5_2_OpenCV依赖接入报告.md doc\Phase5TODO.md`
-- [ ] 后续如修改 CMake，再执行：`git diff --check -- CMakeLists.txt doc\Phase5TODO.md`
+- [x] 静态检查：`git diff --check -- doc\Phase5_2_OpenCV依赖接入报告.md doc\Phase5TODO.md`
+- [x] 定向搜索：`rg -n "OpenCV|opencv_world4100|opencv_world4100d|VC2019|CMake|Lib/opencv|find_package|Phase 5.2" doc\Phase5_2_OpenCV依赖接入报告.md doc\Phase5TODO.md CMakeLists.txt`
 - [ ] 用户人工编译验证 OpenCV 接入是否成功。
 
 **Commit message**：

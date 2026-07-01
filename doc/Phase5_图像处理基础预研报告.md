@@ -178,17 +178,17 @@ VideoFrameScheduler
 
 ## OpenCV 依赖判断
 
-`CMakeLists.txt` 当前没有接入 OpenCV。
+`CMakeLists.txt` 当前已经按项目内 `Lib/opencv` 方式接入 OpenCV。
 
-Phase 5 需要正式引入 OpenCV，但建议分两步：
+Phase 5 的依赖接入仍建议先单独收口，再写图像处理算法：
 
-1. 先做环境和构建接入预检查，确认本机 OpenCV 路径、版本和 Qt / MinGW / MSVC ABI 是否一致。
+1. 先做环境和构建接入预检查，确认本机 OpenCV 路径、版本和 Qt / MSVC ABI 是否一致。
 2. 再新增最小处理器，不在依赖未确认时批量写算法。
 
 原因：
 
 - OpenCV 是新依赖，最容易出现 ABI、Debug/Release、编译器版本不一致问题。
-- 项目当前同时出现过 MSVC 和 MinGW 构建目录，必须明确当前主构建链。
+- 当前采用 VC2019 OpenCV + VC2019 项目链路，后续不默认支持 MinGW OpenCV。
 - 依赖接入失败时，不应影响已有播放器主线。
 
 ## 第一版处理范围
