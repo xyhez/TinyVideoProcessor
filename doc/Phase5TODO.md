@@ -9,8 +9,8 @@
   - Phase 5.3 已完成图像处理抽象空壳。
   - Phase 5.4 已完成帧与 OpenCV Mat 转换边界。
   - Phase 5.5 已完成 active stream 图像处理帧 sink 接入。
+  - Phase 5.6 已完成基础图像处理器实现。
 - 未完成：
-  - 基础处理器实现。
   - 最小 UI 接入。
   - 性能和关闭链路验收。
 - 已知风险：
@@ -19,12 +19,11 @@
   - OpenCV 默认 BGR，当前渲染链路以 YUV420P 为主，需要明确转换边界。
   - 多路同时处理会显著放大性能压力，第一版不承诺。
 - 本轮范围：
-  - 新增 `ImageProcessingFrameSink`。
-  - 将处理链路插入 `VideoFrameScheduler` 和下游 sink 之间。
-  - 通过 Controller 控制 active stream 处理开关。
-  - 非 active stream 默认关闭处理。
+  - 新增灰度化、二值化、边缘检测处理器。
+  - 保持处理器只访问 OpenCV Mat。
+  - 不在处理器中访问 UI、队列、同步器或 OpenGL 资源。
   - 不接入 UI 控件。
-  - 不新增图像处理算法。
+  - 不改变播放链路和渲染链路。
 
 ## 阶段目标
 
@@ -327,32 +326,32 @@ feat: 接入 active stream 图像处理帧 sink
 - `src/infrastructure/thresholdprocessor.cpp`
 - `src/infrastructure/edgedetectionprocessor.h`
 - `src/infrastructure/edgedetectionprocessor.cpp`
-- `CMakeLists.txt`
 - `doc/Phase5TODO.md`
 
 **任务清单**：
 
-- [ ] 实现灰度化处理器。
-- [ ] 实现二值化处理器。
-- [ ] 实现边缘检测处理器。
-- [ ] 二值化支持阈值参数。
-- [ ] 边缘检测第一版使用固定参数。
-- [ ] 处理失败时返回 false。
-- [ ] 不在处理器中访问 UI。
-- [ ] 不在处理器中保存帧指针。
+- [x] 实现灰度化处理器。
+- [x] 实现二值化处理器。
+- [x] 实现边缘检测处理器。
+- [x] 二值化支持阈值参数。
+- [x] 边缘检测第一版使用固定参数。
+- [x] 处理失败时返回 false。
+- [x] 不在处理器中访问 UI。
+- [x] 不在处理器中保存帧指针。
+- [x] `CMakeLists.txt` 当前通过 `file(GLOB_RECURSE src/*.cpp src/*.h ...)` 自动纳入新增文件，本步无需修改。
 
 **验收标准**：
 
-- [ ] 灰度化效果可见。
-- [ ] 二值化效果可见。
-- [ ] 边缘检测效果可见。
-- [ ] 关闭处理后画面恢复原图。
-- [ ] 处理失败不崩溃。
+- [ ] 灰度化效果可见，待 Phase 5.7 UI 接入后人工验证。
+- [ ] 二值化效果可见，待 Phase 5.7 UI 接入后人工验证。
+- [ ] 边缘检测效果可见，待 Phase 5.7 UI 接入后人工验证。
+- [ ] 关闭处理后画面恢复原图，待 Phase 5.7 UI 接入后人工验证。
+- [x] 处理失败返回 false，不在处理器内部抛出异常或访问外部资源。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\grayscaleprocessor.h src\infrastructure\grayscaleprocessor.cpp src\infrastructure\thresholdprocessor.h src\infrastructure\thresholdprocessor.cpp src\infrastructure\edgedetectionprocessor.h src\infrastructure\edgedetectionprocessor.cpp CMakeLists.txt doc\Phase5TODO.md`
-- [ ] 定向搜索：`rg -n "GrayscaleProcessor|ThresholdProcessor|EdgeDetectionProcessor|threshold|Canny|cvtColor" src doc\Phase5TODO.md`
+- [x] 静态检查：`git diff --check -- src\infrastructure\grayscaleprocessor.h src\infrastructure\grayscaleprocessor.cpp src\infrastructure\thresholdprocessor.h src\infrastructure\thresholdprocessor.cpp src\infrastructure\edgedetectionprocessor.h src\infrastructure\edgedetectionprocessor.cpp doc\Phase5TODO.md`
+- [x] 定向搜索：`rg -n "GrayscaleProcessor|ThresholdProcessor|EdgeDetectionProcessor|threshold|Canny|cvtColor" src doc\Phase5TODO.md`
 - [ ] 人工运行建议：普通视频分别切换三种处理效果。
 
 **Commit message**：
