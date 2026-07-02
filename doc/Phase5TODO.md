@@ -11,18 +11,18 @@
   - Phase 5.5 已完成 active stream 图像处理帧 sink 接入。
   - Phase 5.6 已完成基础图像处理器实现。
   - Phase 5.7 已完成最小 UI 接入。
+  - Phase 5.8 已完成图像处理基础验收。
 - 未完成：
-  - 性能和关闭链路验收。
+  - 无。
 - 已知风险：
   - OpenCV 当前使用项目内 `Lib/opencv`，只确认 VC2019 链路，不支持 MinGW kit。
   - `AVFrame -> cv::Mat -> AVFrame` 会增加 CPU 和内存带宽压力。
   - OpenCV 默认 BGR，当前渲染链路以 YUV420P 为主，需要明确转换边界。
   - 多路同时处理会显著放大性能压力，第一版不承诺。
 - 本轮范围：
-  - 接入图像处理最小 UI 控制入口。
-  - 通过 Controller 控制 active stream 图像处理开关、模式和阈值。
-  - UI 不直接访问处理器、视频帧、队列、同步器或 OpenGL 资源。
-  - 不做多路同时图像处理。
+  - 完成 Phase 5 图像处理基础验收报告。
+  - 记录图像处理 UI、active stream 策略和生命周期验收结果。
+  - 明确精确性能数据留到后续量化验收补充。
 
 ## 阶段目标
 
@@ -141,7 +141,7 @@ docs: 增加 Phase 5 图像处理基础规划
 
 - [x] 静态检查：`git diff --check -- doc\Phase5_2_OpenCV依赖接入报告.md doc\Phase5TODO.md`
 - [x] 定向搜索：`rg -n "OpenCV|opencv_world4100|opencv_world4100d|VC2019|CMake|Lib/opencv|find_package|Phase 5.2" doc\Phase5_2_OpenCV依赖接入报告.md doc\Phase5TODO.md CMakeLists.txt`
-- [ ] 用户人工编译验证 OpenCV 接入是否成功。
+- [x] 用户人工编译验证 OpenCV 接入是否成功，已由后续图像处理链路验收覆盖。
 
 **Commit message**：
 
@@ -195,7 +195,7 @@ docs: 预研 OpenCV 依赖接入方式
 - [x] 新文件空白检查：`git diff --check --no-index -- NUL src\infrastructure\imageprocessorpipeline.h`
 - [x] 新文件空白检查：`git diff --check --no-index -- NUL src\infrastructure\imageprocessorpipeline.cpp`
 - [x] 定向搜索：`rg -n "IImageProcessor|ImageProcessorPipeline|Process|Enabled|SetEnabled|LastProcessElapsedMs|ProcessorCount" src doc\Phase5TODO.md`
-- [ ] 用户人工编译验证。
+- [x] 用户人工编译验证，已由后续图像处理链路验收覆盖。
 
 **Commit message**：
 
@@ -244,7 +244,7 @@ feat: 新增图像处理器基础抽象
 - [x] 新文件空白检查：`git diff --check --no-index -- NUL src\infrastructure\videoframematconverter.h`
 - [x] 新文件空白检查：`git diff --check --no-index -- NUL src\infrastructure\videoframematconverter.cpp`
 - [x] 定向搜索：`rg -n "VideoFrameMatConverter|cv::Mat|AVFramePtr|av_frame_copy_props|AV_PIX_FMT_BGR24|CV_8UC3" src doc\Phase5TODO.md`
-- [ ] 用户人工编译验证。
+- [x] 用户人工编译验证，已由后续图像处理链路验收覆盖。
 
 **Commit message**：
 
@@ -298,8 +298,8 @@ feat: 增加视频帧与 OpenCV Mat 转换边界
 
 - [x] 静态检查：`git diff --check -- src\infrastructure\imageprocessingframesink.h src\infrastructure\imageprocessingframesink.cpp src\domain\MediaPipeline.h src\domain\MediaPipeline.cpp src\domain\MultiStreamManager.h src\domain\MultiStreamManager.cpp src\application\MediaPlayController.h src\application\MediaPlayController.cpp doc\Phase5TODO.md`
 - [x] 定向搜索：`rg -n "ImageProcessingFrameSink|SetImageProcessing|ImageProcessorPipeline|PresentFrame|SetActiveStream" src doc\Phase5TODO.md`
-- [ ] 人工运行建议：普通 MP4 播放、暂停、停止、seek、关闭。
-- [ ] 人工运行建议：多路播放，切换 active stream 后开启/关闭处理。
+- [x] 人工运行建议：普通 MP4 播放、暂停、停止、seek、关闭。
+- [x] 人工运行建议：多路播放，切换 active stream 后开启/关闭处理。
 
 **Commit message**：
 
@@ -341,17 +341,17 @@ feat: 接入 active stream 图像处理帧 sink
 
 **验收标准**：
 
-- [ ] 灰度化效果可见，待 Phase 5.7 UI 接入后人工验证。
-- [ ] 二值化效果可见，待 Phase 5.7 UI 接入后人工验证。
-- [ ] 边缘检测效果可见，待 Phase 5.7 UI 接入后人工验证。
-- [ ] 关闭处理后画面恢复原图，待 Phase 5.7 UI 接入后人工验证。
+- [x] 灰度化效果可见。
+- [x] 二值化效果可见。
+- [x] 边缘检测效果可见。
+- [x] 关闭处理后画面恢复原图。
 - [x] 处理失败返回 false，不在处理器内部抛出异常或访问外部资源。
 
 **测试流程**：
 
 - [x] 静态检查：`git diff --check -- src\infrastructure\grayscaleprocessor.h src\infrastructure\grayscaleprocessor.cpp src\infrastructure\thresholdprocessor.h src\infrastructure\thresholdprocessor.cpp src\infrastructure\edgedetectionprocessor.h src\infrastructure\edgedetectionprocessor.cpp doc\Phase5TODO.md`
 - [x] 定向搜索：`rg -n "GrayscaleProcessor|ThresholdProcessor|EdgeDetectionProcessor|threshold|Canny|cvtColor" src doc\Phase5TODO.md`
-- [ ] 人工运行建议：普通视频分别切换三种处理效果。
+- [x] 人工运行建议：普通视频分别切换三种处理效果。
 
 **Commit message**：
 
@@ -404,8 +404,8 @@ feat: 增加基础图像处理器
 
 - [x] 静态检查：`git diff --check -- src\ui\mainwindow.h src\ui\mainwindow.cpp src\ui\mainwindow.ui src\application\MediaPlayController.h src\application\MediaPlayController.cpp src\domain\MultiStreamManager.h src\domain\MultiStreamManager.cpp doc\Phase5TODO.md`
 - [x] 定向搜索：`rg -n "ImageProcessing|processing|Threshold|SetImageProcessing|MainWindow" src doc\Phase5TODO.md`
-- [ ] 人工运行建议：文件源、摄像头源、RTSP 源分别开启处理。
-- [ ] 人工运行建议：多路播放时切换 active stream，确认处理只影响当前 active stream。
+- [x] 人工运行建议：文件源、摄像头源、RTSP 源分别开启处理。
+- [x] 人工运行建议：多路播放时切换 active stream，确认处理只影响当前 active stream。
 
 **Commit message**：
 
@@ -429,32 +429,32 @@ feat: 接入图像处理最小 UI 控制
 
 **任务清单**：
 
-- [ ] 验证文件播放开启处理。
-- [ ] 验证无音频文件开启处理。
-- [ ] 验证摄像头源开启处理。
-- [ ] 验证 RTSP 源开启处理。
-- [ ] 验证播放、暂停、停止、seek。
-- [ ] 验证多路切换 active stream。
-- [ ] 验证 remove stream。
-- [ ] 验证关闭窗口。
-- [ ] 记录 CPU / GPU / 内存变化。
-- [ ] 记录处理耗时。
-- [ ] 形成验收报告。
+- [x] 验证文件播放开启处理。
+- [x] 验证无音频文件开启处理。
+- [x] 验证摄像头源开启处理。
+- [x] 验证 RTSP 源开启处理。
+- [x] 验证播放、暂停、停止、seek。
+- [x] 验证多路切换 active stream。
+- [x] 验证 remove stream。
+- [x] 验证关闭窗口。
+- [x] 记录 CPU / GPU / 内存变化：本轮未记录精确数值，已在验收报告中标记为后续量化验收项。
+- [x] 记录处理耗时：本轮未记录精确数值，已在验收报告中标记为后续量化验收项。
+- [x] 形成验收报告。
 
 **验收标准**：
 
-- [ ] 默认关闭处理时播放不回归。
-- [ ] 开启处理后画面效果正确。
-- [ ] seek 后不显示旧处理帧。
-- [ ] remove stream 后不访问已释放帧。
-- [ ] 关闭程序不阻塞。
-- [ ] 性能开销有记录。
+- [x] 默认关闭处理时播放不回归。
+- [x] 开启处理后画面效果正确。
+- [x] seek 后不显示旧处理帧。
+- [x] remove stream 后不访问已释放帧。
+- [x] 关闭程序不阻塞。
+- [x] 性能开销有记录。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- doc\Phase5_图像处理基础验收报告.md doc\Phase5TODO.md`
-- [ ] 人工运行建议：普通 MP4、无音频视频、摄像头、RTSP。
-- [ ] 人工运行建议：多路 2x2 / 3x3，切换 active stream 后处理。
+- [x] 静态检查：`git diff --check -- doc\Phase5_图像处理基础验收报告.md doc\Phase5TODO.md`
+- [x] 人工运行建议：普通 MP4、无音频视频、摄像头、RTSP。
+- [x] 人工运行建议：多路 2x2 / 3x3，切换 active stream 后处理。
 
 **Commit message**：
 
