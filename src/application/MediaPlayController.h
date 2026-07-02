@@ -326,6 +326,19 @@ public:
      */
     bool IsPreviewFrameRateReductionEnabled() const;
 
+    /**
+     * @brief SetImageProcessingEnabled 设置 active stream 图像处理开关
+     * @param enabled 是否启用图像处理
+     */
+    void SetImageProcessingEnabled(bool enabled);
+
+    /**
+     * @brief IsImageProcessingEnabled 获取 active stream 图像处理开关
+     * @return true 已启用
+     * @return false 未启用
+     */
+    bool IsImageProcessingEnabled() const;
+
 signals:
     /**
      * @brief StateChanged 播放状态变化信号
@@ -356,6 +369,12 @@ signals:
      * @param enabled 是否启用预览降帧
      */
     void PreviewFrameRateReductionChanged(bool enabled);
+
+    /**
+     * @brief ImageProcessingEnabledChanged 图像处理开关变化信号
+     * @param enabled 是否启用图像处理
+     */
+    void ImageProcessingEnabledChanged(bool enabled);
 
     /**
      * @brief PlaybackFinished 当前媒体源自然播放结束信号
@@ -447,6 +466,7 @@ private:
     double volume_ = 1.0;	///< 当前音量
     bool muted_ = false;	///< 当前静音状态
     bool previewFrameRateReductionEnabled_ = false;	///< 是否启用多路预览降帧
+    bool imageProcessingEnabled_ = false;	///< 是否启用 active stream 图像处理
 
     /**
      * @brief ConnectManagerSignals 创建 Controller 与 MultiStreamManager 的信号转发连接

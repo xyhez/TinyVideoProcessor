@@ -18,6 +18,8 @@
 
 class QWidget;
 class IVideoFrameSink;
+class ImageProcessingFrameSink;
+class ImageProcessorPipeline;
 
 /**
  * @brief MediaPipeline 管理单路媒体源的播放管线资源
@@ -118,6 +120,31 @@ public:
      * @param targetFps 启用后目标预览帧率
      */
     void SetPreviewFrameRateReductionEnabled(bool enabled, int targetFps);
+
+    /**
+     * @brief SetImageProcessingEnabled 设置当前管线图像处理开关
+     * @param enabled 是否启用图像处理
+     */
+    void SetImageProcessingEnabled(bool enabled);
+
+    /**
+     * @brief IsImageProcessingEnabled 获取当前管线图像处理开关
+     * @return true 已启用
+     * @return false 未启用
+     */
+    bool IsImageProcessingEnabled() const;
+
+    /**
+     * @brief ImageProcessingPipeline 获取当前管线图像处理器管线
+     * @return 图像处理器管线指针
+     */
+    ImageProcessorPipeline* ImageProcessingPipeline();
+
+    /**
+     * @brief ImageProcessingPipeline 获取当前管线只读图像处理器管线
+     * @return 图像处理器管线指针
+     */
+    const ImageProcessorPipeline* ImageProcessingPipeline() const;
 
     /**
      * @brief SetVolume 设置音量
@@ -243,6 +270,7 @@ private:
     std::unique_ptr<VideoFrameScheduler> videoFrameScheduler_;	///< 视频帧调度器
     VideoRender* videoRender_ = nullptr;	///< 默认视频渲染器
     IVideoFrameSink* activeVideoFrameSink_ = nullptr;	///< 当前视频帧输出目标
+    std::unique_ptr<ImageProcessingFrameSink> imageProcessingFrameSink_;	///< 图像处理帧 sink
 
     std::unique_ptr<QThread> demuxerTH_;	///< 解复用线程
     std::unique_ptr<QThread> AdecoderTH_;	///< 音频解码线程

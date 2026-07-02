@@ -143,6 +143,7 @@ MediaPlayController::StreamId MediaPlayController::AddStreamWithFrameSinkFactory
         streamId,
         previewFrameRateReductionEnabled_,
         kPreviewFrameRateLimitFps);
+    multiStreamManager_->SetActiveStreamImageProcessingEnabled(imageProcessingEnabled_);
 
     return streamId;
 }
@@ -307,6 +308,7 @@ void MediaPlayController::ConnectManagerSignals()
 
     connect(multiStreamManager_.get(), &MultiStreamManager::ActiveStreamChanged,
             this, [this](MultiStreamManager::StreamId id) {
+                ApplyUserSettingsToActiveStream();
                 emit ActiveStreamChanged(id);
                 emit DurationChanged(Duration());
                 emit PositionChanged(Position());
@@ -391,6 +393,7 @@ void MediaPlayController::ApplyUserSettingsToActiveStream()
         multiStreamManager_->SetStreamPlaybackSpeed(activeStream, playbackSpeed_);
     }
 
+    multiStreamManager_->SetActiveStreamImageProcessingEnabled(imageProcessingEnabled_);
     multiStreamManager_->SetAudioVolume(volume_);
     multiStreamManager_->SetAudioMuted(muted_);
 }
@@ -428,6 +431,23 @@ void MediaPlayController::SetPreviewFrameRateReductionEnabled(bool enabled) {
 
 bool MediaPlayController::IsPreviewFrameRateReductionEnabled() const {
     return previewFrameRateReductionEnabled_;
+}
+
+void MediaPlayController::SetImageProcessingEnabled(bool enabled) {
+    if (imageProcessingEnabled_ == enabled) {
+        return;
+    }
+
+    imageProcessingEnabled_ = enabled;
+    if (multiStreamManager_) {
+        multiStreamManager_->SetActiveStreamImageProcessingEnabled(imageProcessingEnabled_);
+    }
+
+    emit ImageProcessingEnabledChanged(imageProcessingEnabled_);
+}
+
+bool MediaPlayController::IsImageProcessingEnabled() const {
+    return imageProcessingEnabled_;
 }
 
 void MediaPlayController::SetPlaybackSpeed(double speed) {

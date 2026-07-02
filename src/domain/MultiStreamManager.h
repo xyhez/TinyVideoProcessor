@@ -14,7 +14,6 @@
 #include "infrastructure/ivideoframesink.h"
 
 class QWidget;
-
 /**
  * @brief MultiStreamManager 管理多路播放管线的外层身份和状态
  *
@@ -245,6 +244,14 @@ public:
      * @return false id 不存在
      */
     bool SetStreamPreviewFrameRateReductionEnabled(StreamId id, bool enabled, int targetFps);
+
+    /**
+     * @brief SetActiveStreamImageProcessingEnabled 只为 active stream 启用图像处理
+     * @param enabled active stream 是否启用图像处理
+     * @return true 操作已下发
+     * @return false 无 active stream
+     */
+    bool SetActiveStreamImageProcessingEnabled(bool enabled);
 
     /**
      * @brief SetStreamVolume 设置指定逻辑流音量

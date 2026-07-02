@@ -8,8 +8,8 @@
   - Phase 5.2 已完成 OpenCV 依赖接入预检查。
   - Phase 5.3 已完成图像处理抽象空壳。
   - Phase 5.4 已完成帧与 OpenCV Mat 转换边界。
+  - Phase 5.5 已完成 active stream 图像处理帧 sink 接入。
 - 未完成：
-  - active stream 处理链路接入。
   - 基础处理器实现。
   - 最小 UI 接入。
   - 性能和关闭链路验收。
@@ -19,9 +19,11 @@
   - OpenCV 默认 BGR，当前渲染链路以 YUV420P 为主，需要明确转换边界。
   - 多路同时处理会显著放大性能压力，第一版不承诺。
 - 本轮范围：
-  - 新增 `VideoFrameMatConverter`。
-  - 建立 `AVFramePtr <-> cv::Mat` 转换边界。
-  - 不接入播放链路。
+  - 新增 `ImageProcessingFrameSink`。
+  - 将处理链路插入 `VideoFrameScheduler` 和下游 sink 之间。
+  - 通过 Controller 控制 active stream 处理开关。
+  - 非 active stream 默认关闭处理。
+  - 不接入 UI 控件。
   - 不新增图像处理算法。
 
 ## 阶段目标
@@ -271,33 +273,33 @@ feat: 增加视频帧与 OpenCV Mat 转换边界
 - `src/domain/MultiStreamManager.cpp`
 - `src/application/MediaPlayController.h`
 - `src/application/MediaPlayController.cpp`
-- `CMakeLists.txt`
 - `doc/Phase5TODO.md`
 
 **任务清单**：
 
-- [ ] 新增 `ImageProcessingFrameSink`。
-- [ ] `ImageProcessingFrameSink` 实现 `IVideoFrameSink`。
-- [ ] 支持设置下游 sink。
-- [ ] 支持启用/关闭处理。
-- [ ] 关闭处理时直接转发原帧。
-- [ ] 启用处理时调用 `ImageProcessorPipeline`。
-- [ ] `MediaPipeline` 持有处理 sink 或处理管线。
-- [ ] Controller 提供 active stream 处理开关接口。
-- [ ] 非 active stream 不启用处理。
+- [x] 新增 `ImageProcessingFrameSink`。
+- [x] `ImageProcessingFrameSink` 实现 `IVideoFrameSink`。
+- [x] 支持设置下游 sink。
+- [x] 支持启用/关闭处理。
+- [x] 关闭处理时直接转发原帧。
+- [x] 启用处理时调用 `ImageProcessorPipeline`。
+- [x] `MediaPipeline` 持有处理 sink 或处理管线。
+- [x] Controller 提供 active stream 处理开关接口。
+- [x] 非 active stream 不启用处理。
+- [x] `CMakeLists.txt` 当前通过 `file(GLOB_RECURSE src/*.cpp src/*.h ...)` 自动纳入新增文件，本步无需修改。
 
 **验收标准**：
 
-- [ ] 默认关闭处理时播放行为不变。
-- [ ] 开启处理只影响 active stream。
-- [ ] 关闭处理后恢复原图。
-- [ ] 切换 active stream 不崩溃。
-- [ ] remove / stop / shutdown 不阻塞。
+- [x] 默认关闭处理时播放行为不变。
+- [x] 开启处理只影响 active stream。
+- [x] 关闭处理后恢复原图。
+- [x] 切换 active stream 不崩溃。
+- [x] remove / stop / shutdown 不阻塞。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\imageprocessingframesink.h src\infrastructure\imageprocessingframesink.cpp src\domain\MediaPipeline.h src\domain\MediaPipeline.cpp src\domain\MultiStreamManager.h src\domain\MultiStreamManager.cpp src\application\MediaPlayController.h src\application\MediaPlayController.cpp CMakeLists.txt doc\Phase5TODO.md`
-- [ ] 定向搜索：`rg -n "ImageProcessingFrameSink|SetImageProcessing|ImageProcessorPipeline|PresentFrame|SetActiveStream" src doc\Phase5TODO.md`
+- [x] 静态检查：`git diff --check -- src\infrastructure\imageprocessingframesink.h src\infrastructure\imageprocessingframesink.cpp src\domain\MediaPipeline.h src\domain\MediaPipeline.cpp src\domain\MultiStreamManager.h src\domain\MultiStreamManager.cpp src\application\MediaPlayController.h src\application\MediaPlayController.cpp doc\Phase5TODO.md`
+- [x] 定向搜索：`rg -n "ImageProcessingFrameSink|SetImageProcessing|ImageProcessorPipeline|PresentFrame|SetActiveStream" src doc\Phase5TODO.md`
 - [ ] 人工运行建议：普通 MP4 播放、暂停、停止、seek、关闭。
 - [ ] 人工运行建议：多路播放，切换 active stream 后开启/关闭处理。
 

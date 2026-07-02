@@ -1,5 +1,6 @@
 #include "MediaPipeline.h"
 #include "tiny_log/Logging.h"
+#include "infrastructure/imageprocessingframesink.h"
 
 #include <algorithm>
 #include <QVBoxLayout>
@@ -267,6 +268,28 @@ void MediaPipeline::SetPreviewFrameRateReductionEnabled(bool enabled, int target
     }
 }
 
+void MediaPipeline::SetImageProcessingEnabled(bool enabled)
+{
+    if (imageProcessingFrameSink_) {
+        imageProcessingFrameSink_->SetImageProcessingEnabled(enabled);
+    }
+}
+
+bool MediaPipeline::IsImageProcessingEnabled() const
+{
+    return imageProcessingFrameSink_ && imageProcessingFrameSink_->IsImageProcessingEnabled();
+}
+
+ImageProcessorPipeline* MediaPipeline::ImageProcessingPipeline()
+{
+    return imageProcessingFrameSink_ ? imageProcessingFrameSink_->ImageProcessingPipeline() : nullptr;
+}
+
+const ImageProcessorPipeline* MediaPipeline::ImageProcessingPipeline() const
+{
+    return imageProcessingFrameSink_ ? imageProcessingFrameSink_->ImageProcessingPipeline() : nullptr;
+}
+
 void MediaPipeline::SetVolume(double volume)
 {
     const double clampedVolume = std::clamp(volume, 0.0, 1.0);
@@ -349,11 +372,15 @@ bool MediaPipeline::CreatePipelineResources(std::shared_ptr<IMediaSource> mediaS
         }
     }
 
-    activeVideoFrameSink_ = videoFrameSink ? videoFrameSink : videoRender_;
-    if (!activeVideoFrameSink_) {
+    IVideoFrameSink* downstreamSink = videoFrameSink ? videoFrameSink : videoRender_;
+    if (!downstreamSink) {
         LOG_CRITICAL("MediaPipeline create resources failed: video frame sink is null");
         return false;
     }
+
+    imageProcessingFrameSink_ = std::make_unique<ImageProcessingFrameSink>();
+    imageProcessingFrameSink_->SetDownstreamSink(downstreamSink);
+    activeVideoFrameSink_ = imageProcessingFrameSink_.get();
 
     videoFrameScheduler_->Initialize(VFrame_, syncManager_, sourceInfo.FrameRate, sourceInfo.V_timeBase);
     videoFrameScheduler_->SetFrameSink(activeVideoFrameSink_);
@@ -442,6 +469,9 @@ void MediaPipeline::ReleaseResources()
         videoFrameScheduler_->ClearOutputFrame();
         videoFrameScheduler_->SetFrameSink(nullptr);
     }
+    if (imageProcessingFrameSink_) {
+        imageProcessingFrameSink_->SetDownstreamSink(nullptr);
+    }
 
     auto stopThread = [](const char* name, std::unique_ptr<QThread>& thread) {
         if (thread) {
@@ -465,6 +495,7 @@ void MediaPipeline::ReleaseResources()
     Vdecoder_.reset();
     audioplay_.reset();
     videoFrameScheduler_.reset();
+    imageProcessingFrameSink_.reset();
     if (videoRender_) {
         LOG_DEBUG("MediaPipeline release: delete video render");
         delete videoRender_;

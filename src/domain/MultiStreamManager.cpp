@@ -380,6 +380,27 @@ bool MultiStreamManager::SetStreamPreviewFrameRateReductionEnabled(
     return true;
 }
 
+bool MultiStreamManager::SetActiveStreamImageProcessingEnabled(bool enabled) {
+    if (activeStreamId_ == InvalidStreamId) {
+        return false;
+    }
+
+    bool activeStreamUpdated = false;
+    for (auto& stream : streams_) {
+        if (!stream.second.pipeline) {
+            continue;
+        }
+
+        const bool streamEnabled = enabled && stream.first == activeStreamId_;
+        stream.second.pipeline->SetImageProcessingEnabled(streamEnabled);
+        if (stream.first == activeStreamId_) {
+            activeStreamUpdated = true;
+        }
+    }
+
+    return activeStreamUpdated;
+}
+
 bool MultiStreamManager::SetStreamVolume(StreamId id, double volume) {
     MediaPipeline* pipeline = FindPipeline(id);
     if (!pipeline) {
