@@ -110,8 +110,8 @@ TinyVideoProcessor 是一个渐进式演进的视频处理框架，遵循清晰�
 │                                                                              │
 │  ┌──────────────────────────── MainWindow ────────────────────────────────┐  │
 │  │ - 播放控制、进度条、音量、速度、全屏                                    │  │
-│  │ - 文件列表、摄像头设置入口                                              │  │
-│  │ - 多路逻辑 slot 分配、布局切换、active stream 交互                      │  │
+│  │ - 文件列表、摄像头/RTSP 添加入口、布局切换                              │  │
+│  │ - active stream / active audio stream 交互                              │  │
 │  │ - 接收 MultiViewRenderer 点击/双击信号并转发给 Controller               │  │
 │  └────────────────────────────────────────────────────────────────────────┘  │
 │                                                                              │
@@ -128,8 +128,9 @@ TinyVideoProcessor 是一个渐进式演进的视频处理框架，遵循清晰�
 │  ┌──────────────────────── MediaPlayController ───────────────────────────┐  │
 │  │ - 对 UI 暴露统一播放控制入口                                             │  │
 │  │ - Start / Pause / Stop / Seek / Speed / Volume / Mute                  │  │
-│  │ - 转发单路和多路播放控制                                                 │  │
-│  │ - 维护 UI 需要的播放位置、时长、音量、静音和状态语义                      │  │
+│  │ - Add File / Add Camera / Add RTSP / Remove / Layout                   │  │
+│  │ - 维护 UI 需要的位置、时长、音量、静音、状态和 active stream 语义          │  │
+│  │ - 提供 active stream 图像处理开关接口                                    │  │
 │  └────────────────────────────────────────────────────────────────────────┘  │
 └──────────────────────────────────────────────────────────────────────────────┘
                                       │
@@ -151,7 +152,7 @@ TinyVideoProcessor 是一个渐进式演进的视频处理框架，遵循清晰�
 │  │ - 分配和管理 StreamId                                                   │  │
 │  │ - 管理 active stream / active audio stream                              │  │
 │  │ - 管理多个 MediaPipeline 生命周期                                        │  │
-│  │ - 保证多路场景最多一路输出音频                                           │  │
+│  │ - 约束图像处理第一版只作用于 active stream                               │  │
 │  └───────────────┬───────────────────────────┬────────────────────────────┘  │
 │                  │                           │                               │
 │        ┌─────────▼──────────┐      ┌─────────▼──────────┐                    │
@@ -178,14 +179,29 @@ TinyVideoProcessor 是一个渐进式演进的视频处理框架，遵循清晰�
 │                         │ 音频播放/音量   │                    │ 可显示帧       │
 │                         └────────┬───────┘                    ▼             │
 │                                  │ 音频时钟            ┌──────────────────┐  │
-│                                  ▼                    │ IVideoFrameSink   │  │
-│                         ┌────────────────┐            │ 可显示帧消费接口   │  │
-│                         │ SyncManager    │            └────────┬─────────┘  │
-│                         │ 音视频同步基准  │                     │            │
-│                         └────────────────┘                     ▼            │
+│                                  ▼                    │ ImageProcessing  │  │
+│                         ┌────────────────┐            │ FrameSink        │  │
+│                         │ SyncManager    │            │ 默认透传/处理包装 │  │
+│                         │ 音视频同步基准  │            └────────┬─────────┘  │
+│                         └────────────────┘                     │            │
+│                                                                │ enabled    │
+│                                                                ▼            │
 │                                                     ┌─────────────────────┐  │
-│                                                     │ VideoFrameConverter │  │
-│                                                     │ 可显示格式转换       │  │
+│                                                     │ VideoFrameMat       │  │
+│                                                     │ Converter           │  │
+│                                                     │ AVFrame <-> cv::Mat │  │
+│                                                     └──────────┬──────────┘  │
+│                                                                ▼             │
+│                                                     ┌─────────────────────┐  │
+│                                                     │ ImageProcessor      │  │
+│                                                     │ Pipeline            │  │
+│                                                     │ OpenCV 处理器链      │  │
+│                                                     └──────────┬──────────┘  │
+│                                                                │ processed   │
+│                                                                ▼             │
+│                                                     ┌─────────────────────┐  │
+│                                                     │ IVideoFrameSink     │  │
+│                                                     │ 可显示帧消费接口     │  │
 │                                                     └──────────┬──────────┘  │
 │                                                                ▼             │
 │                                                     ┌─────────────────────┐  │
@@ -197,7 +213,7 @@ TinyVideoProcessor 是一个渐进式演进的视频处理框架，遵循清晰�
 │                                                     ┌─────────────────────┐  │
 │                                                     │ MultiViewRenderer   │  │
 │                                                     │ 统一 OpenGL 多画面   │  │
-│                                                     │ Single/2x2/3x3/4x4  │  │
+│                                                     │ 内部格式适配/纹理上传 │  │
 │                                                     └─────────────────────┘  │
 │                                                                              │
 │  CameraDeviceEnumerator / VideoRender fallback / SyncQueue / TinyLog         │
@@ -224,10 +240,12 @@ IMediaSource
       -> VideoDecoder
         -> VideoFrameQueue
           -> VideoFrameScheduler
-            -> IVideoFrameSink
-              -> VideoFrameConverter
-                -> SingleStreamFrameSinkAdapter
-                  -> MultiViewRenderer
+            -> ImageProcessingFrameSink
+              -> VideoFrameMatConverter (enabled 时)
+                -> ImageProcessorPipeline (enabled 时)
+                  -> IVideoFrameSink
+                    -> SingleStreamFrameSinkAdapter
+                      -> MultiViewRenderer
 
 音频与同步流：
 
@@ -252,6 +270,7 @@ MultiViewRenderer
 - `MultiStreamManager`：管理 `StreamId`、active stream、active audio stream 和多路 `MediaPipeline` 生命周期。
 - `MediaPipeline`：只负责单路媒体播放，不感知 `StreamId`，不决定多路布局。
 - `VideoFrameScheduler`：负责取帧、同步判断、丢帧追赶和下一帧调度。
+- `ImageProcessingFrameSink`：插在调度器和显示 sink 之间，默认透传，只在 active stream 开启后执行 OpenCV 处理链。
 - `MultiViewRenderer`：只负责统一 OpenGL 多画面绘制，不访问队列、不访问 `SyncManager`、不做同步判断。
 
 ### 核心设计模式
@@ -273,11 +292,19 @@ class NetworkMediaSource : public IMediaSource { };
 **2. 管道模式 - 单路播放流程**
 ```cpp
 class MediaPipeline {
-    IMediaSource -> Demuxer -> Decoder -> VideoFrameScheduler -> IVideoFrameSink;
+    IMediaSource -> Demuxer -> Decoder -> VideoFrameScheduler
+                 -> ImageProcessingFrameSink -> IVideoFrameSink;
 };
 ```
 
-**3. 管理器模式 - 多路播放**
+**3. 装饰器模式 - 图像处理接入**
+```cpp
+class ImageProcessingFrameSink : public IVideoFrameSink {
+    // 默认透传原帧；启用后执行 VideoFrameMatConverter + ImageProcessorPipeline
+};
+```
+
+**4. 管理器模式 - 多路播放**
 ```cpp
 class MultiStreamManager {
     StreamId -> MediaPipeline;
@@ -286,14 +313,14 @@ class MultiStreamManager {
 };
 ```
 
-**4. 适配器模式 - 统一渲染接入**
+**5. 适配器模式 - 统一渲染接入**
 ```cpp
 class SingleStreamFrameSinkAdapter : public IVideoFrameSink {
     // 将单路可显示帧投递到 MultiViewRenderer 的指定 stream/slot
 };
 ```
 
-**5. 观察者模式 - 事件通知**
+**6. 观察者模式 - 事件通知**
 ```cpp
 // 使用 Qt 信号槽机制
 signals:
