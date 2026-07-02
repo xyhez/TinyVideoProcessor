@@ -7,7 +7,7 @@ extern "C" {
 }
 
 namespace {
-constexpr int kMicrosecondsPerMillisecond = 1000;
+constexpr int kMicrosecondsPerMillisecond = 1000;	///< 毫秒到微秒的换算系数，用于 FFmpeg 网络超时参数
 
 QString AvErrorString(int errorCode)
 {

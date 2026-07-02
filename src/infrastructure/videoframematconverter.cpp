@@ -9,9 +9,9 @@ extern "C" {
 }
 
 namespace {
-constexpr AVPixelFormat kMatPixelFormat = AV_PIX_FMT_BGR24;
-constexpr int kMatType = CV_8UC3;
-constexpr int kBgrChannels = 3;
+constexpr AVPixelFormat kMatPixelFormat = AV_PIX_FMT_BGR24;	///< OpenCV 处理链使用的中间 AVFrame 像素格式
+constexpr int kMatType = CV_8UC3;	///< OpenCV 处理链使用的 BGR 三通道 Mat 类型
+constexpr int kBgrChannels = 3;	///< BGR24 / CV_8UC3 每个像素的通道数量
 }
 
 VideoFrameMatConverter::~VideoFrameMatConverter()

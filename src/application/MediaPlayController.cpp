@@ -12,11 +12,11 @@
 #include <utility>
 
 namespace {
-constexpr double kSeekStepSeconds = 10.0;
-constexpr double kSpeedEpsilon = 0.001;
-constexpr double kVolumeStep = 0.05;
-constexpr double kVolumeEpsilon = 0.0001;
-constexpr int kPreviewFrameRateLimitFps = 15;
+constexpr double kSeekStepSeconds = 10.0;	///< 快进/快退的固定跳转秒数
+constexpr double kSpeedEpsilon = 0.001;	///< 播放速度浮点比较容差，避免档位判断受精度误差影响
+constexpr double kVolumeStep = 0.05;	///< 音量增减步长，按 0.0-1.0 归一化音量计算
+constexpr double kVolumeEpsilon = 0.0001;	///< 音量浮点比较容差，避免微小误差触发重复更新
+constexpr int kPreviewFrameRateLimitFps = 15;	///< 启用预览降帧后下发给各路调度器的目标帧率
 
 bool IsSupportedPlaybackSpeed(double speed)
 {

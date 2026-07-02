@@ -18,32 +18,32 @@ extern "C" {
 }
 
 namespace {
-constexpr int kGrid2x2Columns = 2;
-constexpr int kGrid2x2Rows = 2;
-constexpr int kGrid3x3Columns = 3;
-constexpr int kGrid3x3Rows = 3;
-constexpr int kGrid4x4Columns = 4;
-constexpr int kGrid4x4Rows = 4;
-constexpr int kMaxLogicalSlots = kGrid4x4Columns * kGrid4x4Rows;
-constexpr int kSlotBorderWidth = 2;
-constexpr int kActiveSlotBorderWidth = 4;
-constexpr qint64 kPerformanceLogIntervalMs = 5000;
+constexpr int kGrid2x2Columns = 2;	///< 2x2 布局的列数
+constexpr int kGrid2x2Rows = 2;	///< 2x2 布局的行数
+constexpr int kGrid3x3Columns = 3;	///< 3x3 布局的列数
+constexpr int kGrid3x3Rows = 3;	///< 3x3 布局的行数
+constexpr int kGrid4x4Columns = 4;	///< 4x4 布局的列数
+constexpr int kGrid4x4Rows = 4;	///< 4x4 布局的行数
+constexpr int kMaxLogicalSlots = kGrid4x4Columns * kGrid4x4Rows;	///< 当前支持的最大逻辑画面槽位数
+constexpr int kSlotBorderWidth = 2;	///< 普通画面槽位边框宽度，单位像素
+constexpr int kActiveSlotBorderWidth = 4;	///< active stream 画面槽位边框宽度，单位像素
+constexpr qint64 kPerformanceLogIntervalMs = 5000;	///< 多画面渲染性能日志输出间隔，单位毫秒
 
-constexpr float kBackgroundRed = 0.035f;
-constexpr float kBackgroundGreen = 0.04f;
-constexpr float kBackgroundBlue = 0.045f;
-constexpr float kSlotRed = 0.07f;
-constexpr float kSlotGreen = 0.075f;
-constexpr float kSlotBlue = 0.08f;
-constexpr float kEmptySlotRed = 0.055f;
-constexpr float kEmptySlotGreen = 0.06f;
-constexpr float kEmptySlotBlue = 0.065f;
-constexpr float kBorderRed = 0.23f;
-constexpr float kBorderGreen = 0.25f;
-constexpr float kBorderBlue = 0.28f;
-constexpr float kActiveBorderRed = 0.16f;
-constexpr float kActiveBorderGreen = 0.48f;
-constexpr float kActiveBorderBlue = 0.92f;
+constexpr float kBackgroundRed = 0.035f;	///< OpenGL 背景色红色通道值
+constexpr float kBackgroundGreen = 0.04f;	///< OpenGL 背景色绿色通道值
+constexpr float kBackgroundBlue = 0.045f;	///< OpenGL 背景色蓝色通道值
+constexpr float kSlotRed = 0.07f;	///< 普通画面槽位底色红色通道值
+constexpr float kSlotGreen = 0.075f;	///< 普通画面槽位底色绿色通道值
+constexpr float kSlotBlue = 0.08f;	///< 普通画面槽位底色蓝色通道值
+constexpr float kEmptySlotRed = 0.055f;	///< 空画面槽位底色红色通道值
+constexpr float kEmptySlotGreen = 0.06f;	///< 空画面槽位底色绿色通道值
+constexpr float kEmptySlotBlue = 0.065f;	///< 空画面槽位底色蓝色通道值
+constexpr float kBorderRed = 0.23f;	///< 普通槽位边框红色通道值
+constexpr float kBorderGreen = 0.25f;	///< 普通槽位边框绿色通道值
+constexpr float kBorderBlue = 0.28f;	///< 普通槽位边框蓝色通道值
+constexpr float kActiveBorderRed = 0.16f;	///< active stream 边框红色通道值
+constexpr float kActiveBorderGreen = 0.48f;	///< active stream 边框绿色通道值
+constexpr float kActiveBorderBlue = 0.92f;	///< active stream 边框蓝色通道值
 
 struct YuvPlaneUpload {
     const uchar* data = nullptr;

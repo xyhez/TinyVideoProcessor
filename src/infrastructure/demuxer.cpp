@@ -5,9 +5,9 @@
 #include <utility>
 
 namespace {
-constexpr double kSeekStepSeconds = 10.0;
-constexpr int kReadErrorRetryDelayMs = 20;
-constexpr int kMaxConsecutiveReadErrors = 100;
+constexpr double kSeekStepSeconds = 10.0;	///< 相对 seek 的默认步长秒数
+constexpr int kReadErrorRetryDelayMs = 20;	///< 读取失败后的短暂重试等待时间，避免错误循环空转
+constexpr int kMaxConsecutiveReadErrors = 100;	///< 连续读取错误上限，超过后认为媒体源异常
 
 QString AvErrorString(int errorCode)
 {

@@ -7,9 +7,9 @@
 #include <QMutexLocker>
 
 namespace {
-constexpr double kSpeedEpsilon = 0.001;
-constexpr qreal kVolumeStep = 0.05;
-constexpr qreal kVolumeEpsilon = 0.0001;
+constexpr double kSpeedEpsilon = 0.001;	///< 音频播放速度浮点比较容差，避免档位判断受精度误差影响
+constexpr qreal kVolumeStep = 0.05;	///< 音频音量增减步长，按 0.0-1.0 归一化音量计算
+constexpr qreal kVolumeEpsilon = 0.0001;	///< 音频音量浮点比较容差，避免微小误差触发重复更新
 
 bool IsSupportedSpeed(double speed)
 {

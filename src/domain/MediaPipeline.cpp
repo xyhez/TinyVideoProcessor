@@ -6,8 +6,8 @@
 #include <QVBoxLayout>
 
 namespace {
-constexpr size_t kPacketQueueMax = 30;
-constexpr size_t kFrameQueueMax = 30;
+constexpr size_t kPacketQueueMax = 30;	///< 音视频包队列最大缓存数量，限制解复用端超前读取
+constexpr size_t kFrameQueueMax = 30;	///< 音视频帧队列最大缓存数量，限制解码端超前输出
 }
 
 MediaPipeline::MediaPipeline(QObject* parent)

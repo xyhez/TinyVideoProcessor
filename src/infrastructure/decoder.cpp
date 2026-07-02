@@ -5,7 +5,7 @@
 #include <utility>
 
 namespace {
-constexpr bool kEnableHardwareDecoder = true;
+constexpr bool kEnableHardwareDecoder = true;	///< 是否优先尝试硬件解码，失败后回退到软件解码
 }
 decoder::decoder(QObject *parent)
     : QObject{parent}

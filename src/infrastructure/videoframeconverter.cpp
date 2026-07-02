@@ -10,16 +10,16 @@ extern "C" {
 }
 
 namespace {
-constexpr AVPixelFormat kDisplayPixelFormat = AV_PIX_FMT_YUV420P;
-constexpr AVColorRange kDisplayColorRange = AVCOL_RANGE_JPEG;
-constexpr AVColorSpace kDisplayColorSpace = AVCOL_SPC_SMPTE170M;
-constexpr AVColorPrimaries kDisplayColorPrimaries = AVCOL_PRI_SMPTE170M;
-constexpr AVColorTransferCharacteristic kDisplayColorTransfer = AVCOL_TRC_BT709;
-constexpr int kDisplaySwsColorspace = SWS_CS_SMPTE170M;
-constexpr int kFullRangeFlag = 1;
-constexpr int kLimitedRangeFlag = 0;
-constexpr int kFixedPointIdentity = 1 << 16;
-constexpr int kMaxLoggedConversionSignatures = 64;
+constexpr AVPixelFormat kDisplayPixelFormat = AV_PIX_FMT_YUV420P;	///< MultiViewRenderer 当前统一接收的软件显示像素格式
+constexpr AVColorRange kDisplayColorRange = AVCOL_RANGE_JPEG;	///< 转换后显示帧使用的全范围色彩范围标记
+constexpr AVColorSpace kDisplayColorSpace = AVCOL_SPC_SMPTE170M;	///< 转换后显示帧使用的默认 SDR 色彩空间
+constexpr AVColorPrimaries kDisplayColorPrimaries = AVCOL_PRI_SMPTE170M;	///< 转换后显示帧使用的默认 SDR 色彩基准
+constexpr AVColorTransferCharacteristic kDisplayColorTransfer = AVCOL_TRC_BT709;	///< 转换后显示帧使用的默认传输曲线
+constexpr int kDisplaySwsColorspace = SWS_CS_SMPTE170M;	///< swscale 转换输出侧使用的色彩矩阵
+constexpr int kFullRangeFlag = 1;	///< swscale 色彩范围参数中的全范围标记
+constexpr int kLimitedRangeFlag = 0;	///< swscale 色彩范围参数中的有限范围标记
+constexpr int kFixedPointIdentity = 1 << 16;	///< swscale 亮度/对比度/饱和度的定点恒等系数
+constexpr int kMaxLoggedConversionSignatures = 64;	///< 已记录格式转换日志签名的最大缓存数量
 
 struct SwsColorProfile {
     AVColorRange range = AVCOL_RANGE_UNSPECIFIED;

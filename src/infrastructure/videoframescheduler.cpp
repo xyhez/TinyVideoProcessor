@@ -11,13 +11,13 @@ extern "C" {
 #include <libavutil/avutil.h>
 }
 
-static const int SYNC_THRESHOLD_MS = 40;
+static const int SYNC_THRESHOLD_MS = 40;	///< 视频同步阈值，超过该毫秒差值时触发追赶或等待策略
 
 namespace {
-constexpr double kSpeedEpsilon = 0.001;
-constexpr int kMinPreviewFrameRateLimitFps = 1;
-constexpr int kMaxPreviewFrameRateLimitFps = 60;
-constexpr double kPreviewFrameRateEpsilonMs = 0.5;
+constexpr double kSpeedEpsilon = 0.001;	///< 播放速度浮点比较容差，避免 1.0 等档位因精度误差判断失败
+constexpr int kMinPreviewFrameRateLimitFps = 1;	///< 预览降帧目标帧率下限，防止目标间隔过大导致画面长期不刷新
+constexpr int kMaxPreviewFrameRateLimitFps = 120;	///< 预览降帧目标帧率上限，防止异常参数让调度间隔过小
+constexpr double kPreviewFrameRateEpsilonMs = 0.5;	///< 预览降帧 PTS 间隔判断容差，降低毫秒级舍入误差导致的误丢帧
 
 bool IsSupportedSpeed(double speed)
 {
