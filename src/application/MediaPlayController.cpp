@@ -6,6 +6,10 @@
 #include "tiny_log/Logging.h"
 #include "domain/MultiStreamManager.h"
 #include "domain/NetworkMediaSource.h"
+#include "infrastructure/edgedetectionprocessor.h"
+#include "infrastructure/grayscaleprocessor.h"
+#include "infrastructure/imageprocessorpipeline.h"
+#include "infrastructure/thresholdprocessor.h"
 
 #include <algorithm>
 #include <cmath>
@@ -17,6 +21,8 @@ constexpr double kSpeedEpsilon = 0.001;	///< 播放速度浮点比较容差，�
 constexpr double kVolumeStep = 0.05;	///< 音量增减步长，按 0.0-1.0 归一化音量计算
 constexpr double kVolumeEpsilon = 0.0001;	///< 音量浮点比较容差，避免微小误差触发重复更新
 constexpr int kPreviewFrameRateLimitFps = 15;	///< 启用预览降帧后下发给各路调度器的目标帧率
+constexpr int kMinImageProcessingThreshold = 0;	///< 图像二值化阈值最小值
+constexpr int kMaxImageProcessingThreshold = 255;	///< 图像二值化阈值最大值
 
 bool IsSupportedPlaybackSpeed(double speed)
 {
@@ -24,6 +30,18 @@ bool IsSupportedPlaybackSpeed(double speed)
         || std::fabs(speed - 1.0) < kSpeedEpsilon
         || std::fabs(speed - 1.5) < kSpeedEpsilon
         || std::fabs(speed - 2.0) < kSpeedEpsilon;
+}
+
+bool IsValidImageProcessingMode(MediaPlayController::ImageProcessingMode mode)
+{
+    switch (mode) {
+    case MediaPlayController::ImageProcessingMode::Grayscale:
+    case MediaPlayController::ImageProcessingMode::Threshold:
+    case MediaPlayController::ImageProcessingMode::EdgeDetection:
+        return true;
+    }
+
+    return false;
 }
 }
 
@@ -143,7 +161,7 @@ MediaPlayController::StreamId MediaPlayController::AddStreamWithFrameSinkFactory
         streamId,
         previewFrameRateReductionEnabled_,
         kPreviewFrameRateLimitFps);
-    multiStreamManager_->SetActiveStreamImageProcessingEnabled(imageProcessingEnabled_);
+    ApplyImageProcessingSettingsToActiveStream();
 
     return streamId;
 }
@@ -393,9 +411,41 @@ void MediaPlayController::ApplyUserSettingsToActiveStream()
         multiStreamManager_->SetStreamPlaybackSpeed(activeStream, playbackSpeed_);
     }
 
-    multiStreamManager_->SetActiveStreamImageProcessingEnabled(imageProcessingEnabled_);
+    ApplyImageProcessingSettingsToActiveStream();
     multiStreamManager_->SetAudioVolume(volume_);
     multiStreamManager_->SetAudioMuted(muted_);
+}
+
+void MediaPlayController::ApplyImageProcessingSettingsToActiveStream()
+{
+    if (!multiStreamManager_) {
+        return;
+    }
+
+    ImageProcessorPipeline* pipeline = multiStreamManager_->ActiveStreamImageProcessingPipeline();
+    if (!pipeline) {
+        multiStreamManager_->SetActiveStreamImageProcessingEnabled(false);
+        return;
+    }
+
+    pipeline->ClearProcessors();
+
+    bool processorConfigured = false;
+    switch (imageProcessingMode_) {
+    case ImageProcessingMode::Grayscale:
+        processorConfigured = pipeline->AddProcessor(std::make_shared<GrayscaleProcessor>());
+        break;
+    case ImageProcessingMode::Threshold:
+        processorConfigured = pipeline->AddProcessor(
+            std::make_shared<ThresholdProcessor>(imageProcessingThreshold_));
+        break;
+    case ImageProcessingMode::EdgeDetection:
+        processorConfigured = pipeline->AddProcessor(std::make_shared<EdgeDetectionProcessor>());
+        break;
+    }
+
+    multiStreamManager_->SetActiveStreamImageProcessingEnabled(
+        imageProcessingEnabled_ && processorConfigured);
 }
 
 MediaPlayController::PlaybackState MediaPlayController::State() const {
@@ -439,15 +489,50 @@ void MediaPlayController::SetImageProcessingEnabled(bool enabled) {
     }
 
     imageProcessingEnabled_ = enabled;
-    if (multiStreamManager_) {
-        multiStreamManager_->SetActiveStreamImageProcessingEnabled(imageProcessingEnabled_);
-    }
+    ApplyImageProcessingSettingsToActiveStream();
 
     emit ImageProcessingEnabledChanged(imageProcessingEnabled_);
 }
 
 bool MediaPlayController::IsImageProcessingEnabled() const {
     return imageProcessingEnabled_;
+}
+
+void MediaPlayController::SetImageProcessingMode(ImageProcessingMode mode) {
+    if (!IsValidImageProcessingMode(mode)) {
+        LOG_WARN("Unsupported image processing mode");
+        return;
+    }
+
+    if (imageProcessingMode_ == mode) {
+        return;
+    }
+
+    imageProcessingMode_ = mode;
+    ApplyImageProcessingSettingsToActiveStream();
+    emit ImageProcessingModeChanged(imageProcessingMode_);
+}
+
+MediaPlayController::ImageProcessingMode MediaPlayController::CurrentImageProcessingMode() const {
+    return imageProcessingMode_;
+}
+
+void MediaPlayController::SetImageProcessingThreshold(int threshold) {
+    const int clampedThreshold = std::clamp(
+        threshold,
+        kMinImageProcessingThreshold,
+        kMaxImageProcessingThreshold);
+    if (imageProcessingThreshold_ == clampedThreshold) {
+        return;
+    }
+
+    imageProcessingThreshold_ = clampedThreshold;
+    ApplyImageProcessingSettingsToActiveStream();
+    emit ImageProcessingThresholdChanged(imageProcessingThreshold_);
+}
+
+int MediaPlayController::ImageProcessingThreshold() const {
+    return imageProcessingThreshold_;
 }
 
 void MediaPlayController::SetPlaybackSpeed(double speed) {

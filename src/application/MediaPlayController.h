@@ -32,6 +32,13 @@ public:
         Paused
     };
 
+    enum class ImageProcessingMode {
+        Grayscale,
+        Threshold,
+        EdgeDetection
+    };
+    Q_ENUM(ImageProcessingMode)
+
     using StreamId = int;
     static constexpr StreamId InvalidStreamId = -1;	///< 无效流 ID
     using FrameSinkFactory = std::function<std::unique_ptr<IVideoFrameSink>(StreamId)>;
@@ -339,6 +346,30 @@ public:
      */
     bool IsImageProcessingEnabled() const;
 
+    /**
+     * @brief SetImageProcessingMode 设置 active stream 图像处理模式
+     * @param mode 图像处理模式
+     */
+    void SetImageProcessingMode(ImageProcessingMode mode);
+
+    /**
+     * @brief CurrentImageProcessingMode 获取当前图像处理模式
+     * @return 当前图像处理模式
+     */
+    ImageProcessingMode CurrentImageProcessingMode() const;
+
+    /**
+     * @brief SetImageProcessingThreshold 设置二值化阈值
+     * @param threshold 阈值，范围 0-255
+     */
+    void SetImageProcessingThreshold(int threshold);
+
+    /**
+     * @brief ImageProcessingThreshold 获取二值化阈值
+     * @return 当前二值化阈值
+     */
+    int ImageProcessingThreshold() const;
+
 signals:
     /**
      * @brief StateChanged 播放状态变化信号
@@ -375,6 +406,18 @@ signals:
      * @param enabled 是否启用图像处理
      */
     void ImageProcessingEnabledChanged(bool enabled);
+
+    /**
+     * @brief ImageProcessingModeChanged 图像处理模式变化信号
+     * @param mode 当前图像处理模式
+     */
+    void ImageProcessingModeChanged(MediaPlayController::ImageProcessingMode mode);
+
+    /**
+     * @brief ImageProcessingThresholdChanged 二值化阈值变化信号
+     * @param threshold 当前二值化阈值
+     */
+    void ImageProcessingThresholdChanged(int threshold);
 
     /**
      * @brief PlaybackFinished 当前媒体源自然播放结束信号
@@ -467,6 +510,8 @@ private:
     bool muted_ = false;	///< 当前静音状态
     bool previewFrameRateReductionEnabled_ = false;	///< 是否启用多路预览降帧
     bool imageProcessingEnabled_ = false;	///< 是否启用 active stream 图像处理
+    ImageProcessingMode imageProcessingMode_ = ImageProcessingMode::Grayscale;	///< active stream 图像处理模式
+    int imageProcessingThreshold_ = 128;	///< 二值化阈值，范围 0-255
 
     /**
      * @brief ConnectManagerSignals 创建 Controller 与 MultiStreamManager 的信号转发连接
@@ -477,6 +522,11 @@ private:
      * @brief ApplyUserSettingsToActiveStream 将当前用户级播放参数下发给 active stream
      */
     void ApplyUserSettingsToActiveStream();
+
+    /**
+     * @brief ApplyImageProcessingSettingsToActiveStream 将图像处理配置下发给 active stream
+     */
+    void ApplyImageProcessingSettingsToActiveStream();
 
     /**
      * @brief SetState 设置播放状态并发出状态变化信号

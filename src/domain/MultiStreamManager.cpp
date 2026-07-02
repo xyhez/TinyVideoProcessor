@@ -401,6 +401,11 @@ bool MultiStreamManager::SetActiveStreamImageProcessingEnabled(bool enabled) {
     return activeStreamUpdated;
 }
 
+ImageProcessorPipeline* MultiStreamManager::ActiveStreamImageProcessingPipeline() {
+    MediaPipeline* pipeline = FindPipeline(activeStreamId_);
+    return pipeline ? pipeline->ImageProcessingPipeline() : nullptr;
+}
+
 bool MultiStreamManager::SetStreamVolume(StreamId id, double volume) {
     MediaPipeline* pipeline = FindPipeline(id);
     if (!pipeline) {

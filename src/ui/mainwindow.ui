@@ -228,6 +228,36 @@
           </widget>
          </item>
          <item>
+          <widget class="QCheckBox" name="checkBox_imageProcessingEnabled">
+           <property name="text">
+            <string>图像处理</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QComboBox" name="comboBox_imageProcessingMode"/>
+         </item>
+         <item>
+          <widget class="QLabel" name="label_imageProcessingThreshold">
+           <property name="text">
+            <string>阈值</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QSpinBox" name="spinBox_imageProcessingThreshold">
+           <property name="minimum">
+            <number>0</number>
+           </property>
+           <property name="maximum">
+            <number>255</number>
+           </property>
+           <property name="value">
+            <number>128</number>
+           </property>
+          </widget>
+         </item>
+         <item>
           <widget class="QPushButton" name="pushButton_fullscreen">
            <property name="text">
             <string>全屏</string>

@@ -10,8 +10,8 @@
   - Phase 5.4 已完成帧与 OpenCV Mat 转换边界。
   - Phase 5.5 已完成 active stream 图像处理帧 sink 接入。
   - Phase 5.6 已完成基础图像处理器实现。
+  - Phase 5.7 已完成最小 UI 接入。
 - 未完成：
-  - 最小 UI 接入。
   - 性能和关闭链路验收。
 - 已知风险：
   - OpenCV 当前使用项目内 `Lib/opencv`，只确认 VC2019 链路，不支持 MinGW kit。
@@ -19,11 +19,10 @@
   - OpenCV 默认 BGR，当前渲染链路以 YUV420P 为主，需要明确转换边界。
   - 多路同时处理会显著放大性能压力，第一版不承诺。
 - 本轮范围：
-  - 新增灰度化、二值化、边缘检测处理器。
-  - 保持处理器只访问 OpenCV Mat。
-  - 不在处理器中访问 UI、队列、同步器或 OpenGL 资源。
-  - 不接入 UI 控件。
-  - 不改变播放链路和渲染链路。
+  - 接入图像处理最小 UI 控制入口。
+  - 通过 Controller 控制 active stream 图像处理开关、模式和阈值。
+  - UI 不直接访问处理器、视频帧、队列、同步器或 OpenGL 资源。
+  - 不做多路同时图像处理。
 
 ## 阶段目标
 
@@ -377,30 +376,34 @@ feat: 增加基础图像处理器
 - `src/ui/mainwindow.ui`
 - `src/application/MediaPlayController.h`
 - `src/application/MediaPlayController.cpp`
+- `src/domain/MultiStreamManager.h`
+- `src/domain/MultiStreamManager.cpp`
 - `doc/Phase5TODO.md`
+
+说明：`MultiStreamManager` 只新增 active stream 图像处理管线入口，用于保持 `MainWindow -> MediaPlayController -> MultiStreamManager -> MediaPipeline` 的架构方向，避免 UI 直接访问处理器。
 
 **任务清单**：
 
-- [ ] 新增图像处理开关。
-- [ ] 新增处理模式选择。
-- [ ] 新增二值化阈值控件。
-- [ ] UI 只调用 Controller。
-- [ ] Controller 转发到 active stream。
-- [ ] 没有 active stream 时控件安全无效。
-- [ ] 实时源和文件源行为一致。
+- [x] 新增图像处理开关。
+- [x] 新增处理模式选择。
+- [x] 新增二值化阈值控件。
+- [x] UI 只调用 Controller。
+- [x] Controller 转发到 active stream。
+- [x] 没有 active stream 时控件安全无效。
+- [x] 实时源和文件源行为一致。
 
 **验收标准**：
 
-- [ ] 用户可以开启/关闭处理。
-- [ ] 用户可以切换处理模式。
-- [ ] 用户可以调整二值化阈值。
-- [ ] UI 不直接访问处理器和帧。
-- [ ] 多路下只影响 active stream。
+- [x] 用户可以开启/关闭处理。
+- [x] 用户可以切换处理模式。
+- [x] 用户可以调整二值化阈值。
+- [x] UI 不直接访问处理器和帧。
+- [x] 多路下只影响 active stream。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\ui\mainwindow.h src\ui\mainwindow.cpp src\ui\mainwindow.ui src\application\MediaPlayController.h src\application\MediaPlayController.cpp doc\Phase5TODO.md`
-- [ ] 定向搜索：`rg -n "ImageProcessing|processing|Threshold|SetImageProcessing|MainWindow" src doc\Phase5TODO.md`
+- [x] 静态检查：`git diff --check -- src\ui\mainwindow.h src\ui\mainwindow.cpp src\ui\mainwindow.ui src\application\MediaPlayController.h src\application\MediaPlayController.cpp src\domain\MultiStreamManager.h src\domain\MultiStreamManager.cpp doc\Phase5TODO.md`
+- [x] 定向搜索：`rg -n "ImageProcessing|processing|Threshold|SetImageProcessing|MainWindow" src doc\Phase5TODO.md`
 - [ ] 人工运行建议：文件源、摄像头源、RTSP 源分别开启处理。
 - [ ] 人工运行建议：多路播放时切换 active stream，确认处理只影响当前 active stream。
 

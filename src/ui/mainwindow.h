@@ -174,6 +174,11 @@ private:
     void InitializePreviewFrameRateControls();
 
     /**
+     * @brief InitializeImageProcessingControls 初始化图像处理控件
+     */
+    void InitializeImageProcessingControls();
+
+    /**
      * @brief InitializeCursorHideTimer 初始化全屏鼠标隐藏定时器
      */
     void InitializeCursorHideTimer();
@@ -334,6 +339,17 @@ private:
      * @param speed 当前播放速度
      */
     void UpdatePlaybackSpeedComboBox(double speed);
+
+    /**
+     * @brief UpdateImageProcessingModeComboBox 根据当前图像处理模式同步下拉框
+     * @param mode 当前图像处理模式
+     */
+    void UpdateImageProcessingModeComboBox(MediaPlayController::ImageProcessingMode mode);
+
+    /**
+     * @brief UpdateImageProcessingControls 根据 active stream 和当前模式更新图像处理控件状态
+     */
+    void UpdateImageProcessingControls();
 
     /**
      * @brief ToggleFullScreen 切换普通窗口和全屏模式

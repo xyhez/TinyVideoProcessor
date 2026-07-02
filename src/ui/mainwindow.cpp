@@ -8,6 +8,7 @@
 #include "tiny_log/Logging.h"
 
 #include <QAbstractItemView>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QEvent>
 #include <QFileDialog>
@@ -18,6 +19,7 @@
 #include <QMessageBox>
 #include <QRadioButton>
 #include <QSignalBlocker>
+#include <QSpinBox>
 #include <QStringList>
 #include <QTimer>
 #include <QUrl>
@@ -47,6 +49,7 @@ MainWindow::MainWindow(QWidget *parent)
     InitializeVolumeControls();
     InitializePlaybackSpeedComboBox();
     InitializePreviewFrameRateControls();
+    InitializeImageProcessingControls();
     InitializeCursorHideTimer();
     InitializeMultiViewRenderer();
     InitializeMultiViewLayout();
@@ -103,6 +106,25 @@ void MainWindow::CreateConnects() {
                 QSignalBlocker reduceBlocker(ui->radioButton_reducePreviewFrameRate);
                 ui->radioButton_originalPreviewFrameRate->setChecked(!enabled);
                 ui->radioButton_reducePreviewFrameRate->setChecked(enabled);
+            });
+
+    connect(mediaPlayController_.get(), &MediaPlayController::ImageProcessingEnabledChanged,
+            this, [this](bool enabled) {
+                QSignalBlocker blocker(ui->checkBox_imageProcessingEnabled);
+                ui->checkBox_imageProcessingEnabled->setChecked(enabled);
+                UpdateImageProcessingControls();
+            });
+
+    connect(mediaPlayController_.get(), &MediaPlayController::ImageProcessingModeChanged,
+            this, [this](MediaPlayController::ImageProcessingMode mode) {
+                UpdateImageProcessingModeComboBox(mode);
+                UpdateImageProcessingControls();
+            });
+
+    connect(mediaPlayController_.get(), &MediaPlayController::ImageProcessingThresholdChanged,
+            this, [this](int threshold) {
+                QSignalBlocker blocker(ui->spinBox_imageProcessingThreshold);
+                ui->spinBox_imageProcessingThreshold->setValue(threshold);
             });
 
     connect(mediaPlayController_.get(), &MediaPlayController::PlaybackFinished,
@@ -249,6 +271,34 @@ void MainWindow::CreateConnects() {
     connect(ui->radioButton_reducePreviewFrameRate, &QRadioButton::toggled,
             this, [this](bool checked) {
                 mediaPlayController_->SetPreviewFrameRateReductionEnabled(checked);
+            });
+
+    connect(ui->checkBox_imageProcessingEnabled, &QCheckBox::toggled,
+            this, [this](bool checked) {
+                mediaPlayController_->SetImageProcessingEnabled(checked);
+                UpdateImageProcessingControls();
+            });
+
+    connect(ui->comboBox_imageProcessingMode,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            [this](int index) {
+                bool ok = false;
+                const int modeValue = ui->comboBox_imageProcessingMode->itemData(index).toInt(&ok);
+                if (!ok) {
+                    return;
+                }
+
+                mediaPlayController_->SetImageProcessingMode(
+                    static_cast<MediaPlayController::ImageProcessingMode>(modeValue));
+                UpdateImageProcessingControls();
+            });
+
+    connect(ui->spinBox_imageProcessingThreshold,
+            QOverload<int>::of(&QSpinBox::valueChanged),
+            this,
+            [this](int value) {
+                mediaPlayController_->SetImageProcessingThreshold(value);
             });
 
     connect(ui->pushButton_fullscreen, &QPushButton::clicked,
@@ -488,6 +538,25 @@ void MainWindow::InitializePreviewFrameRateControls() {
     const bool enabled = mediaPlayController_->IsPreviewFrameRateReductionEnabled();
     ui->radioButton_originalPreviewFrameRate->setChecked(!enabled);
     ui->radioButton_reducePreviewFrameRate->setChecked(enabled);
+}
+
+void MainWindow::InitializeImageProcessingControls() {
+    ui->comboBox_imageProcessingMode->clear();
+    ui->comboBox_imageProcessingMode->addItem(
+        "灰度",
+        static_cast<int>(MediaPlayController::ImageProcessingMode::Grayscale));
+    ui->comboBox_imageProcessingMode->addItem(
+        "二值化",
+        static_cast<int>(MediaPlayController::ImageProcessingMode::Threshold));
+    ui->comboBox_imageProcessingMode->addItem(
+        "边缘",
+        static_cast<int>(MediaPlayController::ImageProcessingMode::EdgeDetection));
+
+    ui->spinBox_imageProcessingThreshold->setRange(0, 255);
+    ui->spinBox_imageProcessingThreshold->setValue(mediaPlayController_->ImageProcessingThreshold());
+    ui->checkBox_imageProcessingEnabled->setChecked(mediaPlayController_->IsImageProcessingEnabled());
+    UpdateImageProcessingModeComboBox(mediaPlayController_->CurrentImageProcessingMode());
+    UpdateImageProcessingControls();
 }
 
 void MainWindow::InitializeCursorHideTimer() {
@@ -770,6 +839,32 @@ void MainWindow::UpdatePlaybackSpeedComboBox(double speed) {
     ui->comboBox_speed->setCurrentIndex(index);
 }
 
+void MainWindow::UpdateImageProcessingModeComboBox(MediaPlayController::ImageProcessingMode mode) {
+    const int index = ui->comboBox_imageProcessingMode->findData(static_cast<int>(mode));
+    if (index < 0 || ui->comboBox_imageProcessingMode->currentIndex() == index) {
+        return;
+    }
+
+    QSignalBlocker blocker(ui->comboBox_imageProcessingMode);
+    ui->comboBox_imageProcessingMode->setCurrentIndex(index);
+}
+
+void MainWindow::UpdateImageProcessingControls() {
+    const bool hasActiveStream =
+        mediaPlayController_->ActiveStream() != MediaPlayController::InvalidStreamId;
+    const bool processingEnabled = mediaPlayController_->IsImageProcessingEnabled();
+    const bool thresholdMode =
+        mediaPlayController_->CurrentImageProcessingMode()
+        == MediaPlayController::ImageProcessingMode::Threshold;
+
+    ui->checkBox_imageProcessingEnabled->setEnabled(hasActiveStream);
+    ui->comboBox_imageProcessingMode->setEnabled(hasActiveStream);
+    ui->label_imageProcessingThreshold->setEnabled(
+        hasActiveStream && processingEnabled && thresholdMode);
+    ui->spinBox_imageProcessingThreshold->setEnabled(
+        hasActiveStream && processingEnabled && thresholdMode);
+}
+
 void MainWindow::ToggleFullScreen() {
     if (isFullScreenMode_) {
         ExitFullScreen();
@@ -992,6 +1087,7 @@ void MainWindow::UpdateStreamControls() {
     ui->pushButton_startAll->setEnabled(hasStream);
     ui->pushButton_pauseAll->setEnabled(hasStream);
     ui->pushButton_stopAll->setEnabled(hasStream);
+    UpdateImageProcessingControls();
 }
 
 void MainWindow::AddMultiStreamFiles() {

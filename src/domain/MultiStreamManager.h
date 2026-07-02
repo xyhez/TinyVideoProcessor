@@ -14,6 +14,7 @@
 #include "infrastructure/ivideoframesink.h"
 
 class QWidget;
+class ImageProcessorPipeline;
 /**
  * @brief MultiStreamManager 管理多路播放管线的外层身份和状态
  *
@@ -252,6 +253,12 @@ public:
      * @return false 无 active stream
      */
     bool SetActiveStreamImageProcessingEnabled(bool enabled);
+
+    /**
+     * @brief ActiveStreamImageProcessingPipeline 获取 active stream 的图像处理器管线
+     * @return 图像处理器管线指针；无 active stream 时返回 nullptr
+     */
+    ImageProcessorPipeline* ActiveStreamImageProcessingPipeline();
 
     /**
      * @brief SetStreamVolume 设置指定逻辑流音量
