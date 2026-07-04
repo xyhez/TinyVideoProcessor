@@ -11,7 +11,7 @@
 
 #include "domain/IMediaSource.h"
 #include "domain/MediaPipeline.h"
-#include "infrastructure/ivideoframesink.h"
+#include "infrastructure/rendering/ivideoframesink.h"
 
 class QWidget;
 class ImageProcessorPipeline;

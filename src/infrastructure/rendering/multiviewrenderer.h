@@ -14,7 +14,7 @@
 #include <map>
 
 #include "core/ffmpeg_raii.h"
-#include "infrastructure/videoframeconverter.h"
+#include "infrastructure/rendering/videoframeconverter.h"
 
 extern "C" {
 #include <libavutil/frame.h>

@@ -1,5 +1,5 @@
 #include "CameraSettingsDialog.h"
-#include "infrastructure/CameraDeviceEnumerator.h"
+#include "infrastructure/devices/CameraDeviceEnumerator.h"
 
 #include <QMessageBox>
 

@@ -1,9 +1,9 @@
 #ifndef TINYVIDEOPROCESSOR_IMAGEPROCESSINGFRAMESINK_H
 #define TINYVIDEOPROCESSOR_IMAGEPROCESSINGFRAMESINK_H
 
-#include "infrastructure/imageprocessorpipeline.h"
-#include "infrastructure/ivideoframesink.h"
-#include "infrastructure/videoframematconverter.h"
+#include "infrastructure/vision/imageprocessorpipeline.h"
+#include "infrastructure/rendering/ivideoframesink.h"
+#include "infrastructure/vision/videoframematconverter.h"
 
 /**
  * @brief ImageProcessingFrameSink 在视频帧调度器和最终显示 sink 之间执行图像处理

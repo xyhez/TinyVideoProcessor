@@ -9,12 +9,12 @@
 #include "core/ffmpeg_raii.h"
 #include "core/queue.h"
 #include "domain/IMediaSource.h"
-#include "infrastructure/audioplayer.h"
-#include "infrastructure/decoder.h"
-#include "infrastructure/demuxer.h"
-#include "infrastructure/syncmanager.h"
-#include "infrastructure/videoframescheduler.h"
-#include "infrastructure/videorender.h"
+#include "infrastructure/audio/audioplayer.h"
+#include "infrastructure/decoding/decoder.h"
+#include "infrastructure/decoding/demuxer.h"
+#include "infrastructure/sync/syncmanager.h"
+#include "infrastructure/sync/videoframescheduler.h"
+#include "infrastructure/rendering/videorender.h"
 
 class QWidget;
 class IVideoFrameSink;

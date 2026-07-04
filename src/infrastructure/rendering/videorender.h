@@ -7,7 +7,7 @@
 #include <QOpenGLTexture>
 #include <QMutex>
 
-#include "infrastructure/ivideoframesink.h"
+#include "infrastructure/rendering/ivideoframesink.h"
 
 extern "C" {
 #include <libavutil/frame.h>

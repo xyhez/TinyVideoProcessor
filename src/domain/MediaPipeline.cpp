@@ -1,6 +1,6 @@
 #include "MediaPipeline.h"
 #include "tiny_log/Logging.h"
-#include "infrastructure/imageprocessingframesink.h"
+#include "infrastructure/vision/imageprocessingframesink.h"
 
 #include <algorithm>
 #include <QVBoxLayout>

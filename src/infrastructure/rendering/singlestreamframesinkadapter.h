@@ -3,8 +3,8 @@
 
 #include <QPointer>
 
-#include "infrastructure/ivideoframesink.h"
-#include "infrastructure/multiviewrenderer.h"
+#include "infrastructure/rendering/ivideoframesink.h"
+#include "infrastructure/rendering/multiviewrenderer.h"
 
 /**
  * @brief SingleStreamFrameSinkAdapter 单路视频帧 sink 适配器

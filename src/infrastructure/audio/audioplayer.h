@@ -16,7 +16,7 @@
 #include <atomic>
 
 #include "core/ffmpeg_raii.h"
-#include "infrastructure/syncmanager.h"
+#include "infrastructure/sync/syncmanager.h"
 #include "core/queue.h"
 
 extern "C" {

@@ -6,10 +6,10 @@
 #include "tiny_log/Logging.h"
 #include "domain/MultiStreamManager.h"
 #include "domain/NetworkMediaSource.h"
-#include "infrastructure/edgedetectionprocessor.h"
-#include "infrastructure/grayscaleprocessor.h"
-#include "infrastructure/imageprocessorpipeline.h"
-#include "infrastructure/thresholdprocessor.h"
+#include "infrastructure/vision/edgedetectionprocessor.h"
+#include "infrastructure/vision/grayscaleprocessor.h"
+#include "infrastructure/vision/imageprocessorpipeline.h"
+#include "infrastructure/vision/thresholdprocessor.h"
 
 #include <algorithm>
 #include <cmath>

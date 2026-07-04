@@ -2,8 +2,8 @@
 #include "ui_mainwindow.h"
 #include "domain/FileMediaSource.h"
 #include "domain/CameraMediaSource.h"
-#include "infrastructure/multiviewrenderer.h"
-#include "infrastructure/singlestreamframesinkadapter.h"
+#include "infrastructure/rendering/multiviewrenderer.h"
+#include "infrastructure/rendering/singlestreamframesinkadapter.h"
 #include "ui/CameraSettingsDialog.h"
 #include "tiny_log/Logging.h"
 

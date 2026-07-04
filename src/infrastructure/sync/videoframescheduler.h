@@ -8,8 +8,8 @@
 
 #include "core/ffmpeg_raii.h"
 #include "core/queue.h"
-#include "infrastructure/ivideoframesink.h"
-#include "infrastructure/syncmanager.h"
+#include "infrastructure/rendering/ivideoframesink.h"
+#include "infrastructure/sync/syncmanager.h"
 
 extern "C" {
 #include <libavutil/avutil.h>

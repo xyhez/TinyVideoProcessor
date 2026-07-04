@@ -10,7 +10,7 @@
 
 #include "domain/IMediaSource.h"
 #include "domain/NetworkTypes.h"
-#include "infrastructure/ivideoframesink.h"
+#include "infrastructure/rendering/ivideoframesink.h"
 
 class MultiStreamManager;
 class QWidget;
