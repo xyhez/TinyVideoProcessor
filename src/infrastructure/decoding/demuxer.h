@@ -26,12 +26,12 @@ struct videoparam {
 
 
 
-class demuxer : public QObject
+class Demuxer : public QObject
 {
     Q_OBJECT
 public:
     /**
-     * @brief demuxer 构造函数
+     * @brief Demuxer 构造函数
      * @param mediaSource 媒体源抽象
      * @param APacket 音频包队列
      * @param VPacket 视频包队列
@@ -39,7 +39,7 @@ public:
      * @param VFrame 视频帧队列
      * @param parent Qt 父对象
      */
-    explicit demuxer(std::shared_ptr<IMediaSource> mediaSource
+    explicit Demuxer(std::shared_ptr<IMediaSource> mediaSource
                      ,std::shared_ptr<SyncQueue<AVPacketPtr>> APacket = nullptr
                      ,std::shared_ptr<SyncQueue<AVPacketPtr>> VPacket = nullptr
                      ,std::shared_ptr<SyncQueue<AVFramePtr>>  AFrame  = nullptr
@@ -47,9 +47,9 @@ public:
                      ,QObject *parent = nullptr);
 
     /**
-     * @brief demuxer 析构函数
+     * @brief Demuxer 析构函数
      */
-    ~demuxer();
+    ~Demuxer();
 
     /**
      * @brief ReAcoderPar

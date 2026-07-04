@@ -261,11 +261,11 @@ private:
     std::shared_ptr<SyncQueue<AVFramePtr>> VFrame_ = nullptr;	///< 视频帧队列
 
     std::shared_ptr<IMediaSource> mediaSource_;	///< 当前媒体源
-    std::shared_ptr<syncmanager> syncManager_;	///< 同步时钟管理器
+    std::shared_ptr<SyncManager> syncManager_;	///< 同步时钟管理器
 
-    std::unique_ptr<demuxer> demuxer_;	///< 解复用器
-    std::unique_ptr<decoder> Adecoder_;	///< 音频解码器
-    std::unique_ptr<decoder> Vdecoder_;	///< 视频解码器
+    std::unique_ptr<Demuxer> demuxer_;	///< 解复用器
+    std::unique_ptr<Decoder> Adecoder_;	///< 音频解码器
+    std::unique_ptr<Decoder> Vdecoder_;	///< 视频解码器
     std::unique_ptr<AudioPlayer> audioplay_;	///< 音频播放器
     std::unique_ptr<VideoFrameScheduler> videoFrameScheduler_;	///< 视频帧调度器
     VideoRender* videoRender_ = nullptr;	///< 默认视频渲染器

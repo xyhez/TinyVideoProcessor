@@ -17,7 +17,7 @@ QString AvErrorString(int errorCode)
 }
 }
 
-demuxer::demuxer(std::shared_ptr<IMediaSource> mediaSource,
+Demuxer::Demuxer(std::shared_ptr<IMediaSource> mediaSource,
                  std::shared_ptr<SyncQueue<AVPacketPtr>> APacket,
                  std::shared_ptr<SyncQueue<AVPacketPtr>> VPacket,
                  std::shared_ptr<SyncQueue<AVFramePtr>> AFrame,
@@ -98,22 +98,22 @@ demuxer::demuxer(std::shared_ptr<IMediaSource> mediaSource,
     }
 }
 
-demuxer::~demuxer()
+Demuxer::~Demuxer()
 {
     LOG_DEBUG("Demuxer resources released");
 }
 
-AVCodecParameters* demuxer::ReAcoderPar()
+AVCodecParameters* Demuxer::ReAcoderPar()
 {
     return m_A_coderPar;
 }
 
-AVCodecParameters* demuxer::ReVcoderPar()
+AVCodecParameters* Demuxer::ReVcoderPar()
 {
     return m_V_coderPar;
 }
 
-void demuxer::SetAudioQueues(std::shared_ptr<SyncQueue<AVPacketPtr>> APacket,
+void Demuxer::SetAudioQueues(std::shared_ptr<SyncQueue<AVPacketPtr>> APacket,
                              std::shared_ptr<SyncQueue<AVFramePtr>> AFrame)
 {
     QMutexLocker locker(&mutex);
@@ -121,17 +121,17 @@ void demuxer::SetAudioQueues(std::shared_ptr<SyncQueue<AVPacketPtr>> APacket,
     m_AFrame = AFrame;
 }
 
-AVRational demuxer::ReAtimebase()
+AVRational Demuxer::ReAtimebase()
 {
     return m_A_time_base;
 }
 
-AVRational demuxer::ReVtimebase()
+AVRational Demuxer::ReVtimebase()
 {
     return m_V_time_base;
 }
 
-int demuxer::StartDemuxer()
+int Demuxer::StartDemuxer()
 {
     LOG_DEBUG("Demuxer started");
 
@@ -272,17 +272,17 @@ int demuxer::StartDemuxer()
     return 0;
 }
 
-int demuxer::Rewind()
+int Demuxer::Rewind()
 {
     return SeekRelative(-kSeekStepSeconds);
 }
 
-int demuxer::Forward()
+int Demuxer::Forward()
 {
     return SeekRelative(kSeekStepSeconds);
 }
 
-int demuxer::SeekTo(double seconds)
+int Demuxer::SeekTo(double seconds)
 {
     if (!m_mediaSource) {
         LOG_WARN("Seek failed: media source is null");
@@ -324,12 +324,12 @@ int demuxer::SeekTo(double seconds)
     return 0;
 }
 
-int demuxer::SeekRelative(double seconds)
+int Demuxer::SeekRelative(double seconds)
 {
     return SeekTo(CurrentPositionSeconds() + seconds);
 }
 
-int demuxer::SuspendAndWait()
+int Demuxer::SuspendAndWait()
 {
     {
         QMutexLocker locker(&mutex);
@@ -359,12 +359,12 @@ int demuxer::SuspendAndWait()
     return stop_flag ? -1 : 0;
 }
 
-double demuxer::Position() const
+double Demuxer::Position() const
 {
     return CurrentPositionSeconds();
 }
 
-double demuxer::CurrentPositionSeconds() const
+double Demuxer::CurrentPositionSeconds() const
 {
     QMutexLocker locker(&mutex);
 
@@ -379,7 +379,7 @@ double demuxer::CurrentPositionSeconds() const
     return 0.0;
 }
 
-int demuxer::Start()
+int Demuxer::Start()
 {
     mutex.lock();
     pause_flag = false;
@@ -398,7 +398,7 @@ int demuxer::Start()
     return 0;
 }
 
-int demuxer::Stop()
+int Demuxer::Stop()
 {
     mutex.lock();
     stop_flag = true;
@@ -410,7 +410,7 @@ int demuxer::Stop()
     return 0;
 }
 
-int demuxer::Pause()
+int Demuxer::Pause()
 {
     mutex.lock();
     pause_flag = true;
@@ -422,7 +422,7 @@ int demuxer::Pause()
     return 0;
 }
 
-bool demuxer::WaitIfSuspended()
+bool Demuxer::WaitIfSuspended()
 {
     QMutexLocker locker(&mutex);
 
@@ -436,7 +436,7 @@ bool demuxer::WaitIfSuspended()
     return !stop_flag;
 }
 
-bool demuxer::IsSuspendRequested() const
+bool Demuxer::IsSuspendRequested() const
 {
     QMutexLocker locker(&mutex);
     return suspend_requested_;

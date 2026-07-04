@@ -55,7 +55,7 @@ public:
      */
     void InitAudioPlay(AVCodecParameters* codecPar,
                        std::shared_ptr<SyncQueue<AVFramePtr>> frameQueue,
-                       std::shared_ptr<syncmanager> syncManager,
+                       std::shared_ptr<SyncManager> syncManager,
                        double audioTimeBase);
 
     /**
@@ -138,7 +138,7 @@ signals:
 
 private:
     std::shared_ptr<SyncQueue<AVFramePtr>> m_audioFrameQueue;	///< 音频帧队列
-    std::shared_ptr<syncmanager> m_syncManager;	///< 同步时钟管理器
+    std::shared_ptr<SyncManager> m_syncManager;	///< 同步时钟管理器
     double m_audioTimeBase = 0.0;	///< 音频时间基
     bool m_first = true;	///< 是否为首帧音频
 

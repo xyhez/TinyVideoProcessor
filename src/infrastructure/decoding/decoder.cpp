@@ -7,13 +7,13 @@
 namespace {
 constexpr bool kEnableHardwareDecoder = true;	///< 是否优先尝试硬件解码，失败后回退到软件解码
 }
-decoder::decoder(QObject *parent)
+Decoder::Decoder(QObject *parent)
     : QObject{parent}
 {
 
 }
 
-decoder::~decoder() {
+Decoder::~Decoder() {
     if(Ctx) {
         avcodec_free_context(&Ctx);
     }
@@ -23,11 +23,11 @@ decoder::~decoder() {
     LOG_DEBUG_STREAM() << decoder_type << "decoder resources released";
 }
 
-void decoder::CreateConnect() {
+void Decoder::CreateConnect() {
 
 }
 
-bool decoder::InitHWDecoder()
+bool Decoder::InitHWDecoder()
 {
     if (!kEnableHardwareDecoder) {
         LOG_DEBUG_STREAM() << "Video hardware decoding disabled, using software decoder";
@@ -103,7 +103,7 @@ bool decoder::InitHWDecoder()
     return false;
 }
 
-AVFramePtr decoder::TransferHWFrame(AVFrame *hwFrame)
+AVFramePtr Decoder::TransferHWFrame(AVFrame *hwFrame)
 {
     if (!m_isHWDecoder || !hwFrame) {
         return {};
@@ -144,7 +144,7 @@ AVFramePtr decoder::TransferHWFrame(AVFrame *hwFrame)
     return softwareFrame;
 }
 
-int decoder::InitDecoder(std::shared_ptr<SyncQueue<AVPacketPtr>> packetVec
+int Decoder::InitDecoder(std::shared_ptr<SyncQueue<AVPacketPtr>> packetVec
                          ,std::shared_ptr<SyncQueue<AVFramePtr>> framevec
                          , AVCodecParameters *coderPar
                          , AVRational time_base) {
@@ -200,7 +200,7 @@ int decoder::InitDecoder(std::shared_ptr<SyncQueue<AVPacketPtr>> packetVec
     return 0;
 }
 
-int decoder::StartDecoder() {
+int Decoder::StartDecoder() {
     LOG_DEBUG_STREAM() << decoder_type << "decoder thread started"
              << (m_isHWDecoder ? "[hardware]" : "[software]");
 
@@ -329,7 +329,7 @@ int decoder::StartDecoder() {
     return 0;
 }
 
-int decoder::Flush() {
+int Decoder::Flush() {
     if (!Ctx) {
         LOG_WARN_STREAM() << decoder_type << "decoder flush failed: context is null";
         return -1;
@@ -344,7 +344,7 @@ int decoder::Flush() {
     return 0;
 }
 
-int decoder::SuspendAndWait() {
+int Decoder::SuspendAndWait() {
     {
         QMutexLocker locker(&mutex);
         if (stop_flag) {
@@ -373,19 +373,19 @@ int decoder::SuspendAndWait() {
     return stop_flag ? -1 : 0;
 }
 
-void decoder::SetDiscardBefore(double seconds) {
+void Decoder::SetDiscardBefore(double seconds) {
     QMutexLocker locker(&mutex);
     m_discardBeforeEnabled = true;
     m_discardBeforeSeconds = seconds < 0.0 ? 0.0 : seconds;
 }
 
-void decoder::ClearDiscardBefore() {
+void Decoder::ClearDiscardBefore() {
     QMutexLocker locker(&mutex);
     m_discardBeforeEnabled = false;
     m_discardBeforeSeconds = 0.0;
 }
 
-bool decoder::ShouldDiscardFrame(const AVFrame *candidateFrame) {
+bool Decoder::ShouldDiscardFrame(const AVFrame *candidateFrame) {
     if (!candidateFrame || candidateFrame->pts == AV_NOPTS_VALUE) {
         return false;
     }
@@ -404,7 +404,7 @@ bool decoder::ShouldDiscardFrame(const AVFrame *candidateFrame) {
     return false;
 }
 
-int decoder::Start() {
+int Decoder::Start() {
     mutex.lock();
     pause_flag = false;
     suspend_requested_ = false;
@@ -422,7 +422,7 @@ int decoder::Start() {
     return 0;
 }
 
-int decoder::Stop() {
+int Decoder::Stop() {
     {
         QMutexLocker locker(&mutex);
         stop_flag = true;
@@ -441,7 +441,7 @@ int decoder::Stop() {
     return 0;
 }
 
-int decoder::Pause(){
+int Decoder::Pause(){
     mutex.lock();
     pause_flag = true;
     suspend_requested_ = true;
@@ -451,7 +451,7 @@ int decoder::Pause(){
 
     return 0;
 }
-bool decoder::WaitIfSuspended() {
+bool Decoder::WaitIfSuspended() {
     QMutexLocker locker(&mutex);
 
     while (suspend_requested_ && !stop_flag) {
@@ -464,7 +464,7 @@ bool decoder::WaitIfSuspended() {
     return !stop_flag;
 }
 
-bool decoder::IsSuspendRequested() const {
+bool Decoder::IsSuspendRequested() const {
     QMutexLocker locker(&mutex);
     return suspend_requested_;
 }

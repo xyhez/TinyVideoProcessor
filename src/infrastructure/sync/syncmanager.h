@@ -14,20 +14,20 @@ enum class SYNCTYPE {
     EXTERNAL    ///< 外部时钟
 };
 
-class syncmanager : public QObject
+class SyncManager : public QObject
 {
     Q_OBJECT
 public:
     /**
-     * @brief syncmanager 构造函数
+     * @brief SyncManager 构造函数
      * @param parent Qt 父对象
      */
-    explicit syncmanager(QObject *parent = nullptr);
+    explicit SyncManager(QObject *parent = nullptr);
 
     /**
-     * @brief syncmanager 析构函数
+     * @brief SyncManager 析构函数
      */
-    ~syncmanager();
+    ~SyncManager();
 
     /**
      * @brief RefreshClock

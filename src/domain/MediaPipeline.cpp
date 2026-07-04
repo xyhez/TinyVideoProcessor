@@ -320,7 +320,7 @@ bool MediaPipeline::CreatePipelineResources(std::shared_ptr<IMediaSource> mediaS
     VPacket_ = std::make_shared<SyncQueue<AVPacketPtr>>(kPacketQueueMax);
     VFrame_ = std::make_shared<SyncQueue<AVFramePtr>>(kFrameQueueMax);
 
-    demuxer_ = std::make_unique<demuxer>(mediaSource_, APacket_, VPacket_, AFrame_, VFrame_);
+    demuxer_ = std::make_unique<Demuxer>(mediaSource_, APacket_, VPacket_, AFrame_, VFrame_);
 
     const Fileinfo& sourceInfo = mediaSource_->GetSourceInfo();
     const bool hasAudio = sourceInfo.hasAudio_;
@@ -330,13 +330,13 @@ bool MediaPipeline::CreatePipelineResources(std::shared_ptr<IMediaSource> mediaS
         demuxer_->SetAudioQueues(APacket_, AFrame_);
     }
 
-    Vdecoder_ = std::make_unique<decoder>();
+    Vdecoder_ = std::make_unique<Decoder>();
     if (hasAudio) {
-        Adecoder_ = std::make_unique<decoder>();
+        Adecoder_ = std::make_unique<Decoder>();
         audioplay_ = std::make_unique<AudioPlayer>();
     }
 
-    syncManager_ = std::make_shared<syncmanager>();
+    syncManager_ = std::make_shared<SyncManager>();
     syncManager_->SetSyncType(hasAudio ? SYNCTYPE::AUDIO : SYNCTYPE::VIDEO);
     videoFrameScheduler_ = std::make_unique<VideoFrameScheduler>();
     positionTimer_ = std::make_unique<QTimer>();
@@ -391,25 +391,25 @@ bool MediaPipeline::CreatePipelineResources(std::shared_ptr<IMediaSource> mediaS
 void MediaPipeline::CreateConnects()
 {
     connect(demuxerTH_.get(), &QThread::started,
-            demuxer_.get(), &demuxer::StartDemuxer);
+            demuxer_.get(), &Demuxer::StartDemuxer);
 
     if (AdecoderTH_ && Adecoder_) {
         connect(AdecoderTH_.get(), &QThread::started,
-                Adecoder_.get(), &decoder::StartDecoder);
+                Adecoder_.get(), &Decoder::StartDecoder);
     }
 
     connect(VdecoderTH_.get(), &QThread::started,
-            Vdecoder_.get(), &decoder::StartDecoder);
+            Vdecoder_.get(), &Decoder::StartDecoder);
 
     if (audioplayTH_ && audioplay_) {
         connect(audioplayTH_.get(), &QThread::started,
                 audioplay_.get(), &AudioPlayer::StartAudioPlay);
     }
 
-    connect(demuxer_.get(), &demuxer::DemuxFinished,
+    connect(demuxer_.get(), &Demuxer::DemuxFinished,
             this, &MediaPipeline::HandleDemuxFinished);
 
-    connect(demuxer_.get(), &demuxer::DemuxErrorOccurred,
+    connect(demuxer_.get(), &Demuxer::DemuxErrorOccurred,
             this, &MediaPipeline::HandleDemuxError);
 
     connect(positionTimer_.get(), &QTimer::timeout, this, [this]() {

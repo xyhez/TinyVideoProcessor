@@ -2,46 +2,46 @@
 
 #include <QMutexLocker>
 
-syncmanager::syncmanager(QObject *parent)
+SyncManager::SyncManager(QObject *parent)
     : QObject{parent}
 {
 
 }
 
-syncmanager::~syncmanager() {
+SyncManager::~SyncManager() {
 
 }
 
-int syncmanager::RefreshClock(double clock) {
+int SyncManager::RefreshClock(double clock) {
     QMutexLocker locker(&mutex);
     mainclock = clock;
 
     return 0;
 }
 
-double syncmanager::GetClock() const {
+double SyncManager::GetClock() const {
     QMutexLocker locker(&mutex);
     return mainclock;
 }
 
-void syncmanager::SetSyncType(SYNCTYPE type) {
+void SyncManager::SetSyncType(SYNCTYPE type) {
     QMutexLocker locker(&mutex);
     currentSYNCTYPE = type;
 }
 
-SYNCTYPE syncmanager::SyncType() const {
+SYNCTYPE SyncManager::SyncType() const {
     QMutexLocker locker(&mutex);
     return currentSYNCTYPE;
 }
 
-int syncmanager::SeekTo(double clockMs) {
+int SyncManager::SeekTo(double clockMs) {
     QMutexLocker locker(&mutex);
     mainclock = clockMs;
 
     return 0;
 }
 
-int syncmanager::Forward() {
+int SyncManager::Forward() {
     QMutexLocker locker(&mutex);
     mainclock += 3000;
 

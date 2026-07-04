@@ -45,7 +45,7 @@ public:
      * @param videoTimeBase 视频流时间基
      */
     void Initialize(std::shared_ptr<SyncQueue<AVFramePtr>> frameQueue,
-                    std::shared_ptr<syncmanager> syncManager,
+                    std::shared_ptr<SyncManager> syncManager,
                     double frameRate,
                     double videoTimeBase);
 
@@ -205,7 +205,7 @@ private:
     void ScheduleNextFrame(int delayMs);
 
     std::shared_ptr<SyncQueue<AVFramePtr>> frameQueue_;	///< 视频帧队列
-    std::shared_ptr<syncmanager> syncManager_;	///< 同步时钟管理器
+    std::shared_ptr<SyncManager> syncManager_;	///< 同步时钟管理器
     IVideoFrameSink* frameSink_ = nullptr;	///< 视频帧输出目标
 
     double videoTimeBase_ = 0.0;	///< 视频时间基

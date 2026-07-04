@@ -19,20 +19,20 @@ extern "C" {
 }
 
 
-class decoder : public QObject
+class Decoder : public QObject
 {
     Q_OBJECT
 public:
     /**
-     * @brief decoder 构造函数
+     * @brief Decoder 构造函数
      * @param parent Qt 父对象
      */
-    explicit decoder(QObject *parent = nullptr);
+    explicit Decoder(QObject *parent = nullptr);
 
     /**
-     * @brief decoder 析构函数，释放解码器和硬解资源
+     * @brief Decoder 析构函数，释放解码器和硬解资源
      */
-    ~decoder();
+    ~Decoder();
 
     /**
      * @brief 创建信号槽

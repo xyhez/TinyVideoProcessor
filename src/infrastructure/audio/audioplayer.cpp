@@ -115,7 +115,7 @@ AudioPlayer::~AudioPlayer() {
 
 void AudioPlayer::InitAudioPlay(AVCodecParameters* codecPar,
                                 std::shared_ptr<SyncQueue<AVFramePtr>> frameQueue,
-                                std::shared_ptr<syncmanager> syncManager,
+                                std::shared_ptr<SyncManager> syncManager,
                                 double audioTimeBase)
 {
     m_audioFrameQueue = frameQueue;
