@@ -236,37 +236,37 @@ feat: 新增视觉分析核心接口
 
 **任务清单**：
 
-- [ ] 新增 `VisionPipelineManager` 类，继承 `QObject`。
-- [ ] 支持 `RegisterPipeline(std::unique_ptr<IVisionPipeline>)`，按 `Id()` 唯一存储。
-- [ ] 支持 `AvailablePipelineIds()` 返回已注册 id 列表。
-- [ ] 支持 `FindPipeline(const QString&)` 返回原始指针。
-- [ ] 支持 `SetActivePipeline(const QString&)`：先 `Shutdown` 旧 active，再 `Startup` 新 target，成功后更新 `activeId_`。
-- [ ] `SetActivePipeline("")` 关闭当前 active（仅 Shutdown 旧的，不 Startup 新的）。
-- [ ] `SetActivePipeline(不存在的id)` 返回 false 并保持原状态。
-- [ ] Startup 失败时保持无 active 状态并发 `PipelineStartupFailed(id, error)` 信号。
-- [ ] 支持 `ActivePipelineId()` / `ActivePipeline()` 查询。
-- [ ] 支持 `RunActive(const VisionFrame&, VisionResultSet&)`：无 active 时返回 false，否则转发给 active pipeline 的 `Run`。
-- [ ] Manager 析构时遍历所有 pipeline，`IsStarted()` 的调 `Shutdown()`。
-- [ ] 定义信号 `ActivePipelineChanged(QString id)`。
-- [ ] 定义信号 `PipelineStartupFailed(QString id, QString error)`。
-- [ ] 不接入 `MediaPipeline` / `MultiStreamManager`。
-- [ ] 不接入 UI。
-- [ ] `CMakeLists.txt` 当前通过 `file(GLOB_RECURSE src/*.cpp src/*.h ...)` 自动纳入新增文件，本步无需修改。
+- [x] 新增 `VisionPipelineManager` 类，继承 `QObject`。
+- [x] 支持 `RegisterPipeline(std::unique_ptr<IVisionPipeline>)`，按 `Id()` 唯一存储。
+- [x] 支持 `AvailablePipelineIds()` 返回已注册 id 列表。
+- [x] 支持 `FindPipeline(const QString&)` 返回原始指针。
+- [x] 支持 `SetActivePipeline(const QString&)`：先 `Shutdown` 旧 active，再 `Startup` 新 target，成功后更新 `activeId_`。
+- [x] `SetActivePipeline("")` 关闭当前 active（仅 Shutdown 旧的，不 Startup 新的）。
+- [x] `SetActivePipeline(不存在的id)` 返回 false 并保持原状态。
+- [x] Startup 失败时保持无 active 状态并发 `PipelineStartupFailed(id, error)` 信号。
+- [x] 支持 `ActivePipelineId()` / `ActivePipeline()` 查询。
+- [x] 支持 `RunActive(const VisionFrame&, VisionResultSet&)`：无 active 时返回 false，否则转发给 active pipeline 的 `Run`。
+- [x] Manager 析构时遍历所有 pipeline，`IsStarted()` 的调 `Shutdown()`。
+- [x] 定义信号 `ActivePipelineChanged(QString id)`。
+- [x] 定义信号 `PipelineStartupFailed(QString id, QString error)`。
+- [x] 不接入 `MediaPipeline` / `MultiStreamManager`。
+- [x] 不接入 UI。
+- [x] `CMakeLists.txt` 当前通过 `file(GLOB_RECURSE src/*.cpp src/*.h ...)` 自动纳入新增文件，本步无需修改。
 
 **验收标准**：
 
-- [ ] Manager 可以注册空 pipeline 并切换（用测试桩 pipeline 验证）。
-- [ ] `SetActivePipeline("")` 能安全关闭当前 active。
-- [ ] `SetActivePipeline(不存在的id)` 返回 false，不影响当前状态。
-- [ ] Startup 失败时 Manager 保持无 active 并发 `PipelineStartupFailed`。
-- [ ] 切换成功时发 `ActivePipelineChanged`。
-- [ ] Manager 析构不泄漏、不崩溃。
-- [ ] 不影响现有播放。
+- [x] Manager 可以注册空 pipeline 并切换（用测试桩 pipeline 验证）。
+- [x] `SetActivePipeline("")` 能安全关闭当前 active。
+- [x] `SetActivePipeline(不存在的id)` 返回 false，不影响当前状态。
+- [x] Startup 失败时 Manager 保持无 active 并发 `PipelineStartupFailed`。
+- [x] 切换成功时发 `ActivePipelineChanged`。
+- [x] Manager 析构不泄漏、不崩溃。
+- [x] 不影响现有播放。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\vision\visionpipelinemanager.h src\infrastructure\vision\visionpipelinemanager.cpp doc\Phase7TODO.md`
-- [ ] 定向搜索：`rg -n "VisionPipelineManager|RegisterPipeline|SetActivePipeline|ActivePipelineChanged|PipelineStartupFailed|RunActive|AvailablePipelineIds" src doc\Phase7TODO.md`
+- [x] 静态检查：`git diff --check -- src\infrastructure\vision\visionpipelinemanager.h src\infrastructure\vision\visionpipelinemanager.cpp doc\Phase7TODO.md`
+- [x] 定向搜索：`rg -n "VisionPipelineManager|RegisterPipeline|SetActivePipeline|ActivePipelineChanged|PipelineStartupFailed|RunActive|AvailablePipelineIds" src doc\Phase7TODO.md`
 - [ ] 用户人工编译验证：项目能编过。
 
 **Commit message**：
@@ -294,28 +294,28 @@ feat: 新增视觉分析管线管理器
 
 **任务清单**：
 
-- [ ] 新增 `VisionOverlayRenderer` 类。
-- [ ] 支持 `Draw(cv::Mat&, const VisionResultSet&)`。
-- [ ] 绘制 `DetectionBox`（矩形框 + 标签 + 置信度）。
-- [ ] 绘制 `TextRegion`（矩形框 + OCR 文本）。
-- [ ] 绘制分析耗时（在画面角落）。
-- [ ] 空 `VisionResultSet` 时不修改图像。
-- [ ] 不访问 pipeline / Manager / UI。
-- [ ] 不执行识别推理。
-- [ ] 只使用 OpenCV 绘制 API，不依赖 Qt Widgets。
-- [ ] `CMakeLists.txt` 当前通过 `file(GLOB_RECURSE src/*.cpp src/*.h ...)` 自动纳入新增文件，本步无需修改。
+- [x] 新增 `VisionOverlayRenderer` 类。
+- [x] 支持 `Draw(cv::Mat&, const VisionResultSet&)`。
+- [x] 绘制 `DetectionBox`（矩形框 + 标签 + 置信度）。
+- [x] 绘制 `TextRegion`（矩形框 + OCR 文本）。
+- [x] 绘制分析耗时（在画面角落）。
+- [x] 空 `VisionResultSet` 时不修改图像。
+- [x] 不访问 pipeline / Manager / UI。
+- [x] 不执行识别推理。
+- [x] 只使用 OpenCV 绘制 API，不依赖 Qt Widgets。
+- [x] `CMakeLists.txt` 当前通过 `file(GLOB_RECURSE src/*.cpp src/*.h ...)` 自动纳入新增文件，本步无需修改。
 
 **验收标准**：
 
-- [ ] 绘制逻辑不在具体 pipeline 里。
-- [ ] 输入空结果时图像不被修改。
-- [ ] 可以在同一张 `cv::Mat` 上叠加多个 `VisionResult`。
-- [ ] 中文标签能正常显示或明确降级为英文。
+- [x] 绘制逻辑不在具体 pipeline 里。
+- [x] 输入空结果时图像不被修改。
+- [x] 可以在同一张 `cv::Mat` 上叠加多个 `VisionResult`。
+- [x] 中文标签能正常显示或明确降级为英文。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\vision\visionoverlayrenderer.h src\infrastructure\vision\visionoverlayrenderer.cpp doc\Phase7TODO.md`
-- [ ] 定向搜索：`rg -n "VisionOverlayRenderer|Draw|DetectionBox|TextRegion|cv::rectangle|cv::putText" src doc\Phase7TODO.md`
+- [x] 静态检查：`git diff --check -- src\infrastructure\vision\visionoverlayrenderer.h src\infrastructure\vision\visionoverlayrenderer.cpp doc\Phase7TODO.md`
+- [x] 定向搜索：`rg -n "VisionOverlayRenderer|Draw|DetectionBox|TextRegion|cv::rectangle|cv::putText" src doc\Phase7TODO.md`
 - [ ] 用户人工编译验证：项目能编过。
 - [ ] 单元测试建议：给定一个手工构造的 `VisionResultSet`，`Draw` 后 `cv::Mat` 像素被修改。
 
