@@ -8,9 +8,10 @@
   - `src/` 目录按职责重构完成，`infrastructure/` 拆分为 `decoding/audio/sync/rendering/vision/devices/` 六个子目录。
   - 三个类名（`demuxer` / `decoder` / `syncmanager`）统一为 PascalCase。
   - Phase 7.1 架构设计文档已完成，明确"多条独立识别管线 + 单激活 + 懒加载"三条原则。
+  - Phase 7.2 VisionFrame / VisionResultSet 类型定义已完成。
 - 未完成：
-  - Phase 7.2 VisionFrame / VisionResultSet 类型定义。
-  - Phase 7.3 IVisionPipeline + 三小接口 + VisionPipelineManager。
+  - Phase 7.3.1 IVisionPipeline + 三小接口。
+  - Phase 7.3.2 VisionPipelineManager 实现。
   - Phase 7.4 VisionOverlayRenderer。
   - Phase 7.5 内置 OpenCvContourVisionPipeline + VisionProcessorFactory。
   - Phase 7.6 VisionProcessingFrameSink 接入现有链路 + UI 最小接入。
@@ -170,9 +171,9 @@ feat: 新增视觉分析统一数据类型
 - 为 Phase 7.3 IVisionPipeline 接口定义准备类型基础
 ```
 
-## Phase 7.3 IVisionPipeline + 三小接口 + VisionPipelineManager
+## Phase 7.3.1 IVisionPipeline + 三小接口
 
-**目标**：新增视觉分析的顶层接口和管理器，只搭空壳，不接入 sink 链和 UI。
+**目标**：定义视觉分析的四个核心接口，纯 header，不涉及实现和状态。
 
 **预计修改文件**：
 
@@ -180,59 +181,104 @@ feat: 新增视觉分析统一数据类型
 - `src/infrastructure/vision/iframepreprocessor.h`
 - `src/infrastructure/vision/ivisionanalyzer.h`
 - `src/infrastructure/vision/ivisionpostprocessor.h`
+- `doc/Phase7TODO.md`
+
+**任务清单**：
+
+- [x] 新增 `IVisionPipeline` 顶层接口。
+- [x] 声明 `Id()` / `DisplayName()` / `Type()`。
+- [x] 声明 `Startup()` / `Shutdown()` / `IsStarted()`。
+- [x] 声明 `Run(const VisionFrame&, VisionResultSet&)`。
+- [x] 新增 `IFramePreprocessor` 接口，声明 `Name()` / `Process(VisionFrame&)`。
+- [x] 新增 `IVisionAnalyzer` 接口，声明 `Name()` / `Analyze(const VisionFrame&, VisionResultSet&)`。
+- [x] 新增 `IVisionPostprocessor` 接口，声明 `Name()` / `Process(const VisionFrame&, VisionResultSet&)`。
+- [x] Analyzer 和 Postprocessor 的 `VisionFrame` 参数必须是 `const`。
+- [x] 所有接口的 `virtual` 析构函数用 `= default`。
+- [x] 不引用 FFmpeg、UI、`MediaPipeline`、`MultiStreamManager`。
+- [x] `CMakeLists.txt` 当前通过 `file(GLOB_RECURSE src/*.cpp src/*.h ...)` 自动纳入新增文件，本步无需修改。
+
+**验收标准**：
+
+- [x] 接口不依赖 UI。
+- [x] 接口不依赖 `AVFrame` / FFmpeg。
+- [x] `IVisionAnalyzer::Analyze` 的 `VisionFrame` 参数是 `const`。
+- [x] `IVisionPostprocessor::Process` 的 `VisionFrame` 参数是 `const`。
+- [x] 四个 header 都能被空 cpp include 编译通过。
+
+**测试流程**：
+
+- [x] 静态检查：`git diff --check -- src\infrastructure\vision\ivisionpipeline.h src\infrastructure\vision\iframepreprocessor.h src\infrastructure\vision\ivisionanalyzer.h src\infrastructure\vision\ivisionpostprocessor.h doc\Phase7TODO.md`
+- [x] 定向搜索：`rg -n "IVisionPipeline|IFramePreprocessor|IVisionAnalyzer|IVisionPostprocessor|Startup|Shutdown|IsStarted|Analyze" src doc\Phase7TODO.md`
+- [x] 用户人工编译验证：项目能编过。
+
+**Commit message**：
+
+```text
+feat: 新增视觉分析核心接口
+
+- 新增 IVisionPipeline 作为一种识别算法的完整闭包接口
+- 新增 IFramePreprocessor 图像预处理构建块接口
+- 新增 IVisionAnalyzer 分析构建块接口
+- 新增 IVisionPostprocessor 后处理构建块接口
+- Analyzer / Postprocessor 只读 VisionFrame,不修改帧数据
+- 为 Phase 7.3.2 VisionPipelineManager 实现准备接口基础
+```
+
+## Phase 7.3.2 VisionPipelineManager 实现
+
+**目标**：实现视觉分析管线的注册表 + 单激活切换器 + 懒加载生命周期调度，不接入 sink 链和 UI。
+
+**预计修改文件**：
+
 - `src/infrastructure/vision/visionpipelinemanager.h`
 - `src/infrastructure/vision/visionpipelinemanager.cpp`
 - `doc/Phase7TODO.md`
 
 **任务清单**：
 
-- [ ] 新增 `IVisionPipeline` 接口（`Id`/`DisplayName`/`Type`/`Startup`/`Shutdown`/`IsStarted`/`Run`）。
-- [ ] 新增 `IFramePreprocessor` 接口（`Name`/`Process(VisionFrame&)`）。
-- [ ] 新增 `IVisionAnalyzer` 接口（`Name`/`Analyze(const VisionFrame&, VisionResultSet&)`）。
-- [ ] 新增 `IVisionPostprocessor` 接口（`Name`/`Process(const VisionFrame&, VisionResultSet&)`）。
-- [ ] 新增 `VisionPipelineManager` 类。
-- [ ] 支持 `RegisterPipeline(std::unique_ptr<IVisionPipeline>)`。
-- [ ] 支持 `AvailablePipelineIds()`。
-- [ ] 支持 `FindPipeline(const QString&)`。
-- [ ] 支持 `SetActivePipeline(const QString&)`（自动 Shutdown 旧的、Startup 新的）。
-- [ ] 支持 `ActivePipelineId()` / `ActivePipeline()`。
-- [ ] 支持 `RunActive(const VisionFrame&, VisionResultSet&)`。
-- [ ] Manager 析构时遍历所有 pipeline，`IsStarted` 的调 `Shutdown()`。
-- [ ] 定义信号 `ActivePipelineChanged(QString)`。
-- [ ] 定义信号 `PipelineStartupFailed(QString, QString)`。
-- [ ] 空 id 表示关闭视觉分析。
+- [ ] 新增 `VisionPipelineManager` 类，继承 `QObject`。
+- [ ] 支持 `RegisterPipeline(std::unique_ptr<IVisionPipeline>)`，按 `Id()` 唯一存储。
+- [ ] 支持 `AvailablePipelineIds()` 返回已注册 id 列表。
+- [ ] 支持 `FindPipeline(const QString&)` 返回原始指针。
+- [ ] 支持 `SetActivePipeline(const QString&)`：先 `Shutdown` 旧 active，再 `Startup` 新 target，成功后更新 `activeId_`。
+- [ ] `SetActivePipeline("")` 关闭当前 active（仅 Shutdown 旧的，不 Startup 新的）。
+- [ ] `SetActivePipeline(不存在的id)` 返回 false 并保持原状态。
+- [ ] Startup 失败时保持无 active 状态并发 `PipelineStartupFailed(id, error)` 信号。
+- [ ] 支持 `ActivePipelineId()` / `ActivePipeline()` 查询。
+- [ ] 支持 `RunActive(const VisionFrame&, VisionResultSet&)`：无 active 时返回 false，否则转发给 active pipeline 的 `Run`。
+- [ ] Manager 析构时遍历所有 pipeline，`IsStarted()` 的调 `Shutdown()`。
+- [ ] 定义信号 `ActivePipelineChanged(QString id)`。
+- [ ] 定义信号 `PipelineStartupFailed(QString id, QString error)`。
 - [ ] 不接入 `MediaPipeline` / `MultiStreamManager`。
 - [ ] 不接入 UI。
 - [ ] `CMakeLists.txt` 当前通过 `file(GLOB_RECURSE src/*.cpp src/*.h ...)` 自动纳入新增文件，本步无需修改。
 
 **验收标准**：
 
-- [ ] 接口不依赖 UI。
-- [ ] 接口不依赖 `AVFrame` / FFmpeg。
-- [ ] `IVisionAnalyzer::Analyze` 的 `VisionFrame` 参数是 `const`。
-- [ ] `IVisionPostprocessor::Process` 的 `VisionFrame` 参数是 `const`。
-- [ ] Manager 可以注册空 pipeline 并切换。
+- [ ] Manager 可以注册空 pipeline 并切换（用测试桩 pipeline 验证）。
 - [ ] `SetActivePipeline("")` 能安全关闭当前 active。
 - [ ] `SetActivePipeline(不存在的id)` 返回 false，不影响当前状态。
-- [ ] Startup 失败时 Manager 保持无 active 状态并发信号。
+- [ ] Startup 失败时 Manager 保持无 active 并发 `PipelineStartupFailed`。
+- [ ] 切换成功时发 `ActivePipelineChanged`。
+- [ ] Manager 析构不泄漏、不崩溃。
 - [ ] 不影响现有播放。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\vision\ivisionpipeline.h src\infrastructure\vision\iframepreprocessor.h src\infrastructure\vision\ivisionanalyzer.h src\infrastructure\vision\ivisionpostprocessor.h src\infrastructure\vision\visionpipelinemanager.h src\infrastructure\vision\visionpipelinemanager.cpp doc\Phase7TODO.md`
-- [ ] 定向搜索：`rg -n "IVisionPipeline|IFramePreprocessor|IVisionAnalyzer|IVisionPostprocessor|VisionPipelineManager|Startup|Shutdown|IsStarted|RunActive|SetActivePipeline" src doc\Phase7TODO.md`
+- [ ] 静态检查：`git diff --check -- src\infrastructure\vision\visionpipelinemanager.h src\infrastructure\vision\visionpipelinemanager.cpp doc\Phase7TODO.md`
+- [ ] 定向搜索：`rg -n "VisionPipelineManager|RegisterPipeline|SetActivePipeline|ActivePipelineChanged|PipelineStartupFailed|RunActive|AvailablePipelineIds" src doc\Phase7TODO.md`
 - [ ] 用户人工编译验证：项目能编过。
 
 **Commit message**：
 
 ```text
-feat: 新增视觉分析顶层接口与管线管理器
+feat: 新增视觉分析管线管理器
 
-- 新增 IVisionPipeline 作为一种识别算法的完整闭包接口
-- 新增 IFramePreprocessor / IVisionAnalyzer / IVisionPostprocessor 三个构建块接口
-- 新增 VisionPipelineManager,支持注册和单激活切换
-- 支持 Startup/Shutdown 懒加载生命周期
-- 支持 ActivePipelineChanged 和 PipelineStartupFailed 信号
+- 新增 VisionPipelineManager 提供注册表与单激活切换器
+- SetActivePipeline 自动调度旧 pipeline Shutdown 和新 pipeline Startup
+- Startup 失败时保持无 active 状态并发 PipelineStartupFailed
+- 切换成功时发 ActivePipelineChanged
+- 析构时清理所有仍处于 started 状态的 pipeline
 - 暂不接入 MediaPipeline 和 UI
 ```
 
