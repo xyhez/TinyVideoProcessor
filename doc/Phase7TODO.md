@@ -132,31 +132,30 @@ docs: 增加 Phase 7 多视觉处理器架构规划
 
 **任务清单**：
 
-- [ ] 新增 `VisionPixelFormat` enum（`BGR24` / `RGB24` / `GRAY8`）。
-- [ ] 新增 `VisionFrame` struct（`width` / `height` / `stride` / `pts` / `pixelFormat` / `image`）。
-- [ ] 新增 `VisionResultType` enum（`DetectionBox` / `TextRegion` / `Classification` / `Measurement`）。
-- [ ] 新增 `DetectionBox` struct（`box` / `label` / `confidence` / `classId`）。
-- [ ] 新增 `TextRegion` struct（`box` / `text` / `confidence`）。
-- [ ] 新增 `VisionResult` struct（`pipelineId` / `type` / `boxes` / `texts` / `elapsedMs` / `errorMessage`）。
-- [ ] 新增 `VisionResultSet` struct（`pts` / `results`）。
-- [ ] 给所有成员变量添加 `///<` 注释。
-- [ ] 只引用 `<QtCore>` 和 `<opencv2/core/mat.hpp>`，不引用 FFmpeg。
-- [ ] 不引用 UI 头文件。
-- [ ] `CMakeLists.txt` 当前通过 `file(GLOB_RECURSE src/*.cpp src/*.h ...)` 自动纳入新增文件，本步无需修改。
+- [x] 新增 `VisionPixelFormat` enum（`BGR24` / `RGB24` / `GRAY8`）。
+- [x] 新增 `VisionFrame` struct（`width` / `height` / `stride` / `pts` / `pixelFormat` / `image`）。
+- [x] 新增 `VisionResultType` enum（`DetectionBox` / `TextRegion` / `Classification` / `Measurement`）。
+- [x] 新增 `DetectionBox` struct（`box` / `label` / `confidence` / `classId`）。
+- [x] 新增 `TextRegion` struct（`box` / `text` / `confidence`）。
+- [x] 新增 `VisionResult` struct（`pipelineId` / `type` / `boxes` / `texts` / `elapsedMs` / `errorMessage`）。
+- [x] 新增 `VisionResultSet` struct（`pts` / `results`）。
+- [x] 给所有成员变量添加 `///<` 注释。
+- [x] 只引用 `<QtCore>` 和 `<opencv2/core/mat.hpp>`，不引用 FFmpeg。
+- [x] 不引用 UI 头文件。
+- [x] `CMakeLists.txt` 当前通过 `file(GLOB_RECURSE src/*.cpp src/*.h ...)` 自动纳入新增文件，本步无需修改。
 
 **验收标准**：
 
-- [ ] 类型不依赖 UI。
-- [ ] 类型不依赖 FFmpeg。
-- [ ] `VisionFrame` 显式声明像素格式和元数据。
-- [ ] `VisionResultSet` 支持检测框和 OCR 文本。
+- [x] 类型不依赖 UI。
+- [x] 类型不依赖 FFmpeg。
+- [x] `VisionFrame` 显式声明像素格式和元数据。
+- [x] `VisionResultSet` 支持检测框和 OCR 文本。
 - [ ] 编译能过（用一个空 cpp include 该 header 通过编译）。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\vision\visiontypes.h doc\Phase7TODO.md`
-- [ ] 新文件空白检查：`git diff --check --no-index -- /dev/null src\infrastructure\vision\visiontypes.h`
-- [ ] 定向搜索：`rg -n "VisionFrame|VisionResultSet|VisionResult|DetectionBox|TextRegion|VisionPixelFormat|VisionResultType" src doc\Phase7TODO.md`
+- [x] 静态检查：`git diff --check -- src\infrastructure\vision\visiontypes.h doc\Phase7TODO.md`
+- [x] 定向搜索：`rg -n "VisionFrame|VisionResultSet|VisionResult|DetectionBox|TextRegion|VisionPixelFormat|VisionResultType" src doc\Phase7TODO.md`
 - [ ] 用户人工编译验证：项目能编过且无未使用类型的警告。
 
 **Commit message**：
