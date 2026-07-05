@@ -258,6 +258,26 @@
           </widget>
          </item>
          <item>
+          <widget class="QLabel" name="label_visionPipeline">
+           <property name="text">
+            <string>识别</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QComboBox" name="comboBox_visionPipeline"/>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="checkBox_visionOverlay">
+           <property name="text">
+            <string>识别叠加</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
           <widget class="QPushButton" name="pushButton_fullscreen">
            <property name="text">
             <string>全屏</string>

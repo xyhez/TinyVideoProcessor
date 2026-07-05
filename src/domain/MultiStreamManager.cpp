@@ -10,8 +10,6 @@ MultiStreamManager::MultiStreamManager(QObject* parent)
     : QObject(parent)
     , visionPipelineManager_(std::make_unique<VisionPipelineManager>()) {
     VisionProcessorFactory::RegisterBuiltinPipelines(*visionPipelineManager_);
-    // TODO(Phase 7.6.2): UI 下拉框接入后移除这行,让默认关闭视觉分析
-    visionPipelineManager_->SetActivePipeline("opencv-contour");
 }
 
 MultiStreamManager::~MultiStreamManager() = default;
@@ -22,6 +20,19 @@ VisionPipelineManager* MultiStreamManager::VisionManager() {
 
 const VisionPipelineManager* MultiStreamManager::VisionManager() const {
     return visionPipelineManager_.get();
+}
+
+void MultiStreamManager::SetVisionOverlayEnabled(bool enabled) {
+    visionOverlayEnabled_ = enabled;
+    for (auto& entry : streams_) {
+        if (entry.second.pipeline) {
+            entry.second.pipeline->SetVisionOverlayEnabled(enabled);
+        }
+    }
+}
+
+bool MultiStreamManager::IsVisionOverlayEnabled() const {
+    return visionOverlayEnabled_;
 }
 
 MultiStreamManager::StreamId MultiStreamManager::AddStream(std::shared_ptr<IMediaSource> mediaSource,
@@ -75,6 +86,7 @@ MultiStreamManager::StreamId MultiStreamManager::AddStream(std::shared_ptr<IMedi
     slot.pipeline = std::move(pipeline);
 
     ConnectPipelineSignals(id, slot.pipeline.get());
+    slot.pipeline->SetVisionOverlayEnabled(visionOverlayEnabled_);
     streams_.emplace(id, std::move(slot));
 
     if (StreamHasAudio(id)) {
@@ -540,6 +552,7 @@ void MultiStreamManager::UpdateVisionActiveOnAllStreams() {
     for (auto& entry : streams_) {
         if (entry.second.pipeline) {
             entry.second.pipeline->SetVisionActive(entry.first == activeStreamId_);
+            entry.second.pipeline->SetVisionOverlayEnabled(visionOverlayEnabled_);
         }
     }
 }

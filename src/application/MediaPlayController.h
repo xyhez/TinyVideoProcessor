@@ -370,6 +370,34 @@ public:
      */
     int ImageProcessingThreshold() const;
 
+    /**
+     * @brief AvailableVisionPipelineIds 获取所有已注册的视觉分析管线 id
+     */
+    QList<QString> AvailableVisionPipelineIds() const;
+
+    /**
+     * @brief ActiveVisionPipelineId 获取当前激活的视觉分析管线 id
+     * @return 空字符串表示未激活
+     */
+    QString ActiveVisionPipelineId() const;
+
+    /**
+     * @brief SetActiveVisionPipeline 切换当前激活的视觉分析管线
+     * @param id 目标管线 id，空字符串表示关闭视觉分析
+     * @return true 切换成功
+     */
+    bool SetActiveVisionPipeline(const QString& id);
+
+    /**
+     * @brief SetVisionOverlayEnabled 设置视觉分析结果是否绘制到画面
+     */
+    void SetVisionOverlayEnabled(bool enabled);
+
+    /**
+     * @brief IsVisionOverlayEnabled 获取视觉分析结果绘制开关
+     */
+    bool IsVisionOverlayEnabled() const;
+
 signals:
     /**
      * @brief StateChanged 播放状态变化信号
@@ -418,6 +446,24 @@ signals:
      * @param threshold 当前二值化阈值
      */
     void ImageProcessingThresholdChanged(int threshold);
+
+    /**
+     * @brief ActiveVisionPipelineChanged 视觉分析管线切换信号
+     * @param id 新激活的管线 id，空字符串表示关闭
+     */
+    void ActiveVisionPipelineChanged(QString id);
+
+    /**
+     * @brief VisionPipelineStartupFailed 视觉分析管线激活失败信号
+     * @param id 目标管线 id
+     * @param error 错误描述
+     */
+    void VisionPipelineStartupFailed(QString id, QString error);
+
+    /**
+     * @brief VisionOverlayEnabledChanged 视觉分析结果绘制开关变化信号
+     */
+    void VisionOverlayEnabledChanged(bool enabled);
 
     /**
      * @brief PlaybackFinished 当前媒体源自然播放结束信号
@@ -512,6 +558,7 @@ private:
     bool imageProcessingEnabled_ = false;	///< 是否启用 active stream 图像处理
     ImageProcessingMode imageProcessingMode_ = ImageProcessingMode::Grayscale;	///< active stream 图像处理模式
     int imageProcessingThreshold_ = 128;	///< 二值化阈值，范围 0-255
+    bool visionOverlayEnabled_ = true;	///< 是否把视觉分析结果绘制到画面
 
     /**
      * @brief ConnectManagerSignals 创建 Controller 与 MultiStreamManager 的信号转发连接

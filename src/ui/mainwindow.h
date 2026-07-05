@@ -179,6 +179,11 @@ private:
     void InitializeImageProcessingControls();
 
     /**
+     * @brief InitializeVisionControls 初始化视觉分析控件
+     */
+    void InitializeVisionControls();
+
+    /**
      * @brief InitializeCursorHideTimer 初始化全屏鼠标隐藏定时器
      */
     void InitializeCursorHideTimer();
@@ -350,6 +355,16 @@ private:
      * @brief UpdateImageProcessingControls 根据 active stream 和当前模式更新图像处理控件状态
      */
     void UpdateImageProcessingControls();
+
+    /**
+     * @brief UpdateVisionPipelineComboBox 根据 active pipeline id 同步下拉框选中项
+     */
+    void UpdateVisionPipelineComboBox(const QString& activeId);
+
+    /**
+     * @brief UpdateVisionControls 根据 active stream 和 active pipeline 更新视觉分析控件状态
+     */
+    void UpdateVisionControls();
 
     /**
      * @brief ToggleFullScreen 切换普通窗口和全屏模式

@@ -50,6 +50,7 @@ MainWindow::MainWindow(QWidget *parent)
     InitializePlaybackSpeedComboBox();
     InitializePreviewFrameRateControls();
     InitializeImageProcessingControls();
+    InitializeVisionControls();
     InitializeCursorHideTimer();
     InitializeMultiViewRenderer();
     InitializeMultiViewLayout();
@@ -299,6 +300,40 @@ void MainWindow::CreateConnects() {
             this,
             [this](int value) {
                 mediaPlayController_->SetImageProcessingThreshold(value);
+            });
+
+    connect(mediaPlayController_.get(), &MediaPlayController::ActiveVisionPipelineChanged,
+            this, [this](const QString& id) {
+                UpdateVisionPipelineComboBox(id);
+                UpdateVisionControls();
+            });
+
+    connect(mediaPlayController_.get(), &MediaPlayController::VisionPipelineStartupFailed,
+            this, [this](const QString& id, const QString& error) {
+                LOG_WARN_STREAM() << "Vision pipeline startup failed:" << id << error;
+                const QString message = error.isEmpty()
+                    ? QString("识别管线 %1 加载失败").arg(id)
+                    : QString("识别管线 %1 加载失败：%2").arg(id, error);
+                QMessageBox::warning(this, "视觉分析", message);
+            });
+
+    connect(mediaPlayController_.get(), &MediaPlayController::VisionOverlayEnabledChanged,
+            this, [this](bool enabled) {
+                QSignalBlocker blocker(ui->checkBox_visionOverlay);
+                ui->checkBox_visionOverlay->setChecked(enabled);
+            });
+
+    connect(ui->comboBox_visionPipeline,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            [this](int index) {
+                const QString id = ui->comboBox_visionPipeline->itemData(index).toString();
+                mediaPlayController_->SetActiveVisionPipeline(id);
+            });
+
+    connect(ui->checkBox_visionOverlay, &QCheckBox::toggled,
+            this, [this](bool checked) {
+                mediaPlayController_->SetVisionOverlayEnabled(checked);
             });
 
     connect(ui->pushButton_fullscreen, &QPushButton::clicked,
@@ -557,6 +592,23 @@ void MainWindow::InitializeImageProcessingControls() {
     ui->checkBox_imageProcessingEnabled->setChecked(mediaPlayController_->IsImageProcessingEnabled());
     UpdateImageProcessingModeComboBox(mediaPlayController_->CurrentImageProcessingMode());
     UpdateImageProcessingControls();
+}
+
+void MainWindow::InitializeVisionControls() {
+    ui->comboBox_visionPipeline->clear();
+    // 第一项为"关闭",data 为空字符串
+    ui->comboBox_visionPipeline->addItem("关闭", QString());
+
+    const QList<QString> availableIds = mediaPlayController_->AvailableVisionPipelineIds();
+    for (const QString& id : availableIds) {
+        // 第一版直接用 id 作为显示名(DisplayName 需要通过 pipeline 拿,后续可扩展)
+        ui->comboBox_visionPipeline->addItem(id, id);
+    }
+
+    UpdateVisionPipelineComboBox(mediaPlayController_->ActiveVisionPipelineId());
+
+    ui->checkBox_visionOverlay->setChecked(mediaPlayController_->IsVisionOverlayEnabled());
+    UpdateVisionControls();
 }
 
 void MainWindow::InitializeCursorHideTimer() {
@@ -865,6 +917,22 @@ void MainWindow::UpdateImageProcessingControls() {
         hasActiveStream && processingEnabled && thresholdMode);
 }
 
+void MainWindow::UpdateVisionPipelineComboBox(const QString& activeId) {
+    const int index = ui->comboBox_visionPipeline->findData(activeId);
+    if (index < 0 || ui->comboBox_visionPipeline->currentIndex() == index) {
+        return;
+    }
+    QSignalBlocker blocker(ui->comboBox_visionPipeline);
+    ui->comboBox_visionPipeline->setCurrentIndex(index);
+}
+
+void MainWindow::UpdateVisionControls() {
+    const bool hasActiveStream =
+        mediaPlayController_->ActiveStream() != MediaPlayController::InvalidStreamId;
+    ui->comboBox_visionPipeline->setEnabled(hasActiveStream);
+    ui->checkBox_visionOverlay->setEnabled(hasActiveStream);
+}
+
 void MainWindow::ToggleFullScreen() {
     if (isFullScreenMode_) {
         ExitFullScreen();
@@ -1088,6 +1156,7 @@ void MainWindow::UpdateStreamControls() {
     ui->pushButton_pauseAll->setEnabled(hasStream);
     ui->pushButton_stopAll->setEnabled(hasStream);
     UpdateImageProcessingControls();
+    UpdateVisionControls();
 }
 
 void MainWindow::AddMultiStreamFiles() {

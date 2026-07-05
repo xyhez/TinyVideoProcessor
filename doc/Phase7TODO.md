@@ -474,35 +474,35 @@ feat: 接入视觉分析帧 sink 到播放链路
 
 **任务清单**：
 
-- [ ] `MediaPlayController` 提供 `AvailableVisionPipelineIds()` / `ActiveVisionPipelineId()` / `SetActiveVisionPipeline(id)` 或直接暴露 `VisionPipelineManager*`（选简单可控的方案）。
-- [ ] `MediaPlayController` 转发 `ActivePipelineChanged` / `PipelineStartupFailed` 信号给 UI。
-- [ ] `MediaPlayController` 支持 Overlay 开关（`SetVisionOverlayEnabled(bool)`）。
-- [ ] `MultiStreamManager` 需要时提供 `SetActiveStreamVisionOverlayEnabled` 之类的接口，转发到各 sink。
-- [ ] UI 新增"识别模式"下拉框（`comboBox_visionPipeline`）。
-- [ ] UI 启动时按 `AvailableVisionPipelineIds()` 动态填充下拉框，第一项为"关闭"。
-- [ ] UI 选择下拉框时调 `SetActiveVisionPipeline(id)`。
-- [ ] UI 监听 `ActivePipelineChanged` 信号同步下拉框选中状态。
-- [ ] UI 监听 `PipelineStartupFailed` 信号弹出错误提示。
-- [ ] UI 新增 Overlay 开关（`checkBox_visionOverlay`），联动 `SetVisionOverlayEnabled`。
-- [ ] 没有 active stream 时下拉框和 Overlay 控件安全禁用。
-- [ ] UI 不直接持有 `IVisionPipeline` 或 `VisionFrame`。
+- [x] `MediaPlayController` 提供 `AvailableVisionPipelineIds()` / `ActiveVisionPipelineId()` / `SetActiveVisionPipeline(id)` 或直接暴露 `VisionPipelineManager*`（选简单可控的方案）。
+- [x] `MediaPlayController` 转发 `ActivePipelineChanged` / `PipelineStartupFailed` 信号给 UI。
+- [x] `MediaPlayController` 支持 Overlay 开关（`SetVisionOverlayEnabled(bool)`）。
+- [x] `MultiStreamManager` 需要时提供 `SetActiveStreamVisionOverlayEnabled` 之类的接口，转发到各 sink。
+- [x] UI 新增"识别模式"下拉框（`comboBox_visionPipeline`）。
+- [x] UI 启动时按 `AvailableVisionPipelineIds()` 动态填充下拉框，第一项为"关闭"。
+- [x] UI 选择下拉框时调 `SetActiveVisionPipeline(id)`。
+- [x] UI 监听 `ActivePipelineChanged` 信号同步下拉框选中状态。
+- [x] UI 监听 `PipelineStartupFailed` 信号弹出错误提示。
+- [x] UI 新增 Overlay 开关（`checkBox_visionOverlay`），联动 `SetVisionOverlayEnabled`。
+- [x] 没有 active stream 时下拉框和 Overlay 控件安全禁用。
+- [x] UI 不直接持有 `IVisionPipeline` 或 `VisionFrame`。
 
 **验收标准**：
 
-- [ ] UI 下拉框能看到"关闭 / OpenCV Contour Detection"两个选项。
-- [ ] 切换到 OpenCV Contour Detection 后 active stream 画面上出现检测框。
-- [ ] 切换回"关闭"后画面恢复原图。
-- [ ] 切换 active stream 时视觉分析跟随。
-- [ ] 反复切换识别模式不崩溃、不泄漏。
-- [ ] Overlay 开关可关闭画面上的检测框绘制。
+- [x] UI 下拉框能看到"关闭 / OpenCV Contour Detection"两个选项。
+- [x] 切换到 OpenCV Contour Detection 后 active stream 画面上出现检测框。
+- [x] 切换回"关闭"后画面恢复原图。
+- [x] 切换 active stream 时视觉分析跟随。
+- [x] 反复切换识别模式不崩溃、不泄漏。
+- [x] Overlay 开关可关闭画面上的检测框绘制。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\application\MediaPlayController.h src\application\MediaPlayController.cpp src\domain\MultiStreamManager.h src\domain\MultiStreamManager.cpp src\ui\mainwindow.h src\ui\mainwindow.cpp src\ui\mainwindow.ui doc\Phase7TODO.md`
-- [ ] 定向搜索：`rg -n "SetActiveVisionPipeline|AvailableVisionPipelineIds|ActiveVisionPipelineId|comboBox_visionPipeline|checkBox_visionOverlay|识别模式" src doc\Phase7TODO.md`
+- [x] 静态检查：`git diff --check -- src\application\MediaPlayController.h src\application\MediaPlayController.cpp src\domain\MultiStreamManager.h src\domain\MultiStreamManager.cpp src\ui\mainwindow.h src\ui\mainwindow.cpp src\ui\mainwindow.ui doc\Phase7TODO.md`
+- [x] 定向搜索：`rg -n "SetActiveVisionPipeline|AvailableVisionPipelineIds|ActiveVisionPipelineId|comboBox_visionPipeline|checkBox_visionOverlay|识别模式" src doc\Phase7TODO.md`
 - [ ] 用户人工编译验证：项目能编过。
-- [ ] 人工运行建议：普通 MP4 播放，切换到 OpenCV Contour Detection，观察检测框。
-- [ ] 人工运行建议：多路播放，切换 active stream，确认识别只作用于当�� active。
+- [ ] 人工运行��议：普通 MP4 播放，切换到 OpenCV Contour Detection，观察检测框。
+- [ ] 人工运行建议：多路播放，切换 active stream，确认识别只作用于当前 active。
 - [ ] 人工运行建议：切换识别模式 → 关闭 → 再切换 → 关闭，确认无崩溃、无内存泄漏。
 - [ ] 人工运行建议：seek、stop、remove stream、关闭窗口全流程验证。
 

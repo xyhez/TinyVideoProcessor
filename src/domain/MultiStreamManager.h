@@ -53,6 +53,16 @@ public:
     const VisionPipelineManager* VisionManager() const;
 
     /**
+     * @brief SetVisionOverlayEnabled 设置视觉分析结果是否绘制到画面
+     */
+    void SetVisionOverlayEnabled(bool enabled);
+
+    /**
+     * @brief IsVisionOverlayEnabled 获取视觉分析结果绘制开关
+     */
+    bool IsVisionOverlayEnabled() const;
+
+    /**
      * @brief AddStream 添加并初始化一路播放管线
      * @param mediaSource 媒体源抽象
      * @param rendererContainer 视频渲染容器
@@ -414,6 +424,7 @@ private:
     void UpdateVisionActiveOnAllStreams();
 
     std::unique_ptr<VisionPipelineManager> visionPipelineManager_;	///< 视觉分析管线管理器
+    bool visionOverlayEnabled_ = true;	///< 视觉分析结果是否绘制到画面
     std::map<StreamId, StreamSlot> streams_;	///< 多路流表
     StreamId nextStreamId_ = 1;	///< 下一个可分配流 ID
     StreamId activeStreamId_ = InvalidStreamId;	///< 当前活动显示流

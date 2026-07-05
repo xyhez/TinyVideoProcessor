@@ -10,6 +10,7 @@
 #include "infrastructure/vision/grayscaleprocessor.h"
 #include "infrastructure/vision/imageprocessorpipeline.h"
 #include "infrastructure/vision/thresholdprocessor.h"
+#include "infrastructure/vision/visionpipelinemanager.h"
 
 #include <algorithm>
 #include <cmath>
@@ -398,6 +399,17 @@ void MediaPlayController::ConnectManagerSignals()
                     emit MuteChanged(muted_);
                 }
             });
+
+    if (auto* visionManager = multiStreamManager_->VisionManager()) {
+        connect(visionManager, &VisionPipelineManager::ActivePipelineChanged,
+                this, [this](const QString& id) {
+                    emit ActiveVisionPipelineChanged(id);
+                });
+        connect(visionManager, &VisionPipelineManager::PipelineStartupFailed,
+                this, [this](const QString& id, const QString& error) {
+                    emit VisionPipelineStartupFailed(id, error);
+                });
+    }
 }
 
 void MediaPlayController::ApplyUserSettingsToActiveStream()
@@ -533,6 +545,54 @@ void MediaPlayController::SetImageProcessingThreshold(int threshold) {
 
 int MediaPlayController::ImageProcessingThreshold() const {
     return imageProcessingThreshold_;
+}
+
+QList<QString> MediaPlayController::AvailableVisionPipelineIds() const {
+    if (!multiStreamManager_) {
+        return {};
+    }
+    const auto* visionManager = multiStreamManager_->VisionManager();
+    if (!visionManager) {
+        return {};
+    }
+    return visionManager->AvailablePipelineIds();
+}
+
+QString MediaPlayController::ActiveVisionPipelineId() const {
+    if (!multiStreamManager_) {
+        return {};
+    }
+    const auto* visionManager = multiStreamManager_->VisionManager();
+    if (!visionManager) {
+        return {};
+    }
+    return visionManager->ActivePipelineId();
+}
+
+bool MediaPlayController::SetActiveVisionPipeline(const QString& id) {
+    if (!multiStreamManager_) {
+        return false;
+    }
+    auto* visionManager = multiStreamManager_->VisionManager();
+    if (!visionManager) {
+        return false;
+    }
+    return visionManager->SetActivePipeline(id);
+}
+
+void MediaPlayController::SetVisionOverlayEnabled(bool enabled) {
+    if (visionOverlayEnabled_ == enabled) {
+        return;
+    }
+    visionOverlayEnabled_ = enabled;
+    if (multiStreamManager_) {
+        multiStreamManager_->SetVisionOverlayEnabled(enabled);
+    }
+    emit VisionOverlayEnabledChanged(visionOverlayEnabled_);
+}
+
+bool MediaPlayController::IsVisionOverlayEnabled() const {
+    return visionOverlayEnabled_;
 }
 
 void MediaPlayController::SetPlaybackSpeed(double speed) {
