@@ -15,6 +15,7 @@
 
 class QWidget;
 class ImageProcessorPipeline;
+class VisionPipelineManager;
 /**
  * @brief MultiStreamManager 管理多路播放管线的外层身份和状态
  *
@@ -34,6 +35,22 @@ public:
      * @param parent Qt 父对象
      */
     explicit MultiStreamManager(QObject* parent = nullptr);
+
+    /**
+     * @brief MultiStreamManager 析构函数
+     */
+    ~MultiStreamManager() override;
+
+    /**
+     * @brief VisionManager 获取视觉分析管线管理器
+     * @return 指针不为空，生命周期由 MultiStreamManager 管理
+     */
+    VisionPipelineManager* VisionManager();
+
+    /**
+     * @brief VisionManager 获取视觉分析管线管理器（const 版本）
+     */
+    const VisionPipelineManager* VisionManager() const;
 
     /**
      * @brief AddStream 添加并初始化一路播放管线
@@ -391,6 +408,12 @@ private:
      */
     void ConnectPipelineSignals(StreamId id, MediaPipeline* pipeline);
 
+    /**
+     * @brief UpdateVisionActiveOnAllStreams 按当前 activeStreamId_ 更新所有 pipeline 的视觉 sink 激活状态
+     */
+    void UpdateVisionActiveOnAllStreams();
+
+    std::unique_ptr<VisionPipelineManager> visionPipelineManager_;	///< 视觉分析管线管理器
     std::map<StreamId, StreamSlot> streams_;	///< 多路流表
     StreamId nextStreamId_ = 1;	///< 下一个可分配流 ID
     StreamId activeStreamId_ = InvalidStreamId;	///< 当前活动显示流

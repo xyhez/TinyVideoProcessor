@@ -1,6 +1,8 @@
 #include "MediaPipeline.h"
 #include "tiny_log/Logging.h"
 #include "infrastructure/vision/imageprocessingframesink.h"
+#include "infrastructure/vision/visionpipelinemanager.h"
+#include "infrastructure/vision/visionprocessingframesink.h"
 
 #include <algorithm>
 #include <QVBoxLayout>
@@ -10,8 +12,9 @@ constexpr size_t kPacketQueueMax = 30;	///< 音视频包队列最大缓存数量
 constexpr size_t kFrameQueueMax = 30;	///< 音视频帧队列最大缓存数量，限制解码端超前输出
 }
 
-MediaPipeline::MediaPipeline(QObject* parent)
+MediaPipeline::MediaPipeline(VisionPipelineManager* visionPipelineManager, QObject* parent)
     : QObject(parent)
+    , visionPipelineManager_(visionPipelineManager)
 {
 }
 
@@ -290,6 +293,30 @@ const ImageProcessorPipeline* MediaPipeline::ImageProcessingPipeline() const
     return imageProcessingFrameSink_ ? imageProcessingFrameSink_->ImageProcessingPipeline() : nullptr;
 }
 
+void MediaPipeline::SetVisionActive(bool active)
+{
+    if (visionProcessingFrameSink_) {
+        visionProcessingFrameSink_->SetActive(active);
+    }
+}
+
+bool MediaPipeline::IsVisionActive() const
+{
+    return visionProcessingFrameSink_ && visionProcessingFrameSink_->IsActive();
+}
+
+void MediaPipeline::SetVisionOverlayEnabled(bool enabled)
+{
+    if (visionProcessingFrameSink_) {
+        visionProcessingFrameSink_->SetOverlayEnabled(enabled);
+    }
+}
+
+bool MediaPipeline::IsVisionOverlayEnabled() const
+{
+    return visionProcessingFrameSink_ && visionProcessingFrameSink_->IsOverlayEnabled();
+}
+
 void MediaPipeline::SetVolume(double volume)
 {
     const double clampedVolume = std::clamp(volume, 0.0, 1.0);
@@ -376,6 +403,13 @@ bool MediaPipeline::CreatePipelineResources(std::shared_ptr<IMediaSource> mediaS
     if (!downstreamSink) {
         LOG_CRITICAL("MediaPipeline create resources failed: video frame sink is null");
         return false;
+    }
+
+    // 视觉分析 sink 插入到最下游 sink 之前
+    if (visionPipelineManager_) {
+        visionProcessingFrameSink_ = std::make_unique<VisionProcessingFrameSink>(
+            visionPipelineManager_, downstreamSink);
+        downstreamSink = visionProcessingFrameSink_.get();
     }
 
     imageProcessingFrameSink_ = std::make_unique<ImageProcessingFrameSink>();
@@ -472,6 +506,9 @@ void MediaPipeline::ReleaseResources()
     if (imageProcessingFrameSink_) {
         imageProcessingFrameSink_->SetDownstreamSink(nullptr);
     }
+    if (visionProcessingFrameSink_) {
+        visionProcessingFrameSink_->SetDownstreamSink(nullptr);
+    }
 
     auto stopThread = [](const char* name, std::unique_ptr<QThread>& thread) {
         if (thread) {
@@ -496,6 +533,7 @@ void MediaPipeline::ReleaseResources()
     audioplay_.reset();
     videoFrameScheduler_.reset();
     imageProcessingFrameSink_.reset();
+    visionProcessingFrameSink_.reset();
     if (videoRender_) {
         LOG_DEBUG("MediaPipeline release: delete video render");
         delete videoRender_;

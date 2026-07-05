@@ -9,12 +9,13 @@
   - 三个类名（`demuxer` / `decoder` / `syncmanager`）统一为 PascalCase。
   - Phase 7.1 架构设计文档已完成，明确"多条独立识别管线 + 单激活 + 懒加载"三条原则。
   - Phase 7.2 VisionFrame / VisionResultSet 类型定义已完成。
+  - Phase 7.3.1 IVisionPipeline + 三小接口已完成。
+  - Phase 7.3.2 VisionPipelineManager 实现已完成。
+  - Phase 7.4 VisionOverlayRenderer 已完成。
+  - Phase 7.5 内置 OpenCvContourVisionPipeline + VisionProcessorFactory 已完成。
 - 未完成：
-  - Phase 7.3.1 IVisionPipeline + 三小接口。
-  - Phase 7.3.2 VisionPipelineManager 实现。
-  - Phase 7.4 VisionOverlayRenderer。
-  - Phase 7.5 内置 OpenCvContourVisionPipeline + VisionProcessorFactory。
-  - Phase 7.6 VisionProcessingFrameSink 接入现有链路 + UI 最小接入。
+  - Phase 7.6.1 VisionProcessingFrameSink + MediaPipeline / MultiStreamManager 接入。
+  - Phase 7.6.2 MediaPlayController 暴露 + UI 下拉框接入。
   - Phase 7.7 YoloVisionPipeline 端到端接入验证。
   - Phase 7 验收报告。
 - 已知风险：
@@ -394,9 +395,9 @@ feat: 新增 OpenCV 轮廓检测识别管线与内置工厂
 - 尚未接入 MediaPipeline sink 链和 UI
 ```
 
-## Phase 7.6 VisionProcessingFrameSink 接入现有链路
+## Phase 7.6.1 VisionProcessingFrameSink + MediaPipeline / MultiStreamManager 接入
 
-**目标**：把视觉分析层挂到现有 sink 链，让 UI 能选择识别模式并看到检测结果画到画面上。
+**目标**：新增视觉分析 sink 并挂到现有 sink 链，`MultiStreamManager` 持有 `VisionPipelineManager` 并按 active stream 联动 sink 状态。UI 侧本步不动。
 
 **预计修改文件**：
 
@@ -406,52 +407,42 @@ feat: 新增 OpenCV 轮廓检测识别管线与内置工厂
 - `src/domain/MediaPipeline.cpp`
 - `src/domain/MultiStreamManager.h`
 - `src/domain/MultiStreamManager.cpp`
-- `src/application/MediaPlayController.h`
-- `src/application/MediaPlayController.cpp`
-- `src/ui/mainwindow.h`
-- `src/ui/mainwindow.cpp`
-- `src/ui/mainwindow.ui`
 - `doc/Phase7TODO.md`
 
 **任务清单**：
 
-- [ ] 新增 `VisionProcessingFrameSink`，实现 `IVideoFrameSink`。
-- [ ] 构造时传入 `VisionPipelineManager*` / `downstream sink` / `StreamId`。
-- [ ] 支持 `SetActive(bool)` 拨 `isActive_` flag。
-- [ ] 支持 `SetOverlayEnabled(bool)`。
-- [ ] `PresentFrame`：`isActive=false` 或无 active pipeline 时直接透传原帧。
-- [ ] `PresentFrame`：`isActive=true` 且有 active pipeline 时，`AVFrame → VisionFrame → manager.RunActive → overlay.Draw → VisionFrame → AVFrame` → 转发下游。
-- [ ] 处理失败时（Run 返回 false 或转换失败）转发原帧，记录低频日志。
-- [ ] `MediaPipeline` 内部创建 `VisionProcessingFrameSink`，插入到 `ImageProcessingFrameSink` 之后。
-- [ ] `MediaPipeline` 构造时从上层拿 `VisionPipelineManager*`。
-- [ ] `MultiStreamManager` 持有 `std::unique_ptr<VisionPipelineManager>` 成员。
-- [ ] `MultiStreamManager` 构造时调 `VisionProcessorFactory::RegisterBuiltinPipelines` 注册内置 pipeline。
-- [ ] `MultiStreamManager` 切换 active stream 时更新各 sink 的 `SetActive`。
-- [ ] `MediaPlayController` 暴露访问 `VisionPipelineManager` 的接口给 UI。
-- [ ] UI 新增"识别模式"下拉框，根据 `AvailablePipelineIds` 动态填充。
-- [ ] UI 下拉框第一项为"关闭"，选中则 `SetActivePipeline("")`。
-- [ ] UI 监听 `ActivePipelineChanged` / `PipelineStartupFailed` 信号，切换时显示 loading 提示，失败时提示错误。
-- [ ] UI 保留 Overlay 开关。
-- [ ] `CMakeLists.txt` 当前通过 `file(GLOB_RECURSE src/*.cpp src/*.h ...)` 自动纳入新增文件，本步无需修改。
+- [x] 新增 `VisionProcessingFrameSink`，实现 `IVideoFrameSink`。
+- [x] 构造时传入 `VisionPipelineManager*` / `downstream sink` / `StreamId`。
+- [x] 支持 `SetActive(bool)` 拨 `isActive_` flag。
+- [x] 支持 `SetOverlayEnabled(bool)`。
+- [x] `PresentFrame`：`isActive=false` 或无 active pipeline 时直接透传原帧。
+- [x] `PresentFrame`：`isActive=true` 且有 active pipeline 时，`AVFrame → VisionFrame → manager.RunActive → overlay.Draw → VisionFrame → AVFrame` → 转发下游。
+- [x] 处理失败时（Run 返回 false 或转换失败）转发原帧，记录低频日志。
+- [x] `ClearFrame` 转发到下游 sink。
+- [x] `MediaPipeline` 内部创建 `VisionProcessingFrameSink`，插入到 `ImageProcessingFrameSink` 之后。
+- [x] `MediaPipeline` 构造时或 Initialize 时从上层拿 `VisionPipelineManager*`。
+- [x] `MultiStreamManager` 持有 `std::unique_ptr<VisionPipelineManager>` 成员。
+- [x] `MultiStreamManager` 构造时调 `VisionProcessorFactory::RegisterBuiltinPipelines` 注册内置 pipeline。
+- [x] `MultiStreamManager` 切换 active stream 时更新各 sink 的 `SetActive`。
+- [x] `MultiStreamManager` 提供 `VisionPipelineManager` 访问入口给上层。
+- [x] `CMakeLists.txt` 当前通过 `file(GLOB_RECURSE src/*.cpp src/*.h ...)` 自动纳入新增文件，本步无需修改。
 
 **验收标准**：
 
-- [ ] 默认视觉分析关闭时播放行为完全不变。
-- [ ] 选中 OpenCV 轮廓检测后 active stream 画面上出现检测框。
-- [ ] 切换 active stream 后视觉分析跟随，旧 active 恢复原图。
-- [ ] 切换识别模式时旧 pipeline `Shutdown()`，新 pipeline `Startup()`。
-- [ ] 单帧处理失败时转发原帧，不阻断播放。
-- [ ] seek / stop / remove stream / close 不崩溃。
-- [ ] UI 不直接持有 `IVisionPipeline` 或 `VisionFrame`。
+- [x] 默认视觉分析关闭时播放行为完全不变。
+- [x] 手工通过 API `SetActivePipeline("opencv-contour")` 后，active stream 画面出现检测框。
+- [x] 切换 active stream 时旧 active 的 sink 停止分析，新 active 的 sink 开始分析。
+- [x] 单帧处理失败时透传原帧，不阻断播放。
+- [x] seek / stop / remove stream / close 不崩溃。
+- [x] sink 借用 Manager 指针，Manager 生命周期覆盖 sink。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\vision\visionprocessingframesink.h src\infrastructure\vision\visionprocessingframesink.cpp src\domain\MediaPipeline.h src\domain\MediaPipeline.cpp src\domain\MultiStreamManager.h src\domain\MultiStreamManager.cpp src\application\MediaPlayController.h src\application\MediaPlayController.cpp src\ui\mainwindow.h src\ui\mainwindow.cpp src\ui\mainwindow.ui doc\Phase7TODO.md`
-- [ ] 定向搜索：`rg -n "VisionProcessingFrameSink|VisionPipelineManager|SetActivePipeline|SetActive|comboBox_visionPipeline|识别模式" src doc\Phase7TODO.md`
-- [ ] 人工运行建议：普通 MP4 播放，切换到 OpenCV 轮廓检测，观察检测框。
-- [ ] 人工运行建议：多路播放，切换 active stream，确认识别只作用于当前 active。
-- [ ] 人工运行建议：切换识别模式 → 关闭 → 再切换 → 关闭，确认无崩溃、无内存泄漏。
-- [ ] 人工运行建议：seek、stop、remove stream、关闭窗口全流程验证。
+- [x] 静态检查：`git diff --check -- src\infrastructure\vision\visionprocessingframesink.h src\infrastructure\vision\visionprocessingframesink.cpp src\domain\MediaPipeline.h src\domain\MediaPipeline.cpp src\domain\MultiStreamManager.h src\domain\MultiStreamManager.cpp doc\Phase7TODO.md`
+- [x] 定向搜索：`rg -n "VisionProcessingFrameSink|VisionPipelineManager|VisionProcessorFactory|SetActive" src doc\Phase7TODO.md`
+- [ ] 用户人工编译验证：项目能编过。
+- [ ] 人工运行建议：默认状态播放一段视频，画面无变化。
+- [ ] 人工运行建议：临时在代码里调用 `manager.SetActivePipeline("opencv-contour")`，重新运行确认能看到检测框。
 
 **Commit message**：
 
@@ -462,7 +453,69 @@ feat: 接入视觉分析帧 sink 到播放链路
 - MediaPipeline 在 ImageProcessingFrameSink 之后插入 VisionProcessingFrameSink
 - MultiStreamManager 持有 VisionPipelineManager 并注册内置管线
 - 切换 active stream 时联动各 sink 的 isActive 状态
-- UI 增加识别模式下拉框和 Overlay 开关
+- 保持 sink 借用 Manager 指针,不做所有权转移
+- UI 层接入留到 Phase 7.6.2
+```
+
+## Phase 7.6.2 MediaPlayController 暴露 + UI 下拉框接入
+
+**目标**：把 `VisionPipelineManager` 通过 `MediaPlayController` 暴露给 UI，在主窗口增加"识别模式"下拉框和 Overlay 开关。用户可以通过 UI 切换识别管线。
+
+**预计修改文件**：
+
+- `src/application/MediaPlayController.h`
+- `src/application/MediaPlayController.cpp`
+- `src/domain/MultiStreamManager.h`（如需要补充信号透传）
+- `src/domain/MultiStreamManager.cpp`
+- `src/ui/mainwindow.h`
+- `src/ui/mainwindow.cpp`
+- `src/ui/mainwindow.ui`
+- `doc/Phase7TODO.md`
+
+**任务清单**：
+
+- [ ] `MediaPlayController` 提供 `AvailableVisionPipelineIds()` / `ActiveVisionPipelineId()` / `SetActiveVisionPipeline(id)` 或直接暴露 `VisionPipelineManager*`（选简单可控的方案）。
+- [ ] `MediaPlayController` 转发 `ActivePipelineChanged` / `PipelineStartupFailed` 信号给 UI。
+- [ ] `MediaPlayController` 支持 Overlay 开关（`SetVisionOverlayEnabled(bool)`）。
+- [ ] `MultiStreamManager` 需要时提供 `SetActiveStreamVisionOverlayEnabled` 之类的接口，转发到各 sink。
+- [ ] UI 新增"识别模式"下拉框（`comboBox_visionPipeline`）。
+- [ ] UI 启动时按 `AvailableVisionPipelineIds()` 动态填充下拉框，第一项为"关闭"。
+- [ ] UI 选择下拉框时调 `SetActiveVisionPipeline(id)`。
+- [ ] UI 监听 `ActivePipelineChanged` 信号同步下拉框选中状态。
+- [ ] UI 监听 `PipelineStartupFailed` 信号弹出错误提示。
+- [ ] UI 新增 Overlay 开关（`checkBox_visionOverlay`），联动 `SetVisionOverlayEnabled`。
+- [ ] 没有 active stream 时下拉框和 Overlay 控件安全禁用。
+- [ ] UI 不直接持有 `IVisionPipeline` 或 `VisionFrame`。
+
+**验收标准**：
+
+- [ ] UI 下拉框能看到"关闭 / OpenCV Contour Detection"两个选项。
+- [ ] 切换到 OpenCV Contour Detection 后 active stream 画面上出现检测框。
+- [ ] 切换回"关闭"后画面恢复原图。
+- [ ] 切换 active stream 时视觉分析跟随。
+- [ ] 反复切换识别模式不崩溃、不泄漏。
+- [ ] Overlay 开关可关闭画面上的检测框绘制。
+
+**测试流程**：
+
+- [ ] 静态检查：`git diff --check -- src\application\MediaPlayController.h src\application\MediaPlayController.cpp src\domain\MultiStreamManager.h src\domain\MultiStreamManager.cpp src\ui\mainwindow.h src\ui\mainwindow.cpp src\ui\mainwindow.ui doc\Phase7TODO.md`
+- [ ] 定向搜索：`rg -n "SetActiveVisionPipeline|AvailableVisionPipelineIds|ActiveVisionPipelineId|comboBox_visionPipeline|checkBox_visionOverlay|识别模式" src doc\Phase7TODO.md`
+- [ ] 用户人工编译验证：项目能编过。
+- [ ] 人工运行建议：普通 MP4 播放，切换到 OpenCV Contour Detection，观察检测框。
+- [ ] 人工运行建议：多路播放，切换 active stream，确认识别只作用于当�� active。
+- [ ] 人工运行建议：切换识别模式 → 关闭 → 再切换 → 关闭，确认无崩溃、无内存泄漏。
+- [ ] 人工运行建议：seek、stop、remove stream、关闭窗口全流程验证。
+
+**Commit message**：
+
+```text
+feat: 接入视觉分析 UI 控制
+
+- MediaPlayController 暴露 VisionPipelineManager 相关接口给 UI
+- Controller 转发 ActivePipelineChanged 和 PipelineStartupFailed 信号
+- 主窗口增加识别模式下拉框,按 AvailablePipelineIds 动态填充
+- 主窗口增加 Overlay 开关,联动视觉结果绘制
+- Startup 失败时 UI 弹出错误提示并回到关闭状态
 - 保持 UI 不直接访问 IVisionPipeline 和 VisionFrame
 ```
 

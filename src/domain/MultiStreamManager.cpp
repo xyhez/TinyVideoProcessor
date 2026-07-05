@@ -3,8 +3,25 @@
 #include <algorithm>
 #include <utility>
 
+#include "infrastructure/vision/visionpipelinemanager.h"
+#include "infrastructure/vision/visionprocessorfactory.h"
+
 MultiStreamManager::MultiStreamManager(QObject* parent)
-    : QObject(parent) {
+    : QObject(parent)
+    , visionPipelineManager_(std::make_unique<VisionPipelineManager>()) {
+    VisionProcessorFactory::RegisterBuiltinPipelines(*visionPipelineManager_);
+    // TODO(Phase 7.6.2): UI 下拉框接入后移除这行,让默认关闭视觉分析
+    visionPipelineManager_->SetActivePipeline("opencv-contour");
+}
+
+MultiStreamManager::~MultiStreamManager() = default;
+
+VisionPipelineManager* MultiStreamManager::VisionManager() {
+    return visionPipelineManager_.get();
+}
+
+const VisionPipelineManager* MultiStreamManager::VisionManager() const {
+    return visionPipelineManager_.get();
 }
 
 MultiStreamManager::StreamId MultiStreamManager::AddStream(std::shared_ptr<IMediaSource> mediaSource,
@@ -42,7 +59,7 @@ MultiStreamManager::StreamId MultiStreamManager::AddStream(std::shared_ptr<IMedi
     std::unique_ptr<IVideoFrameSink> videoFrameSink =
         frameSinkFactory ? frameSinkFactory(id) : nullptr;
 
-    auto pipeline = std::make_unique<MediaPipeline>();
+    auto pipeline = std::make_unique<MediaPipeline>(visionPipelineManager_.get());
     if (!pipeline->Initialize(mediaSource, rendererContainer, videoFrameSink.get())) {
         pipeline->Shutdown();
         mediaSource->Close();
@@ -73,6 +90,7 @@ MultiStreamManager::StreamId MultiStreamManager::AddStream(std::shared_ptr<IMedi
     emit StreamAdded(id);
     if (activeStreamId_ == InvalidStreamId) {
         activeStreamId_ = id;
+        UpdateVisionActiveOnAllStreams();
         emit ActiveStreamChanged(activeStreamId_);
     }
 
@@ -94,6 +112,7 @@ bool MultiStreamManager::RemoveStream(StreamId id) {
 
     if (activeStreamId_ == id) {
         activeStreamId_ = SelectFallbackStream();
+        UpdateVisionActiveOnAllStreams();
         emit ActiveStreamChanged(activeStreamId_);
     }
 
@@ -135,6 +154,7 @@ bool MultiStreamManager::SetActiveStream(StreamId id) {
     }
 
     activeStreamId_ = id;
+    UpdateVisionActiveOnAllStreams();
     emit ActiveStreamChanged(activeStreamId_);
     return true;
 }
@@ -514,4 +534,12 @@ void MultiStreamManager::ConnectPipelineSignals(StreamId id, MediaPipeline* pipe
             [this, id](const QString& message) {
                 emit StreamErrorOccurred(id, message);
             });
+}
+
+void MultiStreamManager::UpdateVisionActiveOnAllStreams() {
+    for (auto& entry : streams_) {
+        if (entry.second.pipeline) {
+            entry.second.pipeline->SetVisionActive(entry.first == activeStreamId_);
+        }
+    }
 }

@@ -20,6 +20,8 @@ class QWidget;
 class IVideoFrameSink;
 class ImageProcessingFrameSink;
 class ImageProcessorPipeline;
+class VisionPipelineManager;
+class VisionProcessingFrameSink;
 
 /**
  * @brief MediaPipeline 管理单路媒体源的播放管线资源
@@ -32,9 +34,11 @@ class MediaPipeline : public QObject {
 public:
     /**
      * @brief MediaPipeline 构造函数
+     * @param visionPipelineManager 视觉管线管理器指针，nullptr 表示禁用视觉分析
      * @param parent Qt 父对象
      */
-    explicit MediaPipeline(QObject* parent = nullptr);
+    explicit MediaPipeline(VisionPipelineManager* visionPipelineManager = nullptr,
+                           QObject* parent = nullptr);
 
     /**
      * @brief MediaPipeline 析构函数，关闭并释放管线资源
@@ -145,6 +149,27 @@ public:
      * @return 图像处理器管线指针
      */
     const ImageProcessorPipeline* ImageProcessingPipeline() const;
+
+    /**
+     * @brief SetVisionActive 切换本管线视觉分析 sink 的激活状态
+     * @param active true 表示本管线属于 active stream，触发实际分析
+     */
+    void SetVisionActive(bool active);
+
+    /**
+     * @brief IsVisionActive 获取视觉分析 sink 激活状态
+     */
+    bool IsVisionActive() const;
+
+    /**
+     * @brief SetVisionOverlayEnabled 切换视觉结果是否绘制到画面
+     */
+    void SetVisionOverlayEnabled(bool enabled);
+
+    /**
+     * @brief IsVisionOverlayEnabled 获取视觉结果绘制开关
+     */
+    bool IsVisionOverlayEnabled() const;
 
     /**
      * @brief SetVolume 设置音量
@@ -271,6 +296,8 @@ private:
     VideoRender* videoRender_ = nullptr;	///< 默认视频渲染器
     IVideoFrameSink* activeVideoFrameSink_ = nullptr;	///< 当前视频帧输出目标
     std::unique_ptr<ImageProcessingFrameSink> imageProcessingFrameSink_;	///< 图像处理帧 sink
+    VisionPipelineManager* visionPipelineManager_ = nullptr;	///< 视觉管线管理器，借用不拥有
+    std::unique_ptr<VisionProcessingFrameSink> visionProcessingFrameSink_;	///< 视觉分析帧 sink
 
     std::unique_ptr<QThread> demuxerTH_;	///< 解复用线程
     std::unique_ptr<QThread> AdecoderTH_;	///< 音频解码线程

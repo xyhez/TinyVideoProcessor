@@ -18,14 +18,18 @@ const cv::Scalar kColorStatusBg(0, 0, 0);        ///< 状态栏背景（黑）
 const cv::Scalar kColorError(0, 0, 255);         ///< 错误提示文字（BGR 红）
 
 constexpr int kFontFace = cv::FONT_HERSHEY_SIMPLEX;
-constexpr double kFontScale = 0.5;
+constexpr double kFontScale = 0.5;	///< 检测框/OCR 标签字体缩放
 constexpr int kFontThickness = 1;
+constexpr double kStatusFontScale = 0.7;	///< 顶部状态栏字体缩放（比标签更醒目）
+constexpr int kStatusFontThickness = 2;
 constexpr int kBoxThickness = 2;
 constexpr int kLabelPaddingX = 4;
 constexpr int kLabelPaddingY = 2;
 constexpr int kStatusMarginX = 8;
 constexpr int kStatusMarginY = 8;
-constexpr int kStatusLineGap = 4;
+constexpr int kStatusPaddingX = 8;
+constexpr int kStatusPaddingY = 4;
+constexpr int kStatusLineGap = 6;
 
 /**
  * @brief ToAscii 把 QString 转成 Latin-1 std::string,非 Latin-1 字符降级为 '?'
@@ -192,20 +196,20 @@ void DrawStatusBar(cv::Mat& image, const VisionResultSet& resultSet)
 
         const std::string statusAscii = ToAscii(status);
         int baseline = 0;
-        const cv::Size textSize = cv::getTextSize(statusAscii, kFontFace, kFontScale, kFontThickness, &baseline);
+        const cv::Size textSize = cv::getTextSize(statusAscii, kFontFace, kStatusFontScale, kStatusFontThickness, &baseline);
 
-        const int bgW = textSize.width + kLabelPaddingX * 2;
-        const int bgH = textSize.height + baseline + kLabelPaddingY * 2;
+        const int bgW = textSize.width + kStatusPaddingX * 2;
+        const int bgH = textSize.height + baseline + kStatusPaddingY * 2;
         const cv::Rect bgRect(kStatusMarginX, lineY, bgW, bgH);
         if (bgRect.x + bgRect.width > image.cols || bgRect.y + bgRect.height > image.rows) {
             break;	// 状态栏溢出画面就停止绘制,避免越界
         }
         cv::rectangle(image, bgRect, kColorStatusBg, cv::FILLED);
 
-        const cv::Point textOrigin(bgRect.x + kLabelPaddingX,
-                                   bgRect.y + kLabelPaddingY + textSize.height);
-        cv::putText(image, statusAscii, textOrigin, kFontFace, kFontScale,
-                    kColorStatus, kFontThickness, cv::LINE_AA);
+        const cv::Point textOrigin(bgRect.x + kStatusPaddingX,
+                                   bgRect.y + kStatusPaddingY + textSize.height);
+        cv::putText(image, statusAscii, textOrigin, kFontFace, kStatusFontScale,
+                    kColorStatus, kStatusFontThickness, cv::LINE_AA);
 
         lineY += bgH + kStatusLineGap;
 
@@ -215,18 +219,18 @@ void DrawStatusBar(cv::Mat& image, const VisionResultSet& resultSet)
                                        .arg(result.errorMessage);
             const std::string errAscii = ToAscii(errLine);
             int errBaseline = 0;
-            const cv::Size errSize = cv::getTextSize(errAscii, kFontFace, kFontScale, kFontThickness, &errBaseline);
-            const int errBgW = errSize.width + kLabelPaddingX * 2;
-            const int errBgH = errSize.height + errBaseline + kLabelPaddingY * 2;
+            const cv::Size errSize = cv::getTextSize(errAscii, kFontFace, kStatusFontScale, kStatusFontThickness, &errBaseline);
+            const int errBgW = errSize.width + kStatusPaddingX * 2;
+            const int errBgH = errSize.height + errBaseline + kStatusPaddingY * 2;
             const cv::Rect errBgRect(kStatusMarginX, lineY, errBgW, errBgH);
             if (errBgRect.x + errBgRect.width > image.cols || errBgRect.y + errBgRect.height > image.rows) {
                 break;
             }
             cv::rectangle(image, errBgRect, kColorStatusBg, cv::FILLED);
-            const cv::Point errOrigin(errBgRect.x + kLabelPaddingX,
-                                      errBgRect.y + kLabelPaddingY + errSize.height);
-            cv::putText(image, errAscii, errOrigin, kFontFace, kFontScale,
-                        kColorError, kFontThickness, cv::LINE_AA);
+            const cv::Point errOrigin(errBgRect.x + kStatusPaddingX,
+                                      errBgRect.y + kStatusPaddingY + errSize.height);
+            cv::putText(image, errAscii, errOrigin, kFontFace, kStatusFontScale,
+                        kColorError, kStatusFontThickness, cv::LINE_AA);
             lineY += errBgH + kStatusLineGap;
         }
     }
