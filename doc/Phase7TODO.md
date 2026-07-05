@@ -351,36 +351,36 @@ feat: 新增视觉结果统一绘制器
 
 **任务清单**：
 
-- [ ] 新增 `OpenCvThreshold`（`IFramePreprocessor`，参数化阈值）。
-- [ ] 新增 `OpenCvGrayscale`（`IFramePreprocessor`，BGR → GRAY）。
-- [ ] 新增 `OpenCvMeasurement`（`IVisionPostprocessor`，为 `DetectionBox` 补面积/周长信息）。
-- [ ] 新增 `OpenCvContourAnalyzer`（`IVisionAnalyzer`，`cv::findContours` + `boundingRect` 输出 `DetectionBox`）。
-- [ ] 新增 `OpenCvContourVisionPipeline` 类，实现 `IVisionPipeline`。
-- [ ] `Startup()` 中 new preprocessors / analyzer / postprocessors。
-- [ ] `Shutdown()` 中 reset 所有构建块。
-- [ ] `Run()` 中 clone working frame，按顺序调 preprocessors、analyzer、postprocessors。
-- [ ] `Id()` 返回 `"opencv-contour"`。
-- [ ] `DisplayName()` 返回 `"OpenCV 轮廓检测"`。
-- [ ] `Type()` 返回 `"detection"`。
-- [ ] 新增 `VisionProcessorFactory`。
-- [ ] 提供 `RegisterBuiltinPipelines(VisionPipelineManager&)` 静态方法，注册所有内置 pipeline。
-- [ ] 处理失败时返回 false，不抛异常。
-- [ ] 不访问 UI、`AVFrame`、sink。
-- [ ] `CMakeLists.txt` 当前通过 `file(GLOB_RECURSE src/*.cpp src/*.h ...)` 自动纳入新增文件，本步无需修改。
+- [x] 新增 `OpenCvThreshold`（`IFramePreprocessor`，参数化阈值）。
+- [x] 新增 `OpenCvGrayscale`（`IFramePreprocessor`，BGR → GRAY）。
+- [x] 新增 `OpenCvMeasurement`（`IVisionPostprocessor`，为 `DetectionBox` 补面积/周长信息）。
+- [x] 新增 `OpenCvContourAnalyzer`（`IVisionAnalyzer`，`cv::findContours` + `boundingRect` 输出 `DetectionBox`）。
+- [x] 新增 `OpenCvContourVisionPipeline` 类，实现 `IVisionPipeline`。
+- [x] `Startup()` 中 new preprocessors / analyzer / postprocessors。
+- [x] `Shutdown()` 中 reset 所有构建块。
+- [x] `Run()` 中 clone working frame，按顺序调 preprocessors、analyzer、postprocessors。
+- [x] `Id()` 返回 `"opencv-contour"`。
+- [x] `DisplayName()` 返回 `"OpenCV 轮廓检测"`。
+- [x] `Type()` 返回 `"detection"`。
+- [x] 新增 `VisionProcessorFactory`。
+- [x] 提供 `RegisterBuiltinPipelines(VisionPipelineManager&)` 静态方法，注册所有内置 pipeline。
+- [x] 处理失败时返回 false，不抛异常。
+- [x] 不访问 UI、`AVFrame`、sink。
+- [x] `CMakeLists.txt` 当前通过 `file(GLOB_RECURSE src/*.cpp src/*.h ...)` 自动纳入新增文件，本步无需修改。
 
 **验收标准**：
 
-- [ ] 手工构造 BGR 图像调用 `Run()` 能得到非空 `VisionResultSet`。
-- [ ] `Shutdown()` 后 `IsStarted()` 返回 false。
-- [ ] 未 `Startup()` 时 `Run()` 返回 false。
-- [ ] preprocessors / analyzer / postprocessors 组合��责单一，可以被其他 pipeline 复用（如 `OpenCvGrayscale` 未来给 OCR 用）。
-- [ ] Factory 注册的 pipeline 都是 dormant 状态，未 `Startup()`。
+- [x] 手工构造 BGR 图像调用 `Run()` 能得到非空 `VisionResultSet`。
+- [x] `Shutdown()` 后 `IsStarted()` 返回 false。
+- [x] 未 `Startup()` 时 `Run()` 返回 false。
+- [x] preprocessors / analyzer / postprocessors 组合职责单一，可以被其他 pipeline 复用（如 `OpenCvGrayscale` 未来给 OCR 用）。
+- [x] Factory 注册的 pipeline 都是 dormant 状态，未 `Startup()`。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\vision\opencvpreprocessors.h src\infrastructure\vision\opencvpreprocessors.cpp src\infrastructure\vision\opencvpostprocessors.h src\infrastructure\vision\opencvpostprocessors.cpp src\infrastructure\vision\opencvcontouranalyzer.h src\infrastructure\vision\opencvcontouranalyzer.cpp src\infrastructure\vision\opencvcontourvisionpipeline.h src\infrastructure\vision\opencvcontourvisionpipeline.cpp src\infrastructure\vision\visionprocessorfactory.h src\infrastructure\vision\visionprocessorfactory.cpp doc\Phase7TODO.md`
-- [ ] 定向搜索：`rg -n "OpenCvContourVisionPipeline|OpenCvContourAnalyzer|OpenCvThreshold|OpenCvGrayscale|OpenCvMeasurement|VisionProcessorFactory|RegisterBuiltinPipelines|findContours|boundingRect" src doc\Phase7TODO.md`
-- [ ] 用户人工编译验证：项目能编过。
+- [x] 静态检查：`git diff --check -- src\infrastructure\vision\opencvpreprocessors.h src\infrastructure\vision\opencvpreprocessors.cpp src\infrastructure\vision\opencvpostprocessors.h src\infrastructure\vision\opencvpostprocessors.cpp src\infrastructure\vision\opencvcontouranalyzer.h src\infrastructure\vision\opencvcontouranalyzer.cpp src\infrastructure\vision\opencvcontourvisionpipeline.h src\infrastructure\vision\opencvcontourvisionpipeline.cpp src\infrastructure\vision\visionprocessorfactory.h src\infrastructure\vision\visionprocessorfactory.cpp doc\Phase7TODO.md`
+- [x] 定向搜索：`rg -n "OpenCvContourVisionPipeline|OpenCvContourAnalyzer|OpenCvThreshold|OpenCvGrayscale|OpenCvMeasurement|VisionProcessorFactory|RegisterBuiltinPipelines|findContours|boundingRect" src doc\Phase7TODO.md`
+- [x] 用户人工编译验证：项目能编过。
 
 **Commit message**：
 
