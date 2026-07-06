@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "pipelines": [
+    {
+      "id": "opencv-contour",
+      "type": "opencv-contour",
+      "displayName": "OpenCV Contour Detection",
+      "enabled": true,
+      "params": {
+        "threshold": 128,
+        "maxValue": 255
+      }
+    },
+    {
+      "id": "yolo-onnx",
+      "type": "yolo-onnx",
+      "displayName": "YOLO ONNX Detection",
+      "enabled": true,
+      "params": {
+        "modelPath": "models/yolo.onnx",
+        "labelsPath": "",
+        "inputWidth": 640,
+        "inputHeight": 640,
+        "confidenceThreshold": 0.35,
+        "nmsThreshold": 0.45,
+        "backend": "opencv-dnn",
+        "target": "cpu"
+      }
+    }
+  ]
+}

@@ -7,20 +7,20 @@
   - OpenCV 轮廓检测管线可通过 UI 运行。
   - YOLO ONNX 检测管线可通过 UI 运行。
   - Phase 8 架构设计文档已完成。
+  - 配置文件路径确认使用 `config/vision_pipelines.json`。
+  - Phase 8.1 配置格式与默认配置已完成。
 - 未完成：
-  - Phase 8.1 配置格式与默认配置。
   - Phase 8.2 Factory 按配置注册。
   - Phase 8.3 YOLO 参数配置化。
   - Phase 8.4 OpenCV 参数配置化。
   - Phase 8.5 初始化链路接入。
   - Phase 8.6 验收报告。
 - 已知风险：
-  - 配置路径需要确认，第一版建议 `config/vision_pipelines.json`。
   - 自训练 YOLO 的 labels 文件格式需要保持简单：一行一个类别名。
   - 配置错误不能影响程序启动，只能影响对应 pipeline 激活。
 - 本轮范围：
-  - 只新增 Phase 8 设计文档和 TODO。
-  - 不修改 C++ 代码。
+  - 新增 Phase 8.1 配置结构、JSON 加载器和默认配置文件。
+  - 不接入 `VisionProcessorFactory` / `MultiStreamManager` 运行链路。
   - 不编译。
 
 ## 阶段目标
@@ -55,29 +55,31 @@ config/vision_pipelines.json
 - `src/infrastructure/vision/visionpipelineconfig.cpp`
 - `src/infrastructure/vision/visionconfigloader.h`
 - `src/infrastructure/vision/visionconfigloader.cpp`
+- `config/vision_pipelines.json`
 - `doc/Phase8TODO.md`
 
 **任务清单**：
 
-- [ ] 定义 `VisionPipelineConfig`。
-- [ ] 定义 `VisionPipelineConfigSet`。
-- [ ] 实现默认配置生成。
-- [ ] 实现 `VisionConfigLoader::Load(path)`。
-- [ ] 支持 JSON 解析失败时回退默认配置。
-- [ ] 支持缺字段时使用默认值或跳过非法 pipeline。
-- [ ] 支持相对路径解析策略说明。
+- [x] 定义 `VisionPipelineConfig`。
+- [x] 定义 `VisionPipelineConfigSet`。
+- [x] 实现默认配置生成。
+- [x] 实现 `VisionConfigLoader::Load(path)`。
+- [x] 支持 JSON 解析失败时回退默认配置。
+- [x] 支持缺字段时使用默认值或跳过非法 pipeline。
+- [x] 支持相对路径解析策略说明。
+- [x] 新增默认配置文件 `config/vision_pipelines.json`。
 
 **验收标准**：
 
-- [ ] 无配置文件时能得到 OpenCV + YOLO 默认配置。
-- [ ] 合法 JSON 能解析为 `VisionPipelineConfigSet`。
-- [ ] 非法 JSON 不崩溃，并回退默认配置。
-- [ ] 缺少 `id` / `type` 的 pipeline 被跳过。
+- [x] 无配置文件时能得到 OpenCV + YOLO 默认配置。
+- [x] 合法 JSON 能解析为 `VisionPipelineConfigSet`。
+- [x] 非法 JSON 不崩溃，并回退默认配置。
+- [x] 缺少 `id` / `type` 的 pipeline 被跳过。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\vision\visionpipelineconfig.h src\infrastructure\vision\visionpipelineconfig.cpp src\infrastructure\vision\visionconfigloader.h src\infrastructure\vision\visionconfigloader.cpp doc\Phase8TODO.md`
-- [ ] 定向搜索：`rg -n "VisionPipelineConfig|VisionPipelineConfigSet|VisionConfigLoader|vision_pipelines.json|Default" src doc\Phase8TODO.md`
+- [x] 静态检查：`git diff --check -- src\infrastructure\vision\visionpipelineconfig.h src\infrastructure\vision\visionpipelineconfig.cpp src\infrastructure\vision\visionconfigloader.h src\infrastructure\vision\visionconfigloader.cpp config\vision_pipelines.json doc\Phase8TODO.md`
+- [x] 定向搜索：`rg -n "VisionPipelineConfig|VisionPipelineConfigSet|VisionConfigLoader|vision_pipelines.json|Default" src config doc\Phase8TODO.md`
 
 **Commit message**：
 
@@ -306,7 +308,7 @@ docs: 完成 Phase 8 视觉任务配置化验收
 
 ## 风险与沟通点
 
-- 是否提交 `config/vision_pipelines.json` 默认配置文件需要确认。
-- 配置文件路径是否固定为 `config/vision_pipelines.json` 需要确认。
+- 默认配置文件已确认提交：`config/vision_pipelines.json`。
+- 配置文件路径已确认固定为 `config/vision_pipelines.json`。
 - 自训练 YOLO labels 文件格式第一版建议一行一个类别名。
 - Phase 8 仍是同步推理，不解决 YOLO 卡顿问题；性能优化应放到后续 Phase。

@@ -319,7 +319,7 @@ YOLO ONNX Detection
 
 ## 风险与沟通点
 
-- 配置文件路径需要最终确认：第一版建议 `config/vision_pipelines.json`。
-- 是否提交默认配置文件需要确认：提交示例配置更利于验收，但用户本地模型路径可能不同。
+- 配置文件路径已确认：第一版固定为 `config/vision_pipelines.json`。
+- 默认配置文件已确认提交；模型文件仍不进入 git，配置中的 `models/yolo.onnx` 只作为约定路径。
 - 当前 CMake 会把 `doc/*.md` 纳入 source glob，新增文档不影响运行，但会出现在 IDE 工程里。
 - 如果后续支持按 stream 配置 pipeline，需要重新设计 active stream 与配置绑定关系，不纳入 Phase 8 第一版。
