@@ -9,8 +9,8 @@
   - Phase 8 架构设计文档已完成。
   - 配置文件路径确认使用 `config/vision_pipelines.json`。
   - Phase 8.1 配置格式与默认配置已完成。
+  - Phase 8.2 Factory 按配置注册已完成。
 - 未完成：
-  - Phase 8.2 Factory 按配置注册。
   - Phase 8.3 YOLO 参数配置化。
   - Phase 8.4 OpenCV 参数配置化。
   - Phase 8.5 初始化链路接入。
@@ -19,8 +19,9 @@
   - 自训练 YOLO 的 labels 文件格式需要保持简单：一行一个类别名。
   - 配置错误不能影响程序启动，只能影响对应 pipeline 激活。
 - 本轮范围：
-  - 新增 Phase 8.1 配置结构、JSON 加载器和默认配置文件。
-  - 不接入 `VisionProcessorFactory` / `MultiStreamManager` 运行链路。
+  - 新增 Phase 8.2 Factory 按配置注册能力。
+  - 不接入 `MultiStreamManager` 初始化链路。
+  - 不消费 `params`，YOLO / OpenCV 具体参数配置化放到 Phase 8.3 / 8.4。
   - 不编译。
 
 ## 阶段目标
@@ -103,22 +104,23 @@ feat: 增加视觉管线配置加载基础结构
 
 **任务清单**：
 
-- [ ] 新增 `RegisterConfiguredPipelines`。
-- [ ] 按 `enabled` 过滤 pipeline。
-- [ ] 按 `type` 创建对应 pipeline。
-- [ ] 未识别 `type` 时跳过并记录日志。
-- [ ] 没有任何有效 pipeline 时回退内置注册。
+- [x] 新增 `RegisterConfiguredPipelines`。
+- [x] 按 `enabled` 过滤 pipeline。
+- [x] 按 `type` 创建对应 pipeline。
+- [x] 未识别 `type` 时跳过并记录日志。
+- [x] 没有任何有效 pipeline 时回退内置注册。
+- [x] Phase 8.2 只按配置决定注册哪些默认 pipeline，暂不消费 `params`。
 
 **验收标准**：
 
-- [ ] 配置只启用 OpenCV 时，UI 只出现 OpenCV。
-- [ ] 配置只启用 YOLO 时，UI 只出现 YOLO。
-- [ ] 配置为空或全部非法时，仍有默认 OpenCV + YOLO。
+- [x] 配置只启用 OpenCV 时，factory 只注册 OpenCV 类型。
+- [x] 配置只启用 YOLO 时，factory 只注册 YOLO 类型。
+- [x] 配置为空或全部非法时，仍回退默认 OpenCV + YOLO。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\vision\visionprocessorfactory.h src\infrastructure\vision\visionprocessorfactory.cpp doc\Phase8TODO.md`
-- [ ] 定向搜索：`rg -n "RegisterConfiguredPipelines|RegisterBuiltinPipelines|VisionPipelineConfig|enabled|type" src doc\Phase8TODO.md`
+- [x] 静态检查：`git diff --check -- src\infrastructure\vision\visionprocessorfactory.h src\infrastructure\vision\visionprocessorfactory.cpp doc\Phase8TODO.md`
+- [x] 定向搜索：`rg -n "RegisterConfiguredPipelines|RegisterBuiltinPipelines|VisionPipelineConfig|enabled|type" src doc\Phase8TODO.md`
 
 **Commit message**：
 
