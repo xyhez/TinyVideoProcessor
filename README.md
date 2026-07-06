@@ -51,6 +51,10 @@ TinyVideoProcessor 是一个渐进式演进的视频处理框架，遵循清晰�
 - ✅ RTSP 打开失败、断流、移除、重连和关闭窗口生命周期处理
 - ✅ 队列 RAII 所有权重构，`AVPacket` / `AVFrame` 队列使用 `unique_ptr` 管理
 - ✅ 多线程解码、音视频同步、硬件解码基础支持
+- ✅ OpenCV 图像处理基础链路，支持 active stream 灰度、二值化、边缘检测等处理
+- ✅ 多视觉处理器架构，支持 `IVisionPipeline` 单激活、懒加载和统一 overlay 绘制
+- ✅ 内置 OpenCV 轮廓检测管线和 YOLO ONNX 目标检测管线
+- ✅ 视觉任务配置化，支持通过 `config/vision_pipelines.json` 配置 OpenCV / YOLO 参数
 
 ### 规划中的功能
 
@@ -89,14 +93,15 @@ TinyVideoProcessor 是一个渐进式演进的视频处理框架，遵循清晰�
 - 📋 HTTP-FLV 支持
 - 📋 自动断线重连
 
-#### Phase 5-6: 图像处理与分析
-- ✅ Phase 5 图像处理基础预研和任务拆分
-- 📋 OpenCV 依赖接入
-- 📋 实时图像处理（灰度化、二值化、边缘检测）
-- 📋 插件式处理器架构
-- 📋 目标检测与识别
-- 📋 尺寸测量
-- 📋 运动检测与跟踪
+#### Phase 5-8: 图像处理、视觉分析与配置化
+- ✅ Phase 5 图像处理基础链路，支持 `ImageProcessingFrameSink` + OpenCV 处理器链
+- ✅ Phase 6 高级图像分析预研，明确传统视觉、YOLO、OCR、分割等方向
+- ✅ Phase 7 多视觉处理器架构，支持 OpenCV / YOLO 管线切换和统一绘制
+- ✅ Phase 8 视觉任务配置化，支持 JSON 配置 OpenCV / YOLO 参数
+- 📋 Phase 9 视觉推理性能优化：降帧分析、异步推理、结果缓存和耗时统计
+- 📋 OCR 识别管线
+- 📋 深度学习分割管线
+- 📋 识别结果事件、报警、存储和统计
 
 ---
 
@@ -243,9 +248,12 @@ IMediaSource
             -> ImageProcessingFrameSink
               -> VideoFrameMatConverter (enabled 时)
                 -> ImageProcessorPipeline (enabled 时)
-                  -> IVideoFrameSink
-                    -> SingleStreamFrameSinkAdapter
-                      -> MultiViewRenderer
+              -> VisionProcessingFrameSink
+                -> VisionPipelineManager.RunActive() (enabled 时)
+                -> VisionOverlayRenderer (enabled 时)
+              -> IVideoFrameSink
+                -> SingleStreamFrameSinkAdapter
+                  -> MultiViewRenderer
 
 音频与同步流：
 
@@ -263,6 +271,79 @@ MultiViewRenderer
         -> MultiStreamManager
 ```
 
+### 视觉分析链路
+
+Phase 7 之后，项目具备独立于基础图像处理链路的视觉分析管线。基础图像处理仍负责“改图”，视觉分析负责“识别并输出结构化结果”。
+
+```text
+config/vision_pipelines.json
+  -> VisionConfigLoader
+    -> VisionProcessorFactory
+      -> VisionPipelineManager
+        ├─ OpenCvContourVisionPipeline
+        └─ YoloVisionPipeline
+
+VideoFrameScheduler
+  -> ImageProcessingFrameSink
+    -> VisionProcessingFrameSink
+      -> VisionPipelineManager.RunActive()
+        -> IVisionPipeline::Run()
+          -> VisionResultSet
+      -> VisionOverlayRenderer
+      -> MultiViewRenderer
+```
+
+当前内置视觉管线：
+
+- `opencv-contour`：传统 OpenCV 轮廓检测，适合光照稳定、背景简单的规则检测场景。
+- `yolo-onnx`：基于 OpenCV DNN 的 YOLO ONNX 目标检测，默认读取 `models/yolo.onnx`。
+
+视觉分析第一版保持单激活模式：同一时刻只运行一条 `IVisionPipeline`，且只处理 active stream。
+
+### 视觉任务配置
+
+默认配置文件：
+
+```text
+config/vision_pipelines.json
+```
+
+示例：
+
+```json
+{
+  "version": 1,
+  "pipelines": [
+    {
+      "id": "opencv-contour",
+      "type": "opencv-contour",
+      "displayName": "OpenCV Contour Detection",
+      "enabled": true,
+      "params": {
+        "threshold": 128,
+        "maxValue": 255
+      }
+    },
+    {
+      "id": "yolo-onnx",
+      "type": "yolo-onnx",
+      "displayName": "YOLO ONNX Detection",
+      "enabled": true,
+      "params": {
+        "modelPath": "models/yolo.onnx",
+        "labelsPath": "",
+        "inputWidth": 640,
+        "inputHeight": 640,
+        "confidenceThreshold": 0.35,
+        "nmsThreshold": 0.45
+      }
+    }
+  ]
+}
+```
+
+配置缺失、打不开或 JSON 非法时，程序会回退默认 OpenCV + YOLO 管线。模型文件不进入 git，`models/yolo.onnx` 需要本地自行放置。
+
 ### 职责边界
 
 - `MainWindow`：只负责 UI、逻辑 slot、布局切换和用户交互转发。
@@ -271,6 +352,8 @@ MultiViewRenderer
 - `MediaPipeline`：只负责单路媒体播放，不感知 `StreamId`，不决定多路布局。
 - `VideoFrameScheduler`：负责取帧、同步判断、丢帧追赶和下一帧调度。
 - `ImageProcessingFrameSink`：插在调度器和显示 sink 之间，默认透传，只在 active stream 开启后执行 OpenCV 处理链。
+- `VisionProcessingFrameSink`：插在图像处理后，调用当前激活视觉管线并叠加检测结果。
+- `VisionPipelineManager`：管理视觉管线注册、单激活切换、懒加载和运行入口。
 - `MultiViewRenderer`：只负责统一 OpenGL 多画面绘制，不访问队列、不访问 `SyncManager`、不做同步判断。
 
 ### 核心设计模式
@@ -394,6 +477,16 @@ cmake --build . --config Release
 3. 配置构建套件
 4. 点击运行
 
+### YOLO 模型准备
+
+YOLO ONNX 模型文件不进入 git。若要使用 `YOLO ONNX Detection`，请将模型放到：
+
+```text
+models/yolo.onnx
+```
+
+推荐第一版使用轻量模型，例如 YOLO11n 导出的 ONNX。自训练模型可通过 `config/vision_pipelines.json` 修改 `modelPath`、`labelsPath`、输入尺寸和阈值。
+
 ---
 
 ## 📁 项目结构
@@ -402,9 +495,13 @@ cmake --build . --config Release
 TinyVideoProcessor/
 ├── README.md                     # 项目说明
 ├── CMakeLists.txt                # CMake 构建配置
+├── config/
+│   └── vision_pipelines.json     # 视觉管线默认配置
 ├── Lib/
 │   ├── ffmpeg/                   # 随项目发布的 FFmpeg 依赖
 │   └── TinyLogLibrary/           # 日志库
+├── models/
+│   └── yolo.onnx                 # 本地 YOLO 模型约定路径，不进入 git
 ├── doc/
 │   ├── 架构指导.md               # 总体架构路线
 │   ├── TODO.md                   # 当前阶段任务清单
@@ -424,6 +521,11 @@ TinyVideoProcessor/
 │   ├── Phase4_*.md               # RTSP 网络流预研、异常链路和验收文档
 │   ├── Phase5TODO.md             # 图像处理基础计划
 │   ├── Phase5_*.md               # 图像处理基础预研文档
+│   ├── Phase6TODO.md             # 高级图像分析预研计划
+│   ├── Phase7TODO.md             # 多视觉处理器架构计划
+│   ├── Phase7_*.md               # 多视觉处理器架构设计与验收文档
+│   ├── Phase8TODO.md             # 视觉任务配置化计划
+│   ├── Phase8_*.md               # 视觉任务配置化设计与验收文档
 │   └── TODO-队列RAII重构.md       # 队列 RAII 重构计划
 └── src/
     ├── ui/
@@ -444,17 +546,12 @@ TinyVideoProcessor/
     │   ├── MultiStreamManager.h/cpp # 多路播放管理
     │   └── PlaylistManager.h/cpp # 播放列表管理
     ├── infrastructure/
-    │   ├── demuxer.h/cpp         # 解复用器
-    │   ├── decoder.h/cpp         # 解码器
-    │   ├── audioplayer.h/cpp     # 音频播放
-    │   ├── syncmanager.h/cpp     # 音视频同步
-    │   ├── videoframescheduler.h/cpp # 视频帧调度
-    │   ├── videoframeconverter.h/cpp # 可显示帧格式转换
-    │   ├── ivideoframesink.h     # 可显示帧消费接口
-    │   ├── singlestreamframesinkadapter.h/cpp # 单路帧 sink 适配器
-    │   ├── multiviewrenderer.h/cpp # 统一多画面 OpenGL 渲染器
-    │   ├── videorender.h/cpp     # 旧单路渲染 fallback
-    │   └── CameraDeviceEnumerator.h/cpp # 摄像头设备枚举
+    │   ├── decoding/             # FFmpeg 解复用和解码
+    │   ├── audio/                # 音频播放
+    │   ├── sync/                 # 音视频同步和视频帧调度
+    │   ├── rendering/            # 可显示帧 sink 和 OpenGL 多画面渲染
+    │   ├── devices/              # 摄像头设备枚举
+    │   └── vision/               # 图像处理、视觉管线、YOLO/OpenCV 分析和配置加载
     └── core/
         ├── ffmpeg_raii.h         # FFmpeg AVPacket/AVFrame RAII 类型
         └── queue.h               # 线程安全队列
@@ -474,9 +571,11 @@ TinyVideoProcessor/
 | Phase 3.14 | ✅ 已完成 | 多路渲染性能优化 | 已完成 |
 | Phase 3.15 | ✅ 已完成 | 9/16 路真实播放扩容 | 已完成 |
 | Phase 4 | ✅ 已完成 | RTSP 网络流支持 | 已完成 |
-| Phase 5.1 | ✅ 已完成 | 图像处理基础预研和任务拆分 | 已完成 |
-| Phase 5.2+ | 📋 计划中 | OpenCV 接入、基础处理器、active stream 处理预览 | 待开发 |
-| Phase 6 | 📋 计划中 | 高级图像分析 | 2 周 |
+| Phase 5 | ✅ 已完成 | OpenCV 图像处理基础链路、active stream 处理预览 | 已完成 |
+| Phase 6 | ✅ 已完成 | 高级图像分析预研和目标检测方向梳理 | 已完成 |
+| Phase 7 | ✅ 已完成 | 多视觉处理器架构、OpenCV / YOLO 管线接入 | 已完成 |
+| Phase 8 | ✅ 已完成 | 视觉任务配置化、JSON 配置 OpenCV / YOLO 参数 | 已完成 |
+| Phase 9 | 📋 计划中 | 视觉推理性能优化：降帧、异步、缓存、耗时统计 | 待开发 |
 
 详细规划请参考：[架构指导.md](doc/架构指导.md)
 
@@ -494,12 +593,16 @@ TinyVideoProcessor/
   - libswscale: 图像缩放转换
   - libavdevice: 设备输入（摄像头）
 - **OpenGL**: 硬件加速渲染
+- **OpenCV**: 图像处理、传统视觉检测、YOLO ONNX 推理后端
+- **ONNX**: YOLO 模型交换格式，默认模型路径为 `models/yolo.onnx`
+- **JSON**: 视觉任务配置文件格式，默认路径为 `config/vision_pipelines.json`
 
 ### 未来扩展
 
-- **OpenCV**: 图像处理与计算机视觉（Phase 5+）
-- **SQLite**: 数据存储（Phase 7）
-- **QXlsx**: Excel 报表生成（Phase 7）
+- **ONNX Runtime / TensorRT**: 后续可选推理后端
+- **SQLite**: 检测事件和历史结果存储
+- **QXlsx**: Excel 报表生成
+- **OCR / Segmentation 模型**: 后续视觉管线扩展方向
 
 ---
 
@@ -514,7 +617,10 @@ TinyVideoProcessor/
 - **同步链路**: `VideoFrameScheduler` 负责视频帧同步调度，`SyncManager` 维护音视频时钟
 - **格式适配**: `VideoFrameConverter` 将非 `YUV420P` 软件帧转换为当前渲染器可显示格式
 - **网络流**: RTSP 支持打开失败、断流移除、服务恢复后重加和关闭中断处理
-- **已知限制**: 16 路播放性能依赖机器配置和视频规格；RTMP / HTTP-FLV / 自动重连尚未实现；图像处理尚处于 Phase 5 规划阶段
+- **图像处理**: active stream 支持 OpenCV 基础处理链
+- **视觉分析**: 支持 OpenCV 轮廓检测和 YOLO ONNX 目标检测，识别结果可叠加到画面
+- **配置化**: 视觉管线通过 `config/vision_pipelines.json` 配置，缺失或非法时回退默认 OpenCV + YOLO
+- **已知限制**: 16 路播放性能依赖机器配置和视频规格；RTMP / HTTP-FLV / 自动重连尚未实现；YOLO 当前同步推理，复杂模型可能影响播放流畅度
 
 ### 目标性能
 
@@ -522,7 +628,7 @@ TinyVideoProcessor/
 - **CPU 占用**: < 30%
 - **内存占用**: < 500MB
 - **渲染延迟**: < 100ms
-- **后续目标**: 接入 Phase 5 active stream 图像处理预览，并补充更完整的量化性能表
+- **后续目标**: Phase 9 拆分显示帧率与推理帧率，引入异步推理、结果缓存和更完整的量化性能表
 
 ---
 
@@ -548,6 +654,13 @@ TinyVideoProcessor/
 ---
 
 ## 📝 开发日志
+
+### 2026-07-06
+- ✅ 完成 Phase 7 多视觉处理器架构：`IVisionPipeline`、`VisionPipelineManager`、`VisionProcessingFrameSink` 和 `VisionOverlayRenderer`
+- ✅ 接入 OpenCV 轮廓检测管线和 YOLO ONNX 目标检测管线
+- ✅ 完成 Phase 8 视觉任务配置化，支持 `config/vision_pipelines.json`
+- ✅ 支持 YOLO 模型路径、输入尺寸、confidence、NMS、labels 文件配置
+- ✅ 支持 OpenCV 轮廓检测 threshold / maxValue 配置
 
 ### 2026-06-26
 - ✅ 完成主框架稳定化：`MainWindow -> MediaPlayController -> MultiStreamManager -> MediaPipeline`
@@ -585,7 +698,7 @@ TinyVideoProcessor/
 
 - [FFmpeg](https://ffmpeg.org/) - 强大的多媒体框架
 - [Qt](https://www.qt.io/) - 优秀的跨平台框架
-- [OpenCV](https://opencv.org/) - 计算机视觉库（未来使用）
+- [OpenCV](https://opencv.org/) - 计算机视觉和 DNN 推理
 
 ---
 
