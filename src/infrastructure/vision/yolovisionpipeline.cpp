@@ -6,13 +6,12 @@
 #include "infrastructure/vision/opencvpreprocessors.h"
 #include "infrastructure/vision/yoloonnxanalyzer.h"
 
+#include <algorithm>
 #include <utility>
 
 namespace {
-constexpr int kYoloInputWidth = 640;	///< YOLO 默认输入宽度
-constexpr int kYoloInputHeight = 640;	///< YOLO 默认输入高度
-constexpr float kConfidenceThreshold = 0.35F;	///< YOLO 检测置信度阈值
-constexpr float kNmsThreshold = 0.45F;	///< YOLO NMS 阈值
+constexpr int kMinYoloInputSize = 32;
+constexpr int kMaxYoloInputSize = 4096;
 const QString kPipelineId = QStringLiteral("yolo-onnx");
 const QString kDisplayName = QStringLiteral("YOLO ONNX Detection");
 const QString kType = QStringLiteral("detection");
@@ -25,10 +24,34 @@ QString DefaultModelPath()
     return QStringLiteral("models/yolo.onnx");
 #endif
 }
+
+YoloPipelineOptions NormalizeOptions(YoloPipelineOptions options)
+{
+    const YoloPipelineOptions defaults = DefaultYoloPipelineOptions();
+    if (options.modelPath.isEmpty()) {
+        options.modelPath = defaults.modelPath;
+    }
+    options.inputWidth = std::clamp(options.inputWidth, kMinYoloInputSize, kMaxYoloInputSize);
+    options.inputHeight = std::clamp(options.inputHeight, kMinYoloInputSize, kMaxYoloInputSize);
+    options.confidenceThreshold = std::clamp(options.confidenceThreshold, 0.0F, 1.0F);
+    options.nmsThreshold = std::clamp(options.nmsThreshold, 0.0F, 1.0F);
+    return options;
+}
 }
 
-YoloVisionPipeline::YoloVisionPipeline(QString modelPath)
-    : modelPath_(modelPath.isEmpty() ? DefaultModelPath() : std::move(modelPath))
+YoloPipelineOptions DefaultYoloPipelineOptions()
+{
+    YoloPipelineOptions options;
+    options.modelPath = DefaultModelPath();
+    options.inputWidth = 640;
+    options.inputHeight = 640;
+    options.confidenceThreshold = 0.35F;
+    options.nmsThreshold = 0.45F;
+    return options;
+}
+
+YoloVisionPipeline::YoloVisionPipeline(YoloPipelineOptions options)
+    : options_(NormalizeOptions(std::move(options)))
 {
 }
 
@@ -58,15 +81,16 @@ bool YoloVisionPipeline::Startup()
         return true;
     }
 
-    auto letterbox = std::make_unique<OpenCvLetterbox>(kYoloInputWidth, kYoloInputHeight);
+    auto letterbox = std::make_unique<OpenCvLetterbox>(options_.inputWidth, options_.inputHeight);
     letterbox_ = letterbox.get();
     preprocessors_.push_back(std::move(letterbox));
     preprocessors_.push_back(std::make_unique<OpenCvBgrToRgb>());
 
     analyzer_ = std::make_unique<YoloOnnxAnalyzer>(
         kPipelineId,
-        modelPath_,
-        kConfidenceThreshold);
+        options_.modelPath,
+        options_.confidenceThreshold,
+        options_.labelsPath);
     if (!analyzer_->Load()) {
         LOG_WARN_STREAM() << "YoloVisionPipeline startup failed:" << analyzer_->LastError();
         Shutdown();
@@ -75,12 +99,12 @@ bool YoloVisionPipeline::Startup()
 
     postprocessors_.push_back(std::make_unique<YoloNms>(
         kPipelineId,
-        kConfidenceThreshold,
-        kNmsThreshold));
+        options_.confidenceThreshold,
+        options_.nmsThreshold));
     postprocessors_.push_back(std::make_unique<CoordinateMapper>(kPipelineId, letterbox_));
 
     started_ = true;
-    LOG_DEBUG_STREAM() << "YoloVisionPipeline started with model" << modelPath_;
+    LOG_DEBUG_STREAM() << "YoloVisionPipeline started with model" << options_.modelPath;
     return true;
 }
 

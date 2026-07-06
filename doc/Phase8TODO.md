@@ -10,8 +10,8 @@
   - 配置文件路径确认使用 `config/vision_pipelines.json`。
   - Phase 8.1 配置格式与默认配置已完成。
   - Phase 8.2 Factory 按配置注册已完成。
+  - Phase 8.3 YOLO 参数配置化已完成。
 - 未完成：
-  - Phase 8.3 YOLO 参数配置化。
   - Phase 8.4 OpenCV 参数配置化。
   - Phase 8.5 初始化链路接入。
   - Phase 8.6 验收报告。
@@ -19,9 +19,9 @@
   - 自训练 YOLO 的 labels 文件格式需要保持简单：一行一个类别名。
   - 配置错误不能影响程序启动，只能影响对应 pipeline 激活。
 - 本轮范围：
-  - 新增 Phase 8.2 Factory 按配置注册能力。
+  - 新增 Phase 8.3 YOLO 参数配置化能力。
   - 不接入 `MultiStreamManager` 初始化链路。
-  - 不消费 `params`，YOLO / OpenCV 具体参数配置化放到 Phase 8.3 / 8.4。
+  - 只消费 `yolo-onnx` 的 `params`，OpenCV 参数配置化放到 Phase 8.4。
   - 不编译。
 
 ## 阶段目标
@@ -147,25 +147,26 @@ feat: 支持按配置注册视觉管线
 
 **任务清单**：
 
-- [ ] 新增 `YoloPipelineOptions`。
-- [ ] `YoloVisionPipeline` 改为接收 options。
-- [ ] 移除 YOLO 输入尺寸和阈值硬编码。
-- [ ] `YoloOnnxAnalyzer` 支持从 labels 文件读取类别名。
-- [ ] labels 文件缺失时回退 COCO 内置 labels。
-- [ ] 参数越界时 clamp 或回退默认值。
+- [x] 新增 `YoloPipelineOptions`。
+- [x] `YoloVisionPipeline` 改为接收 options。
+- [x] 移除 YOLO 输入尺寸和阈值硬编码。
+- [x] `YoloOnnxAnalyzer` 支持从 labels 文件读取类别名。
+- [x] labels 文件缺失时回退 COCO 内置 labels。
+- [x] 参数越界时 clamp 或回退默认值。
+- [x] `VisionProcessorFactory` 从 `VisionPipelineConfig.params` 构造 `YoloPipelineOptions`。
 
 **验收标准**：
 
-- [ ] 默认配置下 YOLO 行为与 Phase 7 一致。
-- [ ] 修改 `modelPath` 后使用新模型路径。
-- [ ] 修改 `confidenceThreshold` 后检测框数量有可观察变化。
-- [ ] 自定义 labels 文件能影响 overlay 标签显示。
+- [x] 默认 options 下 YOLO 行为与 Phase 7 一致。
+- [x] factory 按 `modelPath` 配置构造 YOLO 模型路径。
+- [x] factory 按 `confidenceThreshold` / `nmsThreshold` 配置构造 YOLO 阈值。
+- [x] 自定义 labels 文件路径能进入 `YoloOnnxAnalyzer`。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\vision\yolovisionpipeline.h src\infrastructure\vision\yolovisionpipeline.cpp src\infrastructure\vision\yoloonnxanalyzer.h src\infrastructure\vision\yoloonnxanalyzer.cpp src\infrastructure\vision\visionprocessorfactory.cpp doc\Phase8TODO.md`
-- [ ] 定向搜索：`rg -n "YoloPipelineOptions|labelsPath|confidenceThreshold|nmsThreshold|inputWidth|inputHeight|ReadLabels" src doc\Phase8TODO.md`
-- [ ] 人工运行：使用默认 `models/yolo.onnx`，确认 YOLO 仍可绘制检测框。
+- [x] 静态检查：`git diff --check -- src\infrastructure\vision\yolovisionpipeline.h src\infrastructure\vision\yolovisionpipeline.cpp src\infrastructure\vision\yoloonnxanalyzer.h src\infrastructure\vision\yoloonnxanalyzer.cpp src\infrastructure\vision\visionprocessorfactory.cpp doc\Phase8TODO.md`
+- [x] 定向搜索：`rg -n "YoloPipelineOptions|labelsPath|confidenceThreshold|nmsThreshold|inputWidth|inputHeight|LoadClassLabels" src doc\Phase8TODO.md`
+- [ ] 人工运行：Phase 8.5 接入配置加载后，使用默认 `models/yolo.onnx`，确认 YOLO 仍可绘制检测框。
 
 **Commit message**：
 

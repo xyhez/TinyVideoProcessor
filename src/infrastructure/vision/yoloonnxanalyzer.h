@@ -18,7 +18,8 @@ class YoloOnnxAnalyzer : public IVisionAnalyzer {
 public:
     YoloOnnxAnalyzer(QString pipelineId,
                      QString modelPath,
-                     float confidenceThreshold = 0.35F);
+                     float confidenceThreshold = 0.35F,
+                     QString labelsPath = {});
 
     QString Name() const override;
     bool Analyze(const VisionFrame& frame, VisionResultSet& out) override;
@@ -28,11 +29,13 @@ public:
     QString LastError() const;
 
 private:
+    QStringList LoadClassLabels() const;
     bool ParseOutput(const cv::Mat& output, const VisionFrame& frame, VisionResult& result) const;
     QString ClassLabel(int classId) const;
 
     QString pipelineId_;	///< 结果归属 pipeline id
     QString modelPath_;	///< ONNX 模型路径
+    QString labelsPath_;	///< 类别名文件路径
     float confidenceThreshold_ = 0.35F;	///< 检测置信度阈值
     cv::dnn::Net net_;	///< OpenCV DNN 网络
     QStringList classLabels_;	///< COCO 类别名

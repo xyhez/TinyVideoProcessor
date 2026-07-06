@@ -7,7 +7,10 @@
 #include <vector>
 
 #include <QElapsedTimer>
+#include <QFile>
 #include <QFileInfo>
+#include <QIODevice>
+#include <QTextStream>
 #include <QtGlobal>
 
 #include <opencv2/imgproc.hpp>
@@ -81,17 +84,42 @@ cv::Mat OutputAsRows(const cv::Mat& output)
 
 YoloOnnxAnalyzer::YoloOnnxAnalyzer(QString pipelineId,
                                    QString modelPath,
-                                   float confidenceThreshold)
+                                   float confidenceThreshold,
+                                   QString labelsPath)
     : pipelineId_(std::move(pipelineId))
     , modelPath_(std::move(modelPath))
+    , labelsPath_(std::move(labelsPath))
     , confidenceThreshold_(confidenceThreshold)
-    , classLabels_(CocoLabels())
+    , classLabels_(LoadClassLabels())
 {
 }
 
 QString YoloOnnxAnalyzer::Name() const
 {
     return QStringLiteral("yolo-onnx-analyzer");
+}
+
+QStringList YoloOnnxAnalyzer::LoadClassLabels() const
+{
+    if (labelsPath_.isEmpty()) {
+        return CocoLabels();
+    }
+
+    QFile file(labelsPath_);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        return CocoLabels();
+    }
+
+    QStringList labels;
+    QTextStream stream(&file);
+    while (!stream.atEnd()) {
+        const QString label = stream.readLine().trimmed();
+        if (!label.isEmpty()) {
+            labels.append(label);
+        }
+    }
+
+    return labels.isEmpty() ? CocoLabels() : labels;
 }
 
 bool YoloOnnxAnalyzer::Load()
