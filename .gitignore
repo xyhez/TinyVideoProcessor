@@ -7,3 +7,5 @@
 /.idea/
 /logfile/
 resource/
+/models/*.onnx
+/models/*.engine

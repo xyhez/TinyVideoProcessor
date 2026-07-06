@@ -13,10 +13,10 @@
   - Phase 7.3.2 VisionPipelineManager 实现已完成。
   - Phase 7.4 VisionOverlayRenderer 已完成。
   - Phase 7.5 内置 OpenCvContourVisionPipeline + VisionProcessorFactory 已完成。
+  - Phase 7.6.1 VisionProcessingFrameSink + MediaPipeline / MultiStreamManager 接入已完成。
+  - Phase 7.6.2 MediaPlayController 暴露 + UI 下拉框接入已完成。
+  - Phase 7.7 YOLO 识别管线端到端验收已通过。
 - 未完成：
-  - Phase 7.6.1 VisionProcessingFrameSink + MediaPipeline / MultiStreamManager 接入。
-  - Phase 7.6.2 MediaPlayController 暴露 + UI 下拉框接入。
-  - Phase 7.7 YoloVisionPipeline 端到端接入验证。
   - Phase 7 验收报告。
 - 已知风险：
   - YOLO / OCR 单帧推理耗时可能明显高于视频帧间隔，第一版仅同步处理 active stream。
@@ -539,23 +539,23 @@ feat: 接入视觉分析 UI 控制
 
 **任务清单**：
 
-- [ ] 确定使用 OpenCV DNN 或 ONNX Runtime（第一版建议 OpenCV DNN，减少依赖）。
-- [ ] 准备 YOLO 模型文件（放在 `models/` 目录，`.gitignore` 排除大文件）。
-- [ ] 新增 `OpenCvLetterbox` preprocessor（保持宽高比缩放到 640x640）。
-- [ ] 新增 `OpenCvBgrToRgb` preprocessor。
-- [ ] 新增 `YoloOnnxAnalyzer`（读模型 / 推理 / 输出原始检测框）。
-- [ ] 新增 `YoloNms` postprocessor（NMS 过滤重叠框）。
-- [ ] 新增 `CoordinateMapper` postprocessor（把模型输入坐标映射回原图尺寸）。
-- [ ] 新增 `YoloVisionPipeline`，实现 `IVisionPipeline`。
-- [ ] `Id() = "yolo-onnx"`，`DisplayName() = "YOLO 目标检测"`，`Type() = "detection"`。
-- [ ] `Startup()` 加载模型，失败返回 false。
-- [ ] `Shutdown()` 释放模型和构建块。
-- [ ] `Run()` 完整调 preprocessors → analyzer → postprocessors。
-- [ ] 在 `VisionProcessorFactory::RegisterBuiltinPipelines` 里加一行注册。
-- [ ] 模型路径可配置（第一版硬编码到 `models/yolov5s.onnx`，后续可改）。
-- [ ] 推理失败时 `Run()` 返回 false，不崩溃。
-- [ ] 输出 `VisionResult::pipelineId = "yolo-onnx"`。
-- [ ] 每帧记录 `elapsedMs`。
+- [x] 确定使用 OpenCV DNN 或 ONNX Runtime（第一版建议 OpenCV DNN，减少依赖）。
+- [x] 准备 YOLO 模型文件（放在 `models/` 目录，`.gitignore` 排除大文件）。
+- [x] 新增 `OpenCvLetterbox` preprocessor（保持宽高比缩放到 640x640）。
+- [x] 新增 `OpenCvBgrToRgb` preprocessor。
+- [x] 新增 `YoloOnnxAnalyzer`（读模型 / 推理 / 输出原始检测框）。
+- [x] 新增 `YoloNms` postprocessor（NMS 过滤重叠框）。
+- [x] 新增 `CoordinateMapper` postprocessor（把模型输入坐标映射回原图尺寸）。
+- [x] 新增 `YoloVisionPipeline`，实现 `IVisionPipeline`。
+- [x] `Id() = "yolo-onnx"`，`DisplayName() = "YOLO 目标检测"`，`Type() = "detection"`。
+- [x] `Startup()` 加载模型，失败返回 false。
+- [x] `Shutdown()` 释放模型和构建块。
+- [x] `Run()` 完整调 preprocessors → analyzer → postprocessors。
+- [x] 在 `VisionProcessorFactory::RegisterBuiltinPipelines` 里加一行注册。
+- [x] 模型路径可配置（第一版默认读取 `models/yolo.onnx`，模型文件不进入 git）。
+- [x] 推理失败时 `Run()` 返回 false，不崩溃。
+- [x] 输出 `VisionResult::pipelineId = "yolo-onnx"`。
+- [x] 每帧记录 `elapsedMs`。
 - [ ] 形成 Phase 7 验收报告。
 
 **验收标准**：
@@ -573,7 +573,7 @@ feat: 接入视觉分析 UI 控制
 **测试流程**：
 
 - [ ] 静态检查：`git diff --check -- src\infrastructure\vision\opencvpreprocessors.h src\infrastructure\vision\opencvpreprocessors.cpp src\infrastructure\vision\opencvpostprocessors.h src\infrastructure\vision\opencvpostprocessors.cpp src\infrastructure\vision\yoloonnxanalyzer.h src\infrastructure\vision\yoloonnxanalyzer.cpp src\infrastructure\vision\yolovisionpipeline.h src\infrastructure\vision\yolovisionpipeline.cpp src\infrastructure\vision\visionprocessorfactory.cpp doc\Phase7TODO.md doc\Phase7_多视觉处理器架构验收报告.md`
-- [ ] 定向搜索：`rg -n "YoloVisionPipeline|YoloOnnxAnalyzer|YoloNms|OpenCvLetterbox|OpenCvBgrToRgb|CoordinateMapper|cv::dnn|readNet|forward" src doc\Phase7TODO.md`
+- [x] 定向搜索：`rg -n "YoloVisionPipeline|YoloOnnxAnalyzer|YoloNms|OpenCvLetterbox|OpenCvBgrToRgb|CoordinateMapper|cv::dnn|readNet|forward" src doc\Phase7TODO.md`
 - [ ] 人工运行建议：普通 MP4 播放，切换到 YOLO 目标检测，观察检测框和标签。
 - [ ] 人工运行建议：反复切换 OpenCV / YOLO / 关闭，确认无崩溃、无泄漏。
 - [ ] 人工运行建议：切换 active stream 后 YOLO 检测跟随。

@@ -42,4 +42,49 @@ private:
     double maxValue_;	///< 高于阈值的输出值
 };
 
+/**
+ * @brief OpenCvBgrToRgb BGR24 → RGB24 色彩转换
+ *
+ * 输入已经是 RGB24 时直接返回 true。YOLO / OCR 等模型如果要求 RGB，
+ * 应在所属 IVisionPipeline 内显式放入该预处理器。
+ */
+class OpenCvBgrToRgb : public IFramePreprocessor {
+public:
+    QString Name() const override;
+    bool Process(VisionFrame& frame) override;
+};
+
+/**
+ * @brief OpenCvLetterbox 按等比例缩放并补边到目标尺寸
+ *
+ * 记录最近一次处理的缩放比例和补边，用于 CoordinateMapper 把模型输入
+ * 坐标映射回原始视频坐标。该对象只应在单条 pipeline 内部复用。
+ */
+class OpenCvLetterbox : public IFramePreprocessor {
+public:
+    OpenCvLetterbox(int targetWidth, int targetHeight);
+
+    QString Name() const override;
+    bool Process(VisionFrame& frame) override;
+
+    int OriginalWidth() const;
+    int OriginalHeight() const;
+    int TargetWidth() const;
+    int TargetHeight() const;
+    double Scale() const;
+    int PadLeft() const;
+    int PadTop() const;
+    bool HasMapping() const;
+
+private:
+    int targetWidth_ = 0;	///< 目标宽度
+    int targetHeight_ = 0;	///< 目标高度
+    int originalWidth_ = 0;	///< 最近一次处理前的原始宽度
+    int originalHeight_ = 0;	///< 最近一次处理前的原始高度
+    double scale_ = 1.0;	///< 最近一次 letterbox 缩放比例
+    int padLeft_ = 0;	///< 最近一次左侧补边
+    int padTop_ = 0;	///< 最近一次顶部补边
+    bool hasMapping_ = false;	///< 是否已有有效映射信息
+};
+
 #endif // TINYVIDEOPROCESSOR_OPENCVPREPROCESSORS_H
