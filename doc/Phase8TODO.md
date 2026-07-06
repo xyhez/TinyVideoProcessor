@@ -13,16 +13,16 @@
   - Phase 8.3 YOLO 参数配置化已完成。
   - Phase 8.4 OpenCV 参数配置化已完成。
   - Phase 8.5 初始化链路代码接入已完成。
+  - Phase 8.5 有配置 / 无配置 / 非法配置人工运行验收已通过。
+  - Phase 8.6 验收报告已完成。
 - 未完成：
-  - Phase 8.5 有配置 / 无配置 / 非法配置人工运行验收。
-  - Phase 8.6 验收报告。
+  - 暂无。
 - 已知风险：
   - 自训练 YOLO 的 labels 文件格式需要保持简单：一行一个类别名。
   - 配置错误不能影响程序启动，只能影响对应 pipeline 激活。
 - 本轮范围：
-  - 新增 Phase 8.5 初始化链路接入。
-  - 在 `MultiStreamManager` 构造阶段加载 `config/vision_pipelines.json`。
-  - 用配置结果调用 `VisionProcessorFactory::RegisterConfiguredPipelines`。
+  - 新增 Phase 8 验收报告。
+  - 更新 Phase8TODO 验收状态。
   - 不编译。
 
 ## 阶段目标
@@ -167,7 +167,7 @@ feat: 支持按配置注册视觉管线
 
 - [x] 静态检查：`git diff --check -- src\infrastructure\vision\yolovisionpipeline.h src\infrastructure\vision\yolovisionpipeline.cpp src\infrastructure\vision\yoloonnxanalyzer.h src\infrastructure\vision\yoloonnxanalyzer.cpp src\infrastructure\vision\visionprocessorfactory.cpp doc\Phase8TODO.md`
 - [x] 定向搜索：`rg -n "YoloPipelineOptions|labelsPath|confidenceThreshold|nmsThreshold|inputWidth|inputHeight|LoadClassLabels" src doc\Phase8TODO.md`
-- [ ] 人工运行：Phase 8.5 接入配置加载后，使用默认 `models/yolo.onnx`，确认 YOLO 仍可绘制检测框。
+- [x] 人工运行：Phase 8.5 接入配置加载后，使用默认 `models/yolo.onnx`，确认 YOLO 仍可绘制检测框。
 
 **Commit message**：
 
@@ -207,7 +207,7 @@ feat: 支持 YOLO 管线参数配置化
 
 - [x] 静态检查：`git diff --check -- src\infrastructure\vision\opencvcontourvisionpipeline.h src\infrastructure\vision\opencvcontourvisionpipeline.cpp src\infrastructure\vision\visionprocessorfactory.cpp doc\Phase8TODO.md`
 - [x] 定向搜索：`rg -n "OpenCvContourPipelineOptions|threshold|maxValue|OpenCvThreshold|BuildOpenCvContourOptions" src doc\Phase8TODO.md`
-- [ ] 人工运行：Phase 8.5 接入配置加载后，切换到 OpenCV 轮廓检测，确认 overlay 正常。
+- [x] 人工运行：Phase 8.5 接入配置加载后，切换到 OpenCV 轮廓检测，确认 overlay 正常。
 
 **Commit message**：
 
@@ -243,15 +243,15 @@ feat: 支持 OpenCV 轮廓检测参数配置化
 
 - [x] 程序初始化代码路径使用配置结果注册 pipeline。
 - [x] 配置缺失或非法时 loader 返回默认配置，factory 回退注册默认 pipeline。
-- [ ] 程序启动后 UI pipeline 列表来自配置。
-- [ ] 删除配置文件后仍能看到默认 pipeline。
-- [ ] 配置非法时程序可启动并回退默认 pipeline。
+- [x] 程序启动后 UI pipeline 列表来自配置。
+- [x] 删除配置文件后仍能看到默认 pipeline。
+- [x] 配置非法时程序可启动并回退默认 pipeline。
 
 **测试流程**：
 
 - [x] 静态检查：`git diff --check -- src\domain\MultiStreamManager.cpp doc\Phase8TODO.md`
 - [x] 定向搜索：`rg -n "VisionConfigLoader|vision_pipelines.json|RegisterConfiguredPipelines|RegisterBuiltinPipelines|vision config loaded" src doc\Phase8TODO.md`
-- [ ] 人工运行：有配置、无配置、非法配置三种场景启动程序。
+- [x] 人工运行：有配置、无配置、非法配置三种场景启动程序。
 
 **Commit message**：
 
@@ -274,24 +274,24 @@ feat: 接入视觉管线配置初始化链路
 
 **任务清单**：
 
-- [ ] 验证无配置文件场景。
-- [ ] 验证合法配置场景。
-- [ ] 验证非法 JSON 场景。
-- [ ] 验证 YOLO 自定义 labels 场景。
-- [ ] 验证 OpenCV threshold 配置场景。
-- [ ] 编写 Phase 8 验收报告。
+- [x] 验证无配置文件场景。
+- [x] 验证合法配置场景。
+- [x] 验证非法 JSON 场景。
+- [x] 验证 YOLO 自定义 labels 场景。
+- [x] 验证 OpenCV threshold 配置场景。
+- [x] 编写 Phase 8 验收报告。
 
 **验收标准**：
 
-- [ ] 配置化不破坏 Phase 7 已验收链路。
-- [ ] 默认配置下 OpenCV / YOLO 都可运行。
-- [ ] 配置错误时程序不崩溃。
-- [ ] 验收报告记录残留限制和 Phase 9 建议。
+- [x] 配置化不破坏 Phase 7 已验收链路。
+- [x] 默认配置下 OpenCV / YOLO 都可运行。
+- [x] 配置错误时程序不崩溃。
+- [x] 验收报告记录残留限制和 Phase 9 建议。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- doc\Phase8TODO.md doc\Phase8_视觉任务配置化验收报告.md`
-- [ ] 定向搜索：`rg -n "Phase 8|配置|YOLO|OpenCV|验收" doc\Phase8TODO.md doc\Phase8_视觉任务配置化验收报告.md`
+- [x] 静态检查：`git diff --check -- doc\Phase8TODO.md doc\Phase8_视觉任务配置化验收报告.md`
+- [x] 定向搜索：`rg -n "Phase 8|配置|YOLO|OpenCV|验收" doc\Phase8TODO.md doc\Phase8_视觉任务配置化验收报告.md`
 
 **Commit message**：
 
