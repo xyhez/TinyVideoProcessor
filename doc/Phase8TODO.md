@@ -12,16 +12,17 @@
   - Phase 8.2 Factory 按配置注册已完成。
   - Phase 8.3 YOLO 参数配置化已完成。
   - Phase 8.4 OpenCV 参数配置化已完成。
+  - Phase 8.5 初始化链路代码接入已完成。
 - 未完成：
-  - Phase 8.5 初始化链路接入。
+  - Phase 8.5 有配置 / 无配置 / 非法配置人工运行验收。
   - Phase 8.6 验收报告。
 - 已知风险：
   - 自训练 YOLO 的 labels 文件格式需要保持简单：一行一个类别名。
   - 配置错误不能影响程序启动，只能影响对应 pipeline 激活。
 - 本轮范围：
-  - 新增 Phase 8.4 OpenCV 参数配置化能力。
-  - 不接入 `MultiStreamManager` 初始化链路。
-  - `opencv-contour` 和 `yolo-onnx` 的 `params` 均已能进入各自 pipeline。
+  - 新增 Phase 8.5 初始化链路接入。
+  - 在 `MultiStreamManager` 构造阶段加载 `config/vision_pipelines.json`。
+  - 用配置结果调用 `VisionProcessorFactory::RegisterConfiguredPipelines`。
   - 不编译。
 
 ## 阶段目标
@@ -232,22 +233,24 @@ feat: 支持 OpenCV 轮廓检测参数配置化
 
 **任务清单**：
 
-- [ ] 确认 `VisionPipelineManager` 初始化位置。
-- [ ] 加载 `config/vision_pipelines.json`。
-- [ ] 调用 `RegisterConfiguredPipelines`。
-- [ ] 配置失败时回退默认注册。
-- [ ] 日志记录配置路径和加载结果。
+- [x] 确认 `VisionPipelineManager` 初始化位置。
+- [x] 加载 `config/vision_pipelines.json`。
+- [x] 调用 `RegisterConfiguredPipelines`。
+- [x] 配置失败时回退默认注册。
+- [x] 日志记录配置路径和加载结果。
 
 **验收标准**：
 
+- [x] 程序初始化代码路径使用配置结果注册 pipeline。
+- [x] 配置缺失或非法时 loader 返回默认配置，factory 回退注册默认 pipeline。
 - [ ] 程序启动后 UI pipeline 列表来自配置。
 - [ ] 删除配置文件后仍能看到默认 pipeline。
 - [ ] 配置非法时程序可启动并回退默认 pipeline。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\domain\MultiStreamManager.h src\domain\MultiStreamManager.cpp src\infrastructure\vision\visionconfigloader.h src\infrastructure\vision\visionconfigloader.cpp doc\Phase8TODO.md`
-- [ ] 定向搜索：`rg -n "VisionConfigLoader|vision_pipelines.json|RegisterConfiguredPipelines|RegisterBuiltinPipelines" src doc\Phase8TODO.md`
+- [x] 静态检查：`git diff --check -- src\domain\MultiStreamManager.cpp doc\Phase8TODO.md`
+- [x] 定向搜索：`rg -n "VisionConfigLoader|vision_pipelines.json|RegisterConfiguredPipelines|RegisterBuiltinPipelines|vision config loaded" src doc\Phase8TODO.md`
 - [ ] 人工运行：有配置、无配置、非法配置三种场景启动程序。
 
 **Commit message**：

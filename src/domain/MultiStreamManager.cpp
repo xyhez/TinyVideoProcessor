@@ -3,13 +3,22 @@
 #include <algorithm>
 #include <utility>
 
+#include "tiny_log/Logging.h"
+
+#include "infrastructure/vision/visionconfigloader.h"
 #include "infrastructure/vision/visionpipelinemanager.h"
 #include "infrastructure/vision/visionprocessorfactory.h"
 
 MultiStreamManager::MultiStreamManager(QObject* parent)
     : QObject(parent)
     , visionPipelineManager_(std::make_unique<VisionPipelineManager>()) {
-    VisionProcessorFactory::RegisterBuiltinPipelines(*visionPipelineManager_);
+    const VisionConfigLoader configLoader;
+    const VisionPipelineConfigSet configSet = configLoader.Load();
+    LOG_DEBUG_STREAM() << "MultiStreamManager vision config loaded"
+                       << "path" << configSet.sourcePath
+                       << "usingDefault" << configSet.usingDefault
+                       << "pipelineCount" << configSet.pipelines.size();
+    VisionProcessorFactory::RegisterConfiguredPipelines(*visionPipelineManager_, configSet);
 }
 
 MultiStreamManager::~MultiStreamManager() = default;
