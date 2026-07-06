@@ -51,6 +51,12 @@ float ReadFloatParam(const QJsonObject& params, const QString& key, float defaul
     return value.isDouble() ? static_cast<float>(value.toDouble(defaultValue)) : defaultValue;
 }
 
+double ReadDoubleParam(const QJsonObject& params, const QString& key, double defaultValue)
+{
+    const QJsonValue value = params.value(key);
+    return value.isDouble() ? value.toDouble(defaultValue) : defaultValue;
+}
+
 QString ReadPathParam(const QJsonObject& params, const QString& key, const QString& defaultValue)
 {
     const QJsonValue value = params.value(key);
@@ -74,6 +80,15 @@ YoloPipelineOptions BuildYoloOptions(const VisionPipelineConfig& config)
     return options;
 }
 
+OpenCvContourPipelineOptions BuildOpenCvContourOptions(const VisionPipelineConfig& config)
+{
+    OpenCvContourPipelineOptions options = DefaultOpenCvContourPipelineOptions();
+    const QJsonObject& params = config.params;
+    options.threshold = ReadDoubleParam(params, QStringLiteral("threshold"), options.threshold);
+    options.maxValue = ReadDoubleParam(params, QStringLiteral("maxValue"), options.maxValue);
+    return options;
+}
+
 bool RegisterConfiguredPipeline(const VisionPipelineConfig& config,
                                 VisionPipelineManager& manager)
 {
@@ -83,7 +98,8 @@ bool RegisterConfiguredPipeline(const VisionPipelineConfig& config,
     }
 
     if (config.type == QStringLiteral("opencv-contour")) {
-        manager.RegisterPipeline(std::make_unique<OpenCvContourVisionPipeline>());
+        manager.RegisterPipeline(
+            std::make_unique<OpenCvContourVisionPipeline>(BuildOpenCvContourOptions(config)));
         return true;
     }
 

@@ -6,17 +6,36 @@
 #include "infrastructure/vision/opencvpostprocessors.h"
 #include "infrastructure/vision/opencvpreprocessors.h"
 
+#include <algorithm>
+#include <utility>
+
 namespace {
-constexpr double kDefaultThreshold = 128.0;	///< 默认二值化阈值
-constexpr double kDefaultMaxValue = 255.0;	///< 二值化输出的最大值
 constexpr double kDefaultMinArea = 100.0;	///< 默认最小轮廓面积过滤
 constexpr double kDefaultMaxArea = -1.0;	///< 默认最大轮廓面积，<=0 表示不限制
 const QString kPipelineId = QStringLiteral("opencv-contour");
 const QString kDisplayName = QStringLiteral("OpenCV Contour Detection");
 const QString kType = QStringLiteral("detection");
+
+OpenCvContourPipelineOptions NormalizeOptions(OpenCvContourPipelineOptions options)
+{
+    options.threshold = std::clamp(options.threshold, 0.0, 255.0);
+    options.maxValue = std::clamp(options.maxValue, 0.0, 255.0);
+    return options;
+}
 }
 
-OpenCvContourVisionPipeline::OpenCvContourVisionPipeline() = default;
+OpenCvContourPipelineOptions DefaultOpenCvContourPipelineOptions()
+{
+    OpenCvContourPipelineOptions options;
+    options.threshold = 128.0;
+    options.maxValue = 255.0;
+    return options;
+}
+
+OpenCvContourVisionPipeline::OpenCvContourVisionPipeline(OpenCvContourPipelineOptions options)
+    : options_(NormalizeOptions(std::move(options)))
+{
+}
 
 OpenCvContourVisionPipeline::~OpenCvContourVisionPipeline()
 {
@@ -45,7 +64,9 @@ bool OpenCvContourVisionPipeline::Startup()
     }
 
     preprocessors_.push_back(std::make_unique<OpenCvGrayscale>());
-    preprocessors_.push_back(std::make_unique<OpenCvThreshold>(kDefaultThreshold, kDefaultMaxValue));
+    preprocessors_.push_back(std::make_unique<OpenCvThreshold>(
+        options_.threshold,
+        options_.maxValue));
     analyzer_ = std::make_unique<OpenCvContourAnalyzer>(kPipelineId, kDefaultMinArea, kDefaultMaxArea);
     postprocessors_.push_back(std::make_unique<OpenCvMeasurement>(kPipelineId));
 

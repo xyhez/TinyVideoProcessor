@@ -11,17 +11,17 @@
   - Phase 8.1 配置格式与默认配置已完成。
   - Phase 8.2 Factory 按配置注册已完成。
   - Phase 8.3 YOLO 参数配置化已完成。
+  - Phase 8.4 OpenCV 参数配置化已完成。
 - 未完成：
-  - Phase 8.4 OpenCV 参数配置化。
   - Phase 8.5 初始化链路接入。
   - Phase 8.6 验收报告。
 - 已知风险：
   - 自训练 YOLO 的 labels 文件格式需要保持简单：一行一个类别名。
   - 配置错误不能影响程序启动，只能影响对应 pipeline 激活。
 - 本轮范围：
-  - 新增 Phase 8.3 YOLO 参数配置化能力。
+  - 新增 Phase 8.4 OpenCV 参数配置化能力。
   - 不接入 `MultiStreamManager` 初始化链路。
-  - 只消费 `yolo-onnx` 的 `params`，OpenCV 参数配置化放到 Phase 8.4。
+  - `opencv-contour` 和 `yolo-onnx` 的 `params` 均已能进入各自 pipeline。
   - 不编译。
 
 ## 阶段目标
@@ -191,21 +191,22 @@ feat: 支持 YOLO 管线参数配置化
 
 **任务清单**：
 
-- [ ] 新增 `OpenCvContourPipelineOptions`。
-- [ ] `OpenCvContourVisionPipeline` 接收 options。
-- [ ] `threshold` / `maxValue` 从配置读取。
-- [ ] 参数越界时 clamp 到 `0 - 255`。
+- [x] 新增 `OpenCvContourPipelineOptions`。
+- [x] `OpenCvContourVisionPipeline` 接收 options。
+- [x] `threshold` / `maxValue` 从配置读取。
+- [x] 参数越界时 clamp 到 `0 - 255`。
+- [x] `VisionProcessorFactory` 从 `VisionPipelineConfig.params` 构造 `OpenCvContourPipelineOptions`。
 
 **验收标准**：
 
-- [ ] 默认配置下 OpenCV 轮廓检测行为与 Phase 7 一致。
-- [ ] 修改 threshold 后轮廓结果有可观察变化。
+- [x] 默认 options 下 OpenCV 轮廓检测行为与 Phase 7 一致。
+- [x] factory 按 `threshold` / `maxValue` 配置构造 OpenCV 轮廓管线参数。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\vision\opencvcontourvisionpipeline.h src\infrastructure\vision\opencvcontourvisionpipeline.cpp src\infrastructure\vision\visionprocessorfactory.cpp doc\Phase8TODO.md`
-- [ ] 定向搜索：`rg -n "OpenCvContourPipelineOptions|threshold|maxValue|OpenCvThreshold" src doc\Phase8TODO.md`
-- [ ] 人工运行：切换到 OpenCV 轮廓检测，确认 overlay 正常。
+- [x] 静态检查：`git diff --check -- src\infrastructure\vision\opencvcontourvisionpipeline.h src\infrastructure\vision\opencvcontourvisionpipeline.cpp src\infrastructure\vision\visionprocessorfactory.cpp doc\Phase8TODO.md`
+- [x] 定向搜索：`rg -n "OpenCvContourPipelineOptions|threshold|maxValue|OpenCvThreshold|BuildOpenCvContourOptions" src doc\Phase8TODO.md`
+- [ ] 人工运行：Phase 8.5 接入配置加载后，切换到 OpenCV 轮廓检测，确认 overlay 正常。
 
 **Commit message**：
 

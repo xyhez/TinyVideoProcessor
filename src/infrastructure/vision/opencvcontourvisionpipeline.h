@@ -12,6 +12,16 @@
 #include "infrastructure/vision/ivisionpostprocessor.h"
 
 /**
+ * @brief OpenCvContourPipelineOptions OpenCV 轮廓检测管线构造参数
+ */
+struct OpenCvContourPipelineOptions {
+    double threshold = 128.0;	///< 二值化阈值
+    double maxValue = 255.0;	///< 二值化输出最大值
+};
+
+OpenCvContourPipelineOptions DefaultOpenCvContourPipelineOptions();
+
+/**
  * @brief OpenCvContourVisionPipeline 基于 OpenCV 传统视觉的目标轮廓检测管线
  *
  * 内部组合：
@@ -24,7 +34,7 @@
  */
 class OpenCvContourVisionPipeline : public IVisionPipeline {
 public:
-    OpenCvContourVisionPipeline();
+    explicit OpenCvContourVisionPipeline(OpenCvContourPipelineOptions options = {});
     ~OpenCvContourVisionPipeline() override;
 
     QString Id() const override;
@@ -38,6 +48,7 @@ public:
     bool Run(const VisionFrame& input, VisionResultSet& out) override;
 
 private:
+    OpenCvContourPipelineOptions options_;	///< OpenCV 轮廓检测构造参数
     std::vector<std::unique_ptr<IFramePreprocessor>> preprocessors_;	///< 预处理链
     std::unique_ptr<IVisionAnalyzer> analyzer_;	///< 轮廓分析器
     std::vector<std::unique_ptr<IVisionPostprocessor>> postprocessors_;	///< 后处理链
