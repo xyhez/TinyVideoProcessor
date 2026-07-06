@@ -328,7 +328,9 @@ void MainWindow::CreateConnects() {
             this,
             [this](int index) {
                 const QString id = ui->comboBox_visionPipeline->itemData(index).toString();
-                mediaPlayController_->SetActiveVisionPipeline(id);
+                if (!mediaPlayController_->SetActiveVisionPipeline(id)) {
+                    UpdateVisionPipelineComboBox(mediaPlayController_->ActiveVisionPipelineId());
+                }
             });
 
     connect(ui->checkBox_visionOverlay, &QCheckBox::toggled,
@@ -601,8 +603,9 @@ void MainWindow::InitializeVisionControls() {
 
     const QList<QString> availableIds = mediaPlayController_->AvailableVisionPipelineIds();
     for (const QString& id : availableIds) {
-        // 第一版直接用 id 作为显示名(DisplayName 需要通过 pipeline 拿,后续可扩展)
-        ui->comboBox_visionPipeline->addItem(id, id);
+        ui->comboBox_visionPipeline->addItem(
+            mediaPlayController_->VisionPipelineDisplayName(id),
+            id);
     }
 
     UpdateVisionPipelineComboBox(mediaPlayController_->ActiveVisionPipelineId());

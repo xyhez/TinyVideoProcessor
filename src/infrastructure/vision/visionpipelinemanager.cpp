@@ -111,11 +111,8 @@ bool VisionPipelineManager::SetActivePipeline(const QString& id)
     if (!targetPipeline->Startup()) {
         LOG_WARN_STREAM() << "VisionPipelineManager: pipeline startup failed" << id;
         const QString errorMessage = QString("Pipeline '%1' startup failed").arg(id);
+        emit ActivePipelineChanged(activeId_);
         emit PipelineStartupFailed(id, errorMessage);
-        if (!previousId.isEmpty()) {
-            // 之前有 active,现在被切走,通知 UI 状态变化
-            emit ActivePipelineChanged(activeId_);
-        }
         return false;
     }
 

@@ -376,6 +376,13 @@ public:
     QList<QString> AvailableVisionPipelineIds() const;
 
     /**
+     * @brief VisionPipelineDisplayName 获取指定视觉分析管线的 UI 展示名
+     * @param id 管线 id
+     * @return 展示名；找不到时返回 id
+     */
+    QString VisionPipelineDisplayName(const QString& id) const;
+
+    /**
      * @brief ActiveVisionPipelineId 获取当前激活的视觉分析管线 id
      * @return 空字符串表示未激活
      */

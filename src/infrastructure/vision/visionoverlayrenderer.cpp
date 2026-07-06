@@ -1,6 +1,7 @@
 #include "visionoverlayrenderer.h"
 
 #include <algorithm>
+#include <cmath>
 #include <string>
 
 #include <QByteArray>
@@ -53,24 +54,30 @@ cv::Rect ClampToImage(const QRectF& rect, const cv::Mat& image)
         return cv::Rect(0, 0, 0, 0);
     }
 
-    int x = static_cast<int>(std::floor(rect.left()));
-    int y = static_cast<int>(std::floor(rect.top()));
-    int w = static_cast<int>(std::ceil(rect.width()));
-    int h = static_cast<int>(std::ceil(rect.height()));
+    const int left = static_cast<int>(std::floor(rect.left()));
+    const int top = static_cast<int>(std::floor(rect.top()));
+    const int right = static_cast<int>(std::ceil(rect.left() + rect.width()));
+    const int bottom = static_cast<int>(std::ceil(rect.top() + rect.height()));
 
     const int imageW = image.cols;
     const int imageH = image.rows;
 
-    if (x >= imageW || y >= imageH || x + w <= 0 || y + h <= 0) {
+    if (left >= imageW || top >= imageH || right <= 0 || bottom <= 0) {
         return cv::Rect(0, 0, 0, 0);
     }
 
-    x = std::max(x, 0);
-    y = std::max(y, 0);
-    w = std::min(w, imageW - x);
-    h = std::min(h, imageH - y);
+    const int clippedLeft = std::clamp(left, 0, imageW);
+    const int clippedTop = std::clamp(top, 0, imageH);
+    const int clippedRight = std::clamp(right, 0, imageW);
+    const int clippedBottom = std::clamp(bottom, 0, imageH);
 
-    return cv::Rect(x, y, w, h);
+    const int w = clippedRight - clippedLeft;
+    const int h = clippedBottom - clippedTop;
+    if (w <= 0 || h <= 0) {
+        return cv::Rect(0, 0, 0, 0);
+    }
+
+    return cv::Rect(clippedLeft, clippedTop, w, h);
 }
 
 /**

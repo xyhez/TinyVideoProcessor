@@ -558,6 +558,25 @@ QList<QString> MediaPlayController::AvailableVisionPipelineIds() const {
     return visionManager->AvailablePipelineIds();
 }
 
+QString MediaPlayController::VisionPipelineDisplayName(const QString& id) const {
+    if (!multiStreamManager_) {
+        return id;
+    }
+
+    const auto* visionManager = multiStreamManager_->VisionManager();
+    if (!visionManager) {
+        return id;
+    }
+
+    const IVisionPipeline* pipeline = visionManager->FindPipeline(id);
+    if (!pipeline) {
+        return id;
+    }
+
+    const QString displayName = pipeline->DisplayName();
+    return displayName.isEmpty() ? id : displayName;
+}
+
 QString MediaPlayController::ActiveVisionPipelineId() const {
     if (!multiStreamManager_) {
         return {};
