@@ -52,17 +52,22 @@ cv::Mat OutputAsRows(const cv::Mat& output)
         return {};
     }
 
-    if (output.dims == 2) {
-        return output;
+    cv::Mat source = output;
+    if (source.type() != CV_32F) {
+        output.convertTo(source, CV_32F);
     }
 
-    if (output.dims != 3 || output.size[0] != 1) {
+    if (source.dims == 2) {
+        return source;
+    }
+
+    if (source.dims != 3 || source.size[0] != 1) {
         return {};
     }
 
-    const int dim1 = output.size[1];
-    const int dim2 = output.size[2];
-    cv::Mat raw(dim1, dim2, CV_32F, const_cast<float*>(output.ptr<float>()));
+    const int dim1 = source.size[1];
+    const int dim2 = source.size[2];
+    cv::Mat raw = source.reshape(1, dim1);
 
     if (dim1 < dim2 && dim1 <= 256) {
         cv::Mat transposed;

@@ -16,8 +16,9 @@
   - Phase 7.6.1 VisionProcessingFrameSink + MediaPipeline / MultiStreamManager 接入已完成。
   - Phase 7.6.2 MediaPlayController 暴露 + UI 下拉框接入已完成。
   - Phase 7.7 YOLO 识别管线端到端验收已通过。
-- 未完成：
   - Phase 7 验收报告。
+- 未完成：
+  - 暂无。
 - 已知风险：
   - YOLO / OCR 单帧推理耗时可能明显高于视频帧间隔，第一版仅同步处理 active stream。
   - `IVisionPipeline::Startup()` 可能耗时几秒（加载模型），第一版同步执行可能阻塞 UI，需要 loading 遮罩。
@@ -556,25 +557,25 @@ feat: 接入视觉分析 UI 控制
 - [x] 推理失败时 `Run()` 返回 false，不崩溃。
 - [x] 输出 `VisionResult::pipelineId = "yolo-onnx"`。
 - [x] 每帧记录 `elapsedMs`。
-- [ ] 形成 Phase 7 验收报告。
+- [x] 形成 Phase 7 验收报告。
 
 **验收标准**：
 
-- [ ] UI 下拉框能看到 "YOLO 目标检测" 选项。
+- [x] UI 下拉框能看到 "YOLO ONNX Detection" 选项。
 - [ ] 选中后 Startup 触发模型加载（可能耗时 1-3 秒，UI 显示 loading）。
-- [ ] Startup 成功后 active stream 画面上出现 YOLO 检测框和类别标签。
+- [x] Startup 成功后 active stream 画面上出现 YOLO 检测框和类别标签。
 - [ ] 模型加载失败时 UI 提示错误，回到无 active 状态。
-- [ ] 检测框坐标能正确映射回原始视频分辨率（不是 640x640）。
+- [x] 检测框坐标能正确映射回原始视频分辨率（不是 640x640）。
 - [ ] 切换回 OpenCV 轮廓检测时 YOLO 正确 `Shutdown` 释放显存/内存。
 - [ ] 切换到"关闭"时视觉分析停止，画面恢复原图。
 - [ ] 单帧推理失败不阻断播放。
-- [ ] 检测结果通过 `VisionResultSet` 暴露（未来可用于统计、报警、存储）。
+- [x] 检测结果通过 `VisionResultSet` 暴露（未来可用于统计、报警、存储）。
 
 **测试流程**：
 
-- [ ] 静态检查：`git diff --check -- src\infrastructure\vision\opencvpreprocessors.h src\infrastructure\vision\opencvpreprocessors.cpp src\infrastructure\vision\opencvpostprocessors.h src\infrastructure\vision\opencvpostprocessors.cpp src\infrastructure\vision\yoloonnxanalyzer.h src\infrastructure\vision\yoloonnxanalyzer.cpp src\infrastructure\vision\yolovisionpipeline.h src\infrastructure\vision\yolovisionpipeline.cpp src\infrastructure\vision\visionprocessorfactory.cpp doc\Phase7TODO.md doc\Phase7_多视觉处理器架构验收报告.md`
+- [x] 静态检查：`git diff --check -- src\infrastructure\vision\opencvpreprocessors.h src\infrastructure\vision\opencvpreprocessors.cpp src\infrastructure\vision\opencvpostprocessors.h src\infrastructure\vision\opencvpostprocessors.cpp src\infrastructure\vision\yoloonnxanalyzer.h src\infrastructure\vision\yoloonnxanalyzer.cpp src\infrastructure\vision\yolovisionpipeline.h src\infrastructure\vision\yolovisionpipeline.cpp src\infrastructure\vision\visionprocessorfactory.cpp doc\Phase7TODO.md doc\Phase7_多视觉处理器架构验收报告.md`
 - [x] 定向搜索：`rg -n "YoloVisionPipeline|YoloOnnxAnalyzer|YoloNms|OpenCvLetterbox|OpenCvBgrToRgb|CoordinateMapper|cv::dnn|readNet|forward" src doc\Phase7TODO.md`
-- [ ] 人工运行建议：普通 MP4 播放，切换到 YOLO 目标检测，观察检测框和标签。
+- [x] 人工运行建议：普通 MP4 播放，切换到 YOLO ONNX Detection，观察检测框和标签。
 - [ ] 人工运行建议：反复切换 OpenCV / YOLO / 关闭，确认无崩溃、无泄漏。
 - [ ] 人工运行建议：切换 active stream 后 YOLO 检测跟随。
 - [ ] 人工运行建议：模型文件损坏或缺失时 UI 提示错误。
