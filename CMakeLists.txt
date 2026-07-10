@@ -9,8 +9,14 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+option(TINY_VIDEO_BUILD_TESTS "Build TinyVideoProcessor unit tests" OFF)
+
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets Multimedia OpenGLWidgets)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets Multimedia OpenGLWidgets)
+
+if(TINY_VIDEO_BUILD_TESTS)
+    find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Test)
+endif()
 
 
 # FFmpeg 随项目发布，统一放在 ${PROJECT_SOURCE_DIR}/Lib/ffmpeg
@@ -131,4 +137,11 @@ install(TARGETS modernFFplay
 
 if(QT_VERSION_MAJOR EQUAL 6)
     qt_finalize_executable(modernFFplay)
+endif()
+
+if(TINY_VIDEO_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(Lib/TinyLogLibrary EXCLUDE_FROM_ALL)
+    target_link_libraries(tiny_log PUBLIC Qt${QT_VERSION_MAJOR}::Core)
+    add_subdirectory(tests)
 endif()
