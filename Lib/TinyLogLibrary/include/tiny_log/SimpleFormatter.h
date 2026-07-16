@@ -6,12 +6,11 @@
 
 #include "Formatter.h"
 #include "Level.h"
-#include "detail/TimeUtils.h"
 
 namespace logging {
 
 /**
- * @brief 简单格式：[Level] message [location]
+ * @brief 简单格式：[Level] [location] message
  *
  * 适合控制台输出。
  */
@@ -20,9 +19,7 @@ public:
     std::string Format(const Record& record) override {
         const auto file = std::filesystem::path(record.GetSourceLocation().file).filename().string();
         std::ostringstream oss;
-        oss << "[" << detail::TimeToString(record.GetTime()) << "] "
-            << "[" << record.GetLoggerName() << "] "
-            << "[" << ToString(record.GetLevel()) << "] "
+        oss << "[" << ToString(record.GetLevel()) << "] "
             << "[" << file << ":" << record.GetSourceLocation().line << "] "
             << record.GetMessage();
         return oss.str();

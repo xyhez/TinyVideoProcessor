@@ -4,8 +4,10 @@ void logging::AsyncLogger::Print(Level level,
                  const std::string& message,
                  SourceLocation source_location) {
     // 双层过滤在入队之前做
-    if (!ShouldLog(level))
+    if (!ShouldLog(level)) {
         return;
+    }
+        
     if (level < detail::Registry::GetInstance()->GetGlobalLevel())
         return;
     Record record(level,

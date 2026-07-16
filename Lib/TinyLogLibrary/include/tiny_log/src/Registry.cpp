@@ -9,8 +9,11 @@ namespace logging::detail {
 Registry::Registry() {
     thread_pool_ = std::make_shared<ThreadPool>(ThreadPoolConfig{});
 
-    auto def = std::make_unique<Logger>("default");
+    // 注册默认日志器
+    std::unique_ptr<logging::Logger> def = std::make_unique<Logger>("default");
+    // qt控制台输出
     def->AddSink(std::make_shared<QtSinkMT>());
+    // 滚动文件输出
     def->AddSink(std::make_shared<RotatingFileSinkMT>(
         std::string(TINY_LOG_PROJECT_ROOT) + "/logfile/log.txt", 50000, 3));
     loggers_["default"] = std::move(def);
