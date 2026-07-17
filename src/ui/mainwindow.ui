@@ -122,7 +122,7 @@
        <item>
         <widget class="QLabel" name="label_workspaceMode">
          <property name="text">
-          <string>VIDEO ANALYSIS WORKSPACE</string>
+          <string>等待视频源 · 运行指标 --</string>
          </property>
         </widget>
        </item>
@@ -243,6 +243,9 @@
        </item>
        <item>
         <widget class="QComboBox" name="comboBox_layout">
+         <property name="toolTip">
+          <string>切换多画面网格布局</string>
+         </property>
          <property name="minimumSize">
           <size>
            <width>100</width>
@@ -439,7 +442,7 @@
            <item>
             <widget class="QLabel" name="label_viewportTitle">
              <property name="text">
-              <string>MULTIVIEW MONITOR</string>
+              <string>多画面监看</string>
              </property>
             </widget>
            </item>
@@ -983,6 +986,9 @@
          </item>
          <item>
           <widget class="QPushButton" name="pushButton_fullscreen">
+           <property name="toolTip">
+            <string>进入全屏工作区</string>
+           </property>
            <property name="text">
             <string>全屏</string>
            </property>
