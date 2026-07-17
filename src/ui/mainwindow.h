@@ -12,8 +12,10 @@
 
 #include "application/MediaPlayController.h"
 #include "domain/PlaylistManager.h"
+#include "ui/StreamPresentationState.h"
 
 class MultiViewRenderer;
+class StreamViewportOverlay;
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -131,6 +133,7 @@ private:
     std::unique_ptr<PlaylistManager> playlistManager_ = nullptr;	///< 播放列表管理器
     std::unique_ptr<QTimer> cursorHideTimer_ = nullptr;	///< 全屏鼠标隐藏定时器
     MultiViewRenderer* multiViewRenderer_ = nullptr;	///< 统一多画面渲染器
+    StreamViewportOverlay* streamViewportOverlay_ = nullptr;	///< 多视口只读信息覆盖层
 
     /**
      * @brief UpdatePlaybackControls 根据播放状态更新按钮可用状态
@@ -204,9 +207,14 @@ private:
     void InitializeMultiViewRenderer();
 
     /**
-     * @brief RefreshMultiViewRenderer 同步统一渲染器的布局、slot 和 active stream
+     * @brief RefreshMultiViewRenderer 同步渲染布局、slot、active stream 和只读浮层
      */
     void RefreshMultiViewRenderer();
+
+    /**
+     * @brief RefreshStreamViewportOverlay 同步多视口只读视频源浮层
+     */
+    void RefreshStreamViewportOverlay();
 
     /**
      * @brief CreateMultiViewFrameSinkFactory 创建统一渲染器帧 sink 工厂
@@ -438,6 +446,27 @@ private:
     void RefreshStreamView();
 
     /**
+     * @brief RegisterStreamPresentationMetadata 登记流的稳定 UI 展示元数据
+     * @param id 流 ID
+     * @param displayName 展示名称
+     * @param sourceKind 来源类型
+     * @param isRealtime 是否为实时源
+     */
+    void RegisterStreamPresentationMetadata(
+        MediaPlayController::StreamId id,
+        const QString& displayName,
+        StreamSourceKind sourceKind,
+        bool isRealtime);
+
+    /**
+     * @brief BuildStreamPresentationState 构建一次列表刷新使用的展示快照
+     * @param id 流 ID
+     * @return 不持有媒体对象的只读展示状态
+     */
+    StreamPresentationState BuildStreamPresentationState(
+        MediaPlayController::StreamId id) const;
+
+    /**
      * @brief UpdateStreamControls 根据多路流选择状态更新按钮
      */
     void UpdateStreamControls();
@@ -493,7 +522,8 @@ private:
     bool hasShownGrid4x4CapacityNotice_ = false;	///< 是否已提示 4x4 实验容量风险
     MultiViewLayout multiViewLayout_ = MultiViewLayout::Single;	///< 当前多画面布局
     MediaPlayController::StreamId focusedStreamId_ = MediaPlayController::InvalidStreamId;	///< 当前聚焦流 ID
-    QMap<MediaPlayController::StreamId, QString> streamDisplayNames_;	///< 流显示名称表
+    QMap<MediaPlayController::StreamId, StreamPresentationMetadata>
+        streamPresentationMetadata_;	///< 流展示元数据表，不持有媒体对象
     QMap<MediaPlayController::StreamId, int> streamSlotIndexes_;	///< 流到 slot 的绑定表
 
     /**

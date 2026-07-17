@@ -5,6 +5,8 @@
 #include "infrastructure/rendering/multiviewrenderer.h"
 #include "infrastructure/rendering/singlestreamframesinkadapter.h"
 #include "ui/CameraSettingsDialog.h"
+#include "ui/StreamListItemDelegate.h"
+#include "ui/StreamViewportOverlay.h"
 #include "tiny_log/Logging.h"
 
 #include <QAbstractItemView>
@@ -23,6 +25,66 @@
 #include <QStringList>
 #include <QTimer>
 #include <QUrl>
+#include <QVariant>
+
+namespace {
+
+QString StreamSourceKindDisplayName(StreamSourceKind sourceKind) {
+    switch (sourceKind) {
+    case StreamSourceKind::File:
+        return QStringLiteral("本地文件");
+    case StreamSourceKind::Camera:
+        return QStringLiteral("摄像头");
+    case StreamSourceKind::Rtsp:
+        return QStringLiteral("RTSP");
+    case StreamSourceKind::Unknown:
+        return QStringLiteral("未知来源");
+    }
+    return QStringLiteral("未知来源");
+}
+
+QStringList StreamStatusLabels(const StreamPresentationState& state) {
+    QStringList labels;
+    if (!state.lastError.isEmpty()) {
+        labels.append(QStringLiteral("最近错误"));
+    }
+    if (state.isActiveVideo) {
+        labels.append(QStringLiteral("主画面"));
+    }
+    if (state.isActiveAudio) {
+        labels.append(QStringLiteral("音频输出"));
+    }
+    if (state.isRealtime) {
+        labels.append(QStringLiteral("LIVE"));
+    }
+    if (labels.isEmpty()) {
+        labels.append(QStringLiteral("已加载"));
+    }
+    return labels;
+}
+
+QString StreamPresentationToolTip(const StreamPresentationState& state) {
+    return QStringLiteral(
+        "StreamId: %1\n名称: %2\n来源: %3\nSlot: %4\n状态: %5\n音频轨道: %6\n最近错误: %7")
+        .arg(state.streamId)
+        .arg(state.displayName)
+        .arg(StreamSourceKindDisplayName(state.sourceKind))
+        .arg(state.slotIndex >= 0
+            ? QString::number(state.slotIndex + 1)
+            : QStringLiteral("未绑定"))
+        .arg(StreamStatusLabels(state).join(QStringLiteral("、")))
+        .arg(state.hasAudio ? QStringLiteral("有") : QStringLiteral("无"))
+        .arg(state.lastError.isEmpty() ? QStringLiteral("无") : state.lastError);
+}
+
+QString StreamPresentationAccessibleText(const StreamPresentationState& state) {
+    return QStringLiteral("%1，%2，%3")
+        .arg(state.displayName)
+        .arg(StreamSourceKindDisplayName(state.sourceKind))
+        .arg(StreamStatusLabels(state).join(QStringLiteral("，")));
+}
+
+} // namespace
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -35,6 +97,10 @@ MainWindow::MainWindow(QWidget *parent)
     ui->listWidget_files->setSelectionMode(QAbstractItemView::SingleSelection);
     ui->listWidget_streams->setSelectionMode(QAbstractItemView::SingleSelection);
     ui->listWidget_streams->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    ui->listWidget_streams->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+    ui->listWidget_streams->setUniformItemSizes(true);
+    ui->listWidget_streams->setItemDelegate(
+        new StreamListItemDelegate(ui->listWidget_streams));
     ui->splitter_workspace->setStretchFactor(0, 0);
     ui->splitter_workspace->setStretchFactor(1, 1);
     ui->splitter_workspace->setStretchFactor(2, 0);
@@ -147,15 +213,19 @@ void MainWindow::CreateConnects() {
 
     connect(mediaPlayController_.get(), &MediaPlayController::StreamAdded,
             this, [this](MediaPlayController::StreamId id) {
-                if (!streamDisplayNames_.contains(id)) {
-                    streamDisplayNames_.insert(id, QString("Stream %1").arg(id));
+                if (!streamPresentationMetadata_.contains(id)) {
+                    RegisterStreamPresentationMetadata(
+                        id,
+                        QString("Stream %1").arg(id),
+                        StreamSourceKind::Unknown,
+                        false);
                 }
                 RefreshStreamView();
             });
 
     connect(mediaPlayController_.get(), &MediaPlayController::StreamRemoved,
             this, [this](MediaPlayController::StreamId id) {
-                streamDisplayNames_.remove(id);
+                streamPresentationMetadata_.remove(id);
                 if (multiViewRenderer_) {
                     multiViewRenderer_->DetachStream(id);
                 }
@@ -175,12 +245,26 @@ void MainWindow::CreateConnects() {
 
     connect(mediaPlayController_.get(), &MediaPlayController::StreamErrorOccurred,
             this, [this](MediaPlayController::StreamId id, const QString& message) {
-                const QString streamName = id == MediaPlayController::InvalidStreamId
-                    ? QString("媒体源")
-                    : QString("Stream %1").arg(id);
                 const QString errorMessage = message.isEmpty()
                     ? QString("未知错误")
                     : message;
+                if (id != MediaPlayController::InvalidStreamId
+                    && mediaPlayController_->StreamIds().contains(id)) {
+                    StreamPresentationMetadata& metadata =
+                        streamPresentationMetadata_[id];
+                    if (metadata.displayName.isEmpty()) {
+                        metadata.displayName = QString("Stream %1").arg(id);
+                    }
+                    metadata.lastError = errorMessage;
+                    RefreshStreamView();
+                }
+                const StreamPresentationMetadata metadata =
+                    streamPresentationMetadata_.value(id);
+                const QString streamName = id == MediaPlayController::InvalidStreamId
+                    ? QString("媒体源")
+                    : (metadata.displayName.isEmpty()
+                        ? QString("Stream %1").arg(id)
+                        : metadata.displayName);
                 LOG_WARN_STREAM() << "Stream error:" << id << errorMessage;
                 QMessageBox::warning(this, "媒体流错误", QString("%1：%2").arg(streamName, errorMessage));
             });
@@ -663,6 +747,7 @@ void MainWindow::InitializeMultiViewRenderer() {
     multiViewRenderer_->setObjectName("multiViewRenderer");
     multiViewRenderer_->setMinimumSize(320, 240);
     ui->gridLayout_videoArea->addWidget(multiViewRenderer_, 0, 0, 2, 2);
+    streamViewportOverlay_ = new StreamViewportOverlay(multiViewRenderer_);
 
     connect(multiViewRenderer_, &MultiViewRenderer::StreamClicked,
             this, &MainWindow::ActivateStreamFromView);
@@ -696,6 +781,21 @@ void MainWindow::RefreshMultiViewRenderer() {
     multiViewRenderer_->SetLayout(rendererLayout);
     multiViewRenderer_->SetViewSlots(MultiViewRendererViewSlots());
     multiViewRenderer_->SetActiveStream(mediaPlayController_->ActiveStream());
+    RefreshStreamViewportOverlay();
+}
+
+void MainWindow::RefreshStreamViewportOverlay() {
+    if (!streamViewportOverlay_) {
+        return;
+    }
+
+    QMap<int, StreamPresentationState> states;
+    const QList<MediaPlayController::StreamId> streamIds =
+        mediaPlayController_->StreamIds();
+    for (MediaPlayController::StreamId streamId : streamIds) {
+        states.insert(streamId, BuildStreamPresentationState(streamId));
+    }
+    streamViewportOverlay_->SetPresentationStates(states);
 }
 
 MediaPlayController::FrameSinkFactory MainWindow::CreateMultiViewFrameSinkFactory() const {
@@ -1095,6 +1195,43 @@ void MainWindow::RefreshPlaylistView() {
     ui->pushButton_next->setEnabled(hasPlaylistItem);
 }
 
+void MainWindow::RegisterStreamPresentationMetadata(
+    MediaPlayController::StreamId id,
+    const QString& displayName,
+    StreamSourceKind sourceKind,
+    bool isRealtime) {
+    if (id == MediaPlayController::InvalidStreamId) {
+        return;
+    }
+
+    StreamPresentationMetadata& metadata = streamPresentationMetadata_[id];
+    metadata.displayName = displayName.isEmpty()
+        ? QString("Stream %1").arg(id)
+        : displayName;
+    metadata.sourceKind = sourceKind;
+    metadata.isRealtime = isRealtime;
+}
+
+StreamPresentationState MainWindow::BuildStreamPresentationState(
+    MediaPlayController::StreamId id) const {
+    const StreamPresentationMetadata metadata =
+        streamPresentationMetadata_.value(id);
+
+    StreamPresentationState state;
+    state.streamId = id;
+    state.displayName = metadata.displayName.isEmpty()
+        ? QString("Stream %1").arg(id)
+        : metadata.displayName;
+    state.sourceKind = metadata.sourceKind;
+    state.slotIndex = SlotIndexForStream(id);
+    state.hasAudio = mediaPlayController_->StreamHasAudio(id);
+    state.isActiveVideo = id == mediaPlayController_->ActiveStream();
+    state.isActiveAudio = id == mediaPlayController_->ActiveAudioStream();
+    state.isRealtime = metadata.isRealtime;
+    state.lastError = metadata.lastError;
+    return state;
+}
+
 void MainWindow::RefreshStreamView() {
     const MediaPlayController::StreamId previousSelectedStreamId = SelectedStreamId();
     const QList<MediaPlayController::StreamId> streamIds = mediaPlayController_->StreamIds();
@@ -1108,48 +1245,57 @@ void MainWindow::RefreshStreamView() {
         selectedStreamId = streamIds.first();
     }
 
-    ui->listWidget_streams->clear();
+    QMap<MediaPlayController::StreamId, QListWidgetItem*> existingItems;
+    for (int row = 0; row < ui->listWidget_streams->count(); ++row) {
+        QListWidgetItem* item = ui->listWidget_streams->item(row);
+        bool ok = false;
+        const MediaPlayController::StreamId id =
+            item->data(Qt::UserRole).toInt(&ok);
+        if (ok) {
+            existingItems.insert(id, item);
+        }
+    }
+
+    for (int row = ui->listWidget_streams->count() - 1; row >= 0; --row) {
+        QListWidgetItem* item = ui->listWidget_streams->item(row);
+        bool ok = false;
+        const MediaPlayController::StreamId id =
+            item->data(Qt::UserRole).toInt(&ok);
+        if (!ok || !streamIds.contains(id)) {
+            if (ok) {
+                existingItems.remove(id);
+            }
+            delete ui->listWidget_streams->takeItem(row);
+        }
+    }
+
     QListWidgetItem* selectedItem = nullptr;
     for (MediaPlayController::StreamId id : streamIds) {
-        const bool isActiveStream = id == mediaPlayController_->ActiveStream();
-        const bool isActiveAudio = id == mediaPlayController_->ActiveAudioStream();
-        const bool hasAudio = mediaPlayController_->StreamHasAudio(id);
-        QStringList marks;
-        if (isActiveStream) {
-            marks.append("View");
-        }
-        if (isActiveAudio) {
-            marks.append("Audio");
+        QListWidgetItem* item = existingItems.value(id, nullptr);
+        if (!item) {
+            item = new QListWidgetItem(ui->listWidget_streams);
         }
 
-        const QString displayName = streamDisplayNames_.value(id, QString("Stream %1").arg(id));
-        QString text = QString("#%1").arg(id);
-        const int slotIndex = SlotIndexForStream(id);
-        if (slotIndex >= 0) {
-            text += QString(" [S%1]").arg(slotIndex + 1);
-        }
-        if (!marks.isEmpty()) {
-            text += QString(" [%1]").arg(marks.join(", "));
-        }
-        text += QString(" %1").arg(displayName);
-
-        auto* item = new QListWidgetItem(text, ui->listWidget_streams);
+        const StreamPresentationState state = BuildStreamPresentationState(id);
+        item->setText(state.displayName);
         item->setData(Qt::UserRole, id);
-        item->setToolTip(QString("StreamId: %1\n名称: %2\nSlot: %3\n音频: %4\n显示: %5\n输出音频: %6")
-            .arg(id)
-            .arg(displayName)
-            .arg(slotIndex >= 0 ? QString::number(slotIndex + 1) : QString("未绑定"))
-            .arg(hasAudio ? QString("有") : QString("无"))
-            .arg(isActiveStream ? QString("是") : QString("否"))
-            .arg(isActiveAudio ? QString("是") : QString("否")));
+        item->setData(
+            kStreamPresentationStateRole,
+            QVariant::fromValue(state));
+        item->setData(
+            Qt::AccessibleTextRole,
+            StreamPresentationAccessibleText(state));
+        item->setToolTip(StreamPresentationToolTip(state));
         if (id == selectedStreamId) {
             selectedItem = item;
         }
     }
 
-    if (selectedItem) {
+    if (selectedItem && ui->listWidget_streams->currentItem() != selectedItem) {
         ui->listWidget_streams->setCurrentItem(selectedItem);
         ui->listWidget_streams->scrollToItem(selectedItem);
+    } else if (!selectedItem) {
+        ui->listWidget_streams->clearSelection();
     }
 
     UpdateStreamControls();
@@ -1217,7 +1363,11 @@ void MainWindow::AddMultiStreamFiles() {
         }
 
         BindStreamToVideoSlot(streamId, slotIndex);
-        streamDisplayNames_.insert(streamId, QFileInfo(filePath).fileName());
+        RegisterStreamPresentationMetadata(
+            streamId,
+            QFileInfo(filePath).fileName(),
+            StreamSourceKind::File,
+            false);
     }
 
     RefreshStreamView();
@@ -1273,11 +1423,15 @@ void MainWindow::AddCameraStream() {
     }
 
     BindStreamToVideoSlot(streamId, slotIndex);
-    streamDisplayNames_.insert(streamId, QString("%1 (%2x%3@%4fps)")
-        .arg(options.deviceName)
-        .arg(options.width)
-        .arg(options.height)
-        .arg(options.frameRate));
+    RegisterStreamPresentationMetadata(
+        streamId,
+        QString("%1 (%2x%3@%4fps)")
+            .arg(options.deviceName)
+            .arg(options.width)
+            .arg(options.height)
+            .arg(options.frameRate),
+        StreamSourceKind::Camera,
+        true);
 
     RefreshStreamView();
 
@@ -1348,7 +1502,11 @@ void MainWindow::AddNetworkStream() {
         ? url
         : QString("RTSP %1").arg(parsedUrl.host());
     BindStreamToVideoSlot(streamId, slotIndex);
-    streamDisplayNames_.insert(streamId, displayName);
+    RegisterStreamPresentationMetadata(
+        streamId,
+        displayName,
+        StreamSourceKind::Rtsp,
+        true);
     RefreshStreamView();
 }
 
@@ -1434,7 +1592,11 @@ bool MainWindow::SwitchToPlaylistIndex(int index, bool autoStart) {
     const MediaPlayController::StreamId activeStreamId = mediaPlayController_->ActiveStream();
     if (activeStreamId != MediaPlayController::InvalidStreamId) {
         BindStreamToVideoSlot(activeStreamId, 0);
-        streamDisplayNames_.insert(activeStreamId, item.displayName);
+        RegisterStreamPresentationMetadata(
+            activeStreamId,
+            item.displayName,
+            StreamSourceKind::File,
+            false);
         RefreshStreamView();
     }
     return true;

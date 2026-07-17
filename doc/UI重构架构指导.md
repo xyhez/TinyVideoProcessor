@@ -4,7 +4,7 @@
 
 - 功能名称：Fincept 风格专业视频分析工作台 UI 重构
 - 开发分支：`dev_ui_refactor`
-- 文档状态：方案已确认，Phase 0～Phase 2 已完成静态验收，待进入 Phase 3
+- 文档状态：方案已确认，Phase 0～Phase 4 已完成静态验收，下一阶段为 Phase 5 真实运行指标
 - 适用范围：主窗口、UI 主题、视频源列表、属性面板、播放控制区及其直接展示状态
 - 视觉参考：Fincept Terminal 的深色终端信息架构和状态色用法
 - 原创约束：只参考视觉规律，不复制 Fincept Terminal 的源码、图标、Logo、品牌文字或具体页面
@@ -192,9 +192,12 @@ QSS、列表绘制、状态刷新和画面浮层不得引入高频对象创建�
 ### 7.3 左侧视频源区
 
 - 第一阶段复用现有 `QListWidget`，统一条目文本和选中态。
-- 后续使用 `QStyledItemDelegate` 或独立条目组件绘制名称、来源类型和状态标识。
+- Phase 3 使用 `QStyledItemDelegate` 与 `QListWidgetItem` 自定义数据角色绘制名称、来源类型和状态标识，不为每一路创建独立 QWidget。
+- 列表按 `StreamId` 原位更新条目，保留选择和双击命中，避免 16 路刷新时反复销毁展示控件。
 - 活动视频与活动音频必须使用不同的可识别标志，不能只依赖颜色。
 - 文件播放列表与多路视频源语义应明确；可通过分页、分组或统一媒体源模型逐步收口，但第一阶段不得改变 `PlaylistManager` 行为。
+- 当前 Controller 没有逐流播放状态查询或状态变化信号；Phase 3 不从按钮命令推断第二套播放状态，非活动流只表达“已加载”，逐流播放状态推迟到只读状态边界完成后实现。
+- `StreamErrorOccurred` 没有恢复或清错信号，因此条目只能表达“最近错误”，不能宣称错误仍在持续；元数据随流移除同步清理。
 
 ### 7.4 中央多视频区
 
@@ -389,7 +392,25 @@ struct StreamPresentationState {
 - 活动视频边框。
 - 点击和双击命中。
 
-第一阶段只允许修改活动边框等直接视觉常量。视频标题和状态浮层属于后续独立 Phase，应优先评估 `QPainter` 与原生 OpenGL 混合绘制、独立覆盖层控件两种方案，再决定实现方式。
+Phase 4.1 只修改活动边框、普通边框和槽位底色等直接视觉常量，不调整 framebuffer 坐标、边框宽度、帧上传、shader、宽高比和点击命中。
+
+Phase 4.2 已完成三种浮层方案预研：
+
+| 方案 | 优点 | 主要风险 | 结论 |
+| --- | --- | --- | --- |
+| `QPainter + 原生 OpenGL` 混合绘制 | Qt 官方支持，直接复用 `Viewport::qtRect`，无需额外控件 | 每帧发生 Painter/OpenGL 状态切换；必须严格维护 `beginNativePainting()`/`endNativePainting()` 边界；渲染器需接收 UI 文案 | 可行，但不作为首版 |
+| `StreamViewportOverlay` 透明子控件 | OpenGL 帧路径不变；展示状态留在 UI 层；后续真实指标可低频独立刷新 | 需维护尺寸、层级、透明鼠标穿透，并运行验证不同平台的合成效果 | Phase 4 首选 |
+| OpenGL 字体或文字纹理 | 可完全留在 GPU 绘制链 | 中文字形、缓存、DPI、混合、上下文丢失和 Qt 版本兼容复杂 | 不采用 |
+
+Phase 4.3 新增 UI 层只读覆盖层，作为 `MultiViewRenderer` 子控件存在：
+
+- 覆盖层通过 `MultiViewRenderer::Viewports()` 读取逻辑坐标，不读取 framebuffer 坐标，也不参与视频帧绘制。
+- 覆盖层设置鼠标穿透、无焦点和透明背景；点击与双击继续由渲染器处理。
+- 覆盖层监听渲染器尺寸和显示事件，并在整表刷新时主动置顶；覆盖区域始终使用渲染器逻辑尺寸，生命周期由父子对象关系管理。
+- `MainWindow` 在现有 `RefreshStreamView() -> RefreshMultiViewRenderer()` 链路中整表同步只读展示快照，不新增第二套状态信号链。
+- 首版只显示真实名称、来源、实时源属性、活动视频、活动音频和“最近错误”；缺失项不展示。
+- `LIVE` 只表示实时源类型，“最近错误”只表示历史错误记录；不推断逐流播放状态，不展示伪造 FPS、分辨率、编码或在线状态。
+- 覆盖层不持有媒体对象，不访问 Controller；`MultiViewRenderer` 不依赖 `StreamPresentationState` 或其他 UI 类型。
 
 ### 9.7 状态数据流
 
@@ -698,7 +719,7 @@ rg -n "<关键控件名|函数名|状态字段>" <本 Phase 修改文件>
 
 ### 14.2 进入后续 Phase 前必须确认
 
-- 是否允许在 Phase 4 修改 `MultiViewRenderer`。
+- [x] 已确认允许在 Phase 4 修改 `MultiViewRenderer` 的直接视觉常量；浮层结构保持在 UI 层。
 - 是否允许在 Phase 5 为真实运行指标增加应用层和基础设施层只读接口。
 - 是否需要每个 Phase 编译运行，还是继续只做静态检查。
 - 是否需要保留亮色主题扩展能力；默认本轮只实现深色主题。
@@ -745,3 +766,11 @@ rg -n "<关键控件名|函数名|状态字段>" <本 Phase 修改文件>
 11. Phase 2 使用 `splitter_workspace` 组织左、中、右工作区，子项顺序固定为 `widget_sourcePanel`、`widget_centerPanel`、`widget_inspectorPanel`，中央区域索引保持为 1。
 12. Phase 2 的全屏行为继续沿用整个 `MainWindow` 全屏，不在布局重构阶段引入仅视频区可见的影院模式。
 13. Phase 2 只展示静态工作区标识和现有真实状态；FPS、分辨率、编码、容量等指标继续推迟到 Phase 5 的真实数据接口完成后展示。
+14. Phase 3 使用单个 `QStyledItemDelegate` 绘制紧凑视频源条目，以自定义数据角色传递纯展示状态；Delegate 不访问 Controller，不使用 `setItemWidget()`。
+15. Phase 3 在 UI 层只记录来源类型、是否实时、显示名称和最近错误，不持有媒体源或管线对象；活动视频、活动音频和有无音频每次刷新时从 Controller 读取。
+16. 当前没有可靠逐流播放状态，Phase 3 禁止将 Controller 全局 `PlaybackState` 展示为每一路的播放状态。
+17. 用户已确认进入 Phase 4；多视口边框可修改渲染器直接视觉常量，但保持 2/4 framebuffer 物理像素边框宽度和现有绘制顺序不变。
+18. Phase 4 浮层采用 UI 层透明 `StreamViewportOverlay`，不在 `paintGL()` 中混合文字绘制，也不向基础设施层传递 UI 展示类型。
+19. Phase 4 浮层首版只复用 Phase 3 的可靠展示状态；逐流播放状态、FPS、分辨率和编码继续等待 Phase 5 的只读数据边界。
+20. Phase 4 透明子控件保留 QWidget 默认父内容传播，不使用 `WA_NoSystemBackground` 或 `CompositionMode_Source` 清空整块区域，降低覆盖 QOpenGLWidget 合成内容的风险。
+21. Phase 4 小视口降级顺序为“视频名称优先、来源徽章其次、状态徽章按可用宽高展示”，系统字体增大时不得强行绘制越界内容。

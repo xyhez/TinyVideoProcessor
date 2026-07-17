@@ -29,21 +29,21 @@ constexpr int kSlotBorderWidth = 2;	///< 普通画面槽位边框宽度，单位
 constexpr int kActiveSlotBorderWidth = 4;	///< active stream 画面槽位边框宽度，单位像素
 constexpr qint64 kPerformanceLogIntervalMs = 5000;	///< 多画面渲染性能日志输出间隔，单位毫秒
 
-constexpr float kBackgroundRed = 0.035f;	///< OpenGL 背景色红色通道值
-constexpr float kBackgroundGreen = 0.04f;	///< OpenGL 背景色绿色通道值
-constexpr float kBackgroundBlue = 0.045f;	///< OpenGL 背景色蓝色通道值
-constexpr float kSlotRed = 0.07f;	///< 普通画面槽位底色红色通道值
-constexpr float kSlotGreen = 0.075f;	///< 普通画面槽位底色绿色通道值
-constexpr float kSlotBlue = 0.08f;	///< 普通画面槽位底色蓝色通道值
-constexpr float kEmptySlotRed = 0.055f;	///< 空画面槽位底色红色通道值
-constexpr float kEmptySlotGreen = 0.06f;	///< 空画面槽位底色绿色通道值
-constexpr float kEmptySlotBlue = 0.065f;	///< 空画面槽位底色蓝色通道值
-constexpr float kBorderRed = 0.23f;	///< 普通槽位边框红色通道值
-constexpr float kBorderGreen = 0.25f;	///< 普通槽位边框绿色通道值
-constexpr float kBorderBlue = 0.28f;	///< 普通槽位边框蓝色通道值
-constexpr float kActiveBorderRed = 0.16f;	///< active stream 边框红色通道值
-constexpr float kActiveBorderGreen = 0.48f;	///< active stream 边框绿色通道值
-constexpr float kActiveBorderBlue = 0.92f;	///< active stream 边框蓝色通道值
+constexpr float kBackgroundRed = 0.027451f;	///< 主题背景色 #070A0D 红色通道值
+constexpr float kBackgroundGreen = 0.039216f;	///< 主题背景色 #070A0D 绿色通道值
+constexpr float kBackgroundBlue = 0.050980f;	///< 主题背景色 #070A0D 蓝色通道值
+constexpr float kSlotRed = 0.050980f;	///< 已绑定槽位底色 #0D1217 红色通道值
+constexpr float kSlotGreen = 0.070588f;	///< 已绑定槽位底色 #0D1217 绿色通道值
+constexpr float kSlotBlue = 0.090196f;	///< 已绑定槽位底色 #0D1217 蓝色通道值
+constexpr float kEmptySlotRed = 0.027451f;	///< 空槽位底色 #070A0D 红色通道值
+constexpr float kEmptySlotGreen = 0.039216f;	///< 空槽位底色 #070A0D 绿色通道值
+constexpr float kEmptySlotBlue = 0.050980f;	///< 空槽位底色 #070A0D 蓝色通道值
+constexpr float kBorderRed = 0.125490f;	///< 普通槽位弱边框 #202A33 红色通道值
+constexpr float kBorderGreen = 0.164706f;	///< 普通槽位弱边框 #202A33 绿色通道值
+constexpr float kBorderBlue = 0.200000f;	///< 普通槽位弱边框 #202A33 蓝色通道值
+constexpr float kActiveBorderRed = 0.960784f;	///< active stream 强调边框 #F59E0B 红色通道值
+constexpr float kActiveBorderGreen = 0.619608f;	///< active stream 强调边框 #F59E0B 绿色通道值
+constexpr float kActiveBorderBlue = 0.043137f;	///< active stream 强调边框 #F59E0B 蓝色通道值
 
 struct YuvPlaneUpload {
     const uchar* data = nullptr;

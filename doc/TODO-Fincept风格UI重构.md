@@ -5,10 +5,10 @@
 - 开发分支：`dev_ui_refactor`
 - 基准分支：`dev`
 - 架构文档：`doc/UI重构架构指导.md`
-- 已完成：Phase 0 文档基线、Phase 1 主题基础和 Phase 2 主窗口五区布局均已完成静态验收。
-- 当前阶段：第一里程碑已完成，下一阶段为 Phase 3 视频源列表与状态表达。
-- 本轮范围：完成原创深色主题、应用级主题接入、终端式五区工作台布局及其兼容性静态检查。
-- 未完成：视频源条目增强、多视口浮层、真实运行指标、关联对话框和最终运行验收。
+- 已完成：Phase 0～Phase 4 已完成静态验收，包括文档基线、全局主题、五区布局、紧凑视频源状态条目和多视口视觉融合。
+- 当前阶段：Phase 4 已静态完成；下一阶段为 Phase 5 真实运行指标，进入前需确认只读指标边界。
+- 本轮范围：只修改 `MultiViewRenderer` 的直接视觉常量及 `MainWindow` 到 UI 覆盖层的只读展示数据同步，未修改解码、同步、Controller、流生命周期和点击语义。
+- 未完成：真实运行指标、关联对话框和最终运行验收。
 - 默认验证方式：静态检查；不编译、不运行，除非用户明确要求。
 
 ## 2. 已知风险
@@ -76,6 +76,8 @@
 - 新增顶部和右侧容器后，必须重新检查全屏鼠标活动事件过滤范围。
 - `splitter_workspace` 的 0/1/2 索引分别对应左侧资源区、中央视频区和右侧检查器；后续调整子项顺序时必须同步检查伸缩因子代码。
 - 当前全屏行为是整个 `MainWindow` 全屏，布局重构不改变这一既有语义；仅显示视频区的影院模式属于额外功能。
+- Controller 仅有全局 `PlaybackState`，没有逐流播放状态 getter 或信号；Phase 3 不得把全局状态冒充为每一路状态。
+- `StreamErrorOccurred` 没有恢复通知；列表只标记“最近错误”，并在流移除时清理，不能声称当前仍处于错误状态。
 
 ---
 
@@ -321,13 +323,13 @@
 
 ## 7. Phase 3：视频源列表与状态表达
 
-### [ ] Phase 3.1：定义 Presentation Layer 展示状态
+### [x] Phase 3.1：定义 Presentation Layer 展示状态
 
 - 目标：在不复制领域状态的前提下整理视频源列表所需的只读展示字段。
 - 修改文件：
   - `src/ui/mainwindow.h`
   - `src/ui/mainwindow.cpp`
-  - 或经评估后新增的 `src/ui/StreamPresentationState.h`
+  - `src/ui/StreamPresentationState.h`，新增
 - 验收标准：
   - 展示状态只包含 UI 所需值，不持有媒体对象。
   - 所有值来自现有 Controller 或 UI 已有映射。
@@ -343,22 +345,24 @@
   - 保持列表展示状态不拥有媒体对象
   ```
 
-### [ ] Phase 3.2：实现紧凑视频源条目
+### [x] Phase 3.2：实现紧凑视频源条目
 
 - 目标：通过委托或轻量条目组件显示名称、类型和状态。
 - 修改文件：
-  - 经预研确定的 `src/ui` 展示组件文件
+  - `src/ui/StreamListItemDelegate.h`，新增
+  - `src/ui/StreamListItemDelegate.cpp`，新增
   - `src/ui/mainwindow.cpp`
 - 验收标准：
-  - 活动视频、活动音频、LIVE、播放和错误状态可区分。
+  - 活动视频、活动音频、LIVE、已加载和最近错误状态可区分。
   - 状态同时使用文字或图标，不只依赖颜色。
-  - 16 路刷新无明显额外对象抖动。
+  - Delegate 不访问 Controller，不创建逐行 QWidget；16 路刷新按 StreamId 原位更新。
+  - 逐流播放状态明确推迟到应用层只读状态边界具备后实现，不展示推断值。
 - 测试流程：
   1. 静态检查委托不访问 Controller。
   2. 人工验证不同来源和状态组合。
 - Commit message：与 Phase 3.1 合并提交。
 
-### [ ] Phase 3.3：视频源交互回归检查
+### [x] Phase 3.3：视频源交互静态回归检查
 
 - 目标：确认选中、双击、移除、活动视频和活动音频行为不退化。
 - 修改文件：
@@ -368,15 +372,28 @@
   - 双击行为继续按现有语义激活视频。
   - 移除活动流后 UI 状态正确回收。
 - 测试流程：
-  1. 对至少四路混合来源重复执行选择和移除。
-  2. 验证活动视频与活动音频标志独立。
+  1. 静态检查选择、双击、移除、活动视频和活动音频连接未改变。
+  2. 用户要求运行时，对至少四路混合来源重复执行选择、激活和移除。
+  3. 运行验证活动视频与活动音频标志独立。
 - Commit message：与 Phase 3.1 合并提交。
+
+静态验收记录（2026-07-17）：
+
+- 新增纯展示 `StreamPresentationState`/`StreamPresentationMetadata`，仅保存名称、来源类型、实时属性和最近错误，不持有媒体对象。
+- 新增单个 `QStyledItemDelegate` 绘制来源、主画面、音频、LIVE、已加载和最近错误文字徽章；Delegate 不访问 Controller，也不创建逐行 QWidget。
+- `RefreshStreamView()` 已由整表清空重建改为按 `StreamId` 原位更新，`Qt::UserRole` 继续保存 StreamId，选择只在原条目失效时回退并滚动。
+- 本地文件、播放列表切换、摄像头和 RTSP 四条成功创建路径均登记来源；`StreamRemoved` 同步清理展示元数据。
+- 活动视频、活动音频和有无音频仍从 Controller 实时读取；没有逐流接口的播放状态未被推断或展示。
+- `StreamErrorOccurred` 只记录有效流的“最近错误”，无效 StreamId 不绑定列表，错误元数据随流移除清理。
+- 选择、`currentRowChanged`、双击激活、移除、设为主画面和设为音频源的原有连接未改变。
+- `git diff --check` 无错误；新增/修改文件无行尾空白，Delegate 与主窗口花括号数量平衡。
+- 按默认开发规范未编译、未运行；窄侧栏、高 DPI、错误触发和 16 路刷新仍需后续人工验收。
 
 ---
 
 ## 8. Phase 4：多视口视觉融合
 
-### [ ] Phase 4.1：统一多视口边框主题
+### [x] Phase 4.1：统一多视口边框主题
 
 - 目标：将活动视频和普通槽位边框调整为新主题语义色。
 - 修改文件：
@@ -396,7 +413,7 @@
   - 保持多布局和宽高比计算不变
   ```
 
-### [ ] Phase 4.2：预研视频信息浮层方案
+### [x] Phase 4.2：预研视频信息浮层方案
 
 - 目标：在 `QPainter + 原生 OpenGL` 与独立覆盖层控件之间选择安全方案。
 - 修改文件：
@@ -407,11 +424,22 @@
 - 测试流程：评审绘制顺序、DPI、点击命中和生命周期。
 - Commit message：与 Phase 4.1 分开提交预研文档。
 
-### [ ] Phase 4.3：实现真实可用的视频浮层
+预研决策（2026-07-17）：
+
+- `QPainter + 原生 OpenGL` 混合绘制可行，但每帧需要 Painter/OpenGL 状态切换，并会扩大渲染器展示接口和 16 路性能验收范围。
+- OpenGL 字体/纹理方案涉及中文字形、DPI、混合和上下文生命周期，首版不采用。
+- 采用 UI 层透明 `StreamViewportOverlay` 子控件：通过 `Viewports()` 使用逻辑坐标，设置鼠标穿透和无焦点，保持 OpenGL 帧路径与命中逻辑不变。
+- 覆盖层由 `MainWindow` 在现有刷新链路中整表传入 `StreamPresentationState`；渲染器不依赖 UI 类型。
+- 用户已确认进入 Phase 4，按该最小边界继续 Phase 4.3；跨平台层叠、缩放和高 DPI 仍列入运行验收。
+
+### [x] Phase 4.3：实现真实可用的视频浮层
 
 - 目标：显示现有可获得的视频名称和状态，后续接入真实指标。
 - 修改文件：
-  - 根据 Phase 4.2 决策确定的最小文件范围
+  - `src/ui/StreamViewportOverlay.h`，新增
+  - `src/ui/StreamViewportOverlay.cpp`，新增
+  - `src/ui/mainwindow.h`
+  - `src/ui/mainwindow.cpp`
 - 验收标准：
   - 浮层不影响帧绘制、点击、双击和宽高比。
   - 缺失数据使用 `--` 或不展示。
@@ -419,6 +447,19 @@
   1. 验证 Single、2x2、3x3、4x4。
   2. 验证 DPI、缩放、聚焦和空槽位。
 - Commit message：与 Phase 4.1 合并或按方案独立提交。
+
+静态验收记录（2026-07-17）：
+
+- `MultiViewRenderer` 只调整 15 个 RGB 常量：背景/空槽位 `#070A0D`、已绑定槽位 `#0D1217`、普通边框 `#202A33`、活动边框 `#F59E0B`；2/4 framebuffer 物理像素宽度和全部绘制函数未改变。
+- 新增 UI 层 `StreamViewportOverlay`，作为渲染器子控件使用 `Viewport::qtRect` 逻辑坐标绘制，不读取 framebuffer 坐标，不修改 `paintGL()` 或 OpenGL 状态。
+- 覆盖层设置鼠标穿透和无焦点，父对象负责生命周期；Resize/Show 事件同步几何，整表状态刷新时主动置顶和重绘。
+- 浮层只显示现有名称、FILE/CAM/RTSP、LIVE 实时源属性、主画面、活动音频和最近错误；未展示逐流播放状态、FPS、分辨率、编码或在线状态。
+- `MainWindow` 复用 `BuildStreamPresentationState()`，在既有 `RefreshStreamView() -> RefreshMultiViewRenderer()` 链路中整表更新；添加、移除、活动视频、活动音频、错误、布局和聚焦路径均会刷新。
+- 4x4 窄视口下优先保留省略后的视频名称，空间不足时隐藏来源徽章；标题高度按实际字体度量，状态徽章不足空间时不绘制。
+- 默认 QWidget 父内容传播负责透明区域，覆盖层不使用 `CompositionMode_Source` 清屏，避免覆盖 QOpenGLWidget 已合成的视频内容。
+- 基础设施层没有依赖 `StreamPresentationState` 或浮层类型；新增文件由现有 `GLOB_RECURSE CONFIGURE_DEPENDS` 自动收录，无需修改 CMake。
+- `git diff --check` 无错误；相关新增/修改文件无行尾空白，花括号和圆括号数量平衡。
+- 按默认开发规范未编译、未运行；透明层叠、连续帧、最小化恢复、全屏、跨屏 DPI、100%/125%/150% 缩放和四种布局仍需后续人工验收。
 
 ---
 
