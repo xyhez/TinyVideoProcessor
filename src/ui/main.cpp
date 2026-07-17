@@ -1,4 +1,5 @@
 ﻿#include "ui/mainwindow.h"
+#include "ui/theme/UiTheme.h"
 #include "tiny_log/Logging.h"
 
 #include <QApplication>
@@ -12,6 +13,7 @@
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
+    UiTheme::Apply(a);
     logging::SetGlobalLevel(logging::Level::Trace);
     logging::GetDefaultLogger()->SetLevel(logging::Level::Trace);
     LOG_INFO("TinyVideoProcessor started");

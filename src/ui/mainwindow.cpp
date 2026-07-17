@@ -31,19 +31,14 @@ MainWindow::MainWindow(QWidget *parent)
     , playlistManager_(std::make_unique<PlaylistManager>())
 {
     ui->setupUi(this);
-    this->setWindowTitle("modernFFplay-V2.0");
+    this->setWindowTitle("TinyVideoProcessor");
     ui->listWidget_files->setSelectionMode(QAbstractItemView::SingleSelection);
     ui->listWidget_streams->setSelectionMode(QAbstractItemView::SingleSelection);
     ui->listWidget_streams->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    ui->splitter_workspace->setStretchFactor(0, 0);
+    ui->splitter_workspace->setStretchFactor(1, 1);
+    ui->splitter_workspace->setStretchFactor(2, 0);
     setMouseTracking(true);
-    ui->centralwidget->setMouseTracking(true);
-    ui->widget_func->setMouseTracking(true);
-    ui->listWidget_files->setMouseTracking(true);
-    ui->listWidget_streams->setMouseTracking(true);
-    ui->centralwidget->installEventFilter(this);
-    ui->widget_func->installEventFilter(this);
-    ui->listWidget_files->installEventFilter(this);
-    ui->listWidget_streams->installEventFilter(this);
     InitializeVideoArea();
     InitializePlayModeComboBox();
     InitializeVolumeControls();
@@ -55,12 +50,22 @@ MainWindow::MainWindow(QWidget *parent)
     InitializeMultiViewRenderer();
     InitializeMultiViewLayout();
 
+    ui->centralwidget->setMouseTracking(true);
+    ui->centralwidget->installEventFilter(this);
+    const auto childWidgets = ui->centralwidget->findChildren<QWidget*>();
+    for (QWidget* widget : childWidgets) {
+        widget->setMouseTracking(true);
+        widget->installEventFilter(this);
+    }
+
     CreateConnects();
+    ui->statusbar->showMessage("正在初始化...");
 
     QString filepath = "../../resource/动物发现自己被绿.mp4";
     playlistManager_->AddFile(filepath);
     if (!SwitchToPlaylistIndex(playlistManager_->CurrentIndex(), false)) {
         LOG_CRITICAL_STREAM() << "Controller initialization failed";
+        ui->statusbar->showMessage("初始化失败");
         return;
     }
 
@@ -491,6 +496,18 @@ void MainWindow::UpdatePlaybackControls(MediaPlayController::PlaybackState state
     ui->pushButton_pause->setEnabled(playing);
     ui->pushButton_prev->setEnabled(hasPlaylistItem);
     ui->pushButton_next->setEnabled(hasPlaylistItem);
+
+    switch (state) {
+    case MediaPlayController::PlaybackState::Playing:
+        ui->statusbar->showMessage("播放中");
+        break;
+    case MediaPlayController::PlaybackState::Paused:
+        ui->statusbar->showMessage("已暂停");
+        break;
+    case MediaPlayController::PlaybackState::Stopped:
+        ui->statusbar->showMessage("就绪 · 已停止");
+        break;
+    }
 }
 
 void MainWindow::OpenFile() {
