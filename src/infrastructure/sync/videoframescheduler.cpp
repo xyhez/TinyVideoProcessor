@@ -66,8 +66,6 @@ void VideoFrameScheduler::Start()
 
     running_.store(true);
     hasPreviewPresentedPts_ = false;
-    rendered_.store(0);
-    dropped_.store(0);
     QTimer::singleShot(0, this, &VideoFrameScheduler::Tick);
 }
 
@@ -110,6 +108,17 @@ void VideoFrameScheduler::ClearOutputFrame()
     if (frameSink_) {
         frameSink_->ClearFrame();
     }
+}
+
+VideoFrameScheduler::RuntimeMetricsSnapshot VideoFrameScheduler::RuntimeMetrics() const
+{
+    RuntimeMetricsSnapshot snapshot;
+    snapshot.submittedFrames = submittedFrames_.load();
+    snapshot.schedulerDroppedFrames = schedulerDroppedFrames_.load();
+    snapshot.frameWidth = submittedFrameWidth_.load();
+    snapshot.frameHeight = submittedFrameHeight_.load();
+    snapshot.running = running_.load();
+    return snapshot;
 }
 
 void VideoFrameScheduler::Tick()
@@ -220,7 +229,7 @@ bool VideoFrameScheduler::DropLateFrame()
         return false;
     }
 
-    dropped_.fetch_add(1);
+    schedulerDroppedFrames_.fetch_add(1);
     return true;
 }
 
@@ -250,7 +259,7 @@ bool VideoFrameScheduler::DropPreviewRateLimitedFrame(SYNCTYPE syncType)
     }
 
     RefreshVideoClockIfNeeded(drop.get(), syncType);
-    dropped_.fetch_add(1);
+    schedulerDroppedFrames_.fetch_add(1);
     return true;
 }
 
@@ -292,8 +301,12 @@ void VideoFrameScheduler::PresentDisplayableFrame(AVFramePtr frame)
     }
 
     RememberPreviewPresentedFrame(frame.get());
+    const int frameWidth = frame->width;
+    const int frameHeight = frame->height;
     frameSink_->PresentFrame(std::move(frame));
-    rendered_.fetch_add(1);
+    submittedFrameWidth_.store(frameWidth);
+    submittedFrameHeight_.store(frameHeight);
+    submittedFrames_.fetch_add(1);
 }
 
 void VideoFrameScheduler::ScheduleNextFrame(int delayMs)

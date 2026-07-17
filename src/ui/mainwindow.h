@@ -2,12 +2,14 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QElapsedTimer>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPropertyAnimation>
 #include <QLabel>
 #include <QTimer>
 #include <QMap>
+#include <cstdint>
 #include <memory>
 
 #include "application/MediaPlayController.h"
@@ -119,6 +121,14 @@ private slots:
 
 private:
     static constexpr int kMaxVideoSlotCount = 16;	///< 主窗口支持的最大逻辑视频 slot 数
+    static constexpr int kRuntimeMetricsIntervalMs = 1000;	///< 运行指标整表采样周期
+    static constexpr int kMinimumRuntimeMetricsSampleMs = 500;	///< 可用于速率换算的最短采样窗口
+
+    struct StreamRuntimeMetricBaseline {
+        std::uint64_t submittedFrames = 0;
+        std::uint64_t schedulerDroppedFrames = 0;
+        qint64 capturedElapsedMs = 0;
+    };
 
     enum class MultiViewLayout {
         Single,
@@ -132,6 +142,9 @@ private:
     std::unique_ptr<MediaPlayController> mediaPlayController_ = nullptr;	///< 播放控制器
     std::unique_ptr<PlaylistManager> playlistManager_ = nullptr;	///< 播放列表管理器
     std::unique_ptr<QTimer> cursorHideTimer_ = nullptr;	///< 全屏鼠标隐藏定时器
+    std::unique_ptr<QTimer> runtimeMetricsTimer_ = nullptr;	///< 运行指标唯一低频采样定时器
+    QElapsedTimer runtimeMetricsElapsed_;	///< 指标采样实际时间基
+    QLabel* runtimeContextLabel_ = nullptr;	///< 状态栏工作上下文摘要
     MultiViewRenderer* multiViewRenderer_ = nullptr;	///< 统一多画面渲染器
     StreamViewportOverlay* streamViewportOverlay_ = nullptr;	///< 多视口只读信息覆盖层
 
@@ -190,6 +203,26 @@ private:
      * @brief InitializeCursorHideTimer 初始化全屏鼠标隐藏定时器
      */
     void InitializeCursorHideTimer();
+
+    /**
+     * @brief InitializeRuntimeMetrics 初始化低频运行指标展示链路
+     */
+    void InitializeRuntimeMetrics();
+
+    /**
+     * @brief RefreshRuntimeMetrics 拉取一次整表快照并计算采样窗口指标
+     */
+    void RefreshRuntimeMetrics();
+
+    /**
+     * @brief UpdateRuntimeMetricLabels 使用缓存刷新顶部、右侧和状态栏摘要
+     */
+    void UpdateRuntimeMetricLabels();
+
+    /**
+     * @brief StopRuntimeMetrics 停止采样并清理所有流指标缓存
+     */
+    void StopRuntimeMetrics();
 
     /**
      * @brief InitializeVideoArea 初始化主视频显示区域事件状态
@@ -524,6 +557,10 @@ private:
     MediaPlayController::StreamId focusedStreamId_ = MediaPlayController::InvalidStreamId;	///< 当前聚焦流 ID
     QMap<MediaPlayController::StreamId, StreamPresentationMetadata>
         streamPresentationMetadata_;	///< 流展示元数据表，不持有媒体对象
+    QMap<MediaPlayController::StreamId, StreamRuntimePresentationMetrics>
+        streamRuntimeMetrics_;	///< UI 低频运行指标展示表
+    QMap<MediaPlayController::StreamId, StreamRuntimeMetricBaseline>
+        streamRuntimeMetricBaselines_;	///< 累计计数采样基线
     QMap<MediaPlayController::StreamId, int> streamSlotIndexes_;	///< 流到 slot 的绑定表
 
     /**

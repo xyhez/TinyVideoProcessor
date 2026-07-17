@@ -254,6 +254,32 @@ bool MediaPipeline::IsInitialized() const
            positionTimer_ && demuxerTH_ && VdecoderTH_;
 }
 
+MediaPipeline::RuntimeMetricsSnapshot MediaPipeline::RuntimeMetrics() const
+{
+    RuntimeMetricsSnapshot snapshot;
+    snapshot.initialized = IsInitialized();
+    snapshot.frameWidth = sourceVideoWidth_;
+    snapshot.frameHeight = sourceVideoHeight_;
+    snapshot.videoCodecId = sourceVideoCodecId_;
+    snapshot.imageProcessingEnabled = IsImageProcessingEnabled();
+    snapshot.visionAnalysisActive = IsVisionActive();
+
+    if (!videoFrameScheduler_) {
+        return snapshot;
+    }
+
+    const VideoFrameScheduler::RuntimeMetricsSnapshot schedulerMetrics =
+        videoFrameScheduler_->RuntimeMetrics();
+    snapshot.submittedFrames = schedulerMetrics.submittedFrames;
+    snapshot.schedulerDroppedFrames = schedulerMetrics.schedulerDroppedFrames;
+    snapshot.schedulerRunning = schedulerMetrics.running;
+    if (schedulerMetrics.frameWidth > 0 && schedulerMetrics.frameHeight > 0) {
+        snapshot.frameWidth = schedulerMetrics.frameWidth;
+        snapshot.frameHeight = schedulerMetrics.frameHeight;
+    }
+    return snapshot;
+}
+
 void MediaPipeline::SetPlaybackSpeed(double speed)
 {
     if (audioplay_) {
@@ -350,6 +376,11 @@ bool MediaPipeline::CreatePipelineResources(std::shared_ptr<IMediaSource> mediaS
     demuxer_ = std::make_unique<Demuxer>(mediaSource_, APacket_, VPacket_, AFrame_, VFrame_);
 
     const Fileinfo& sourceInfo = mediaSource_->GetSourceInfo();
+    sourceVideoWidth_ = std::max(0, sourceInfo.width_);
+    sourceVideoHeight_ = std::max(0, sourceInfo.height_);
+    sourceVideoCodecId_ = sourceInfo.videoCodecId_ != AV_CODEC_ID_NONE
+        ? sourceInfo.videoCodecId_
+        : sourceInfo.CodecId_;
     const bool hasAudio = sourceInfo.hasAudio_;
     if (hasAudio) {
         APacket_ = std::make_shared<SyncQueue<AVPacketPtr>>(kPacketQueueMax);
@@ -552,6 +583,9 @@ void MediaPipeline::ReleaseResources()
         mediaSource_->Close();
     }
     mediaSource_.reset();
+    sourceVideoWidth_ = 0;
+    sourceVideoHeight_ = 0;
+    sourceVideoCodecId_ = AV_CODEC_ID_NONE;
     positionTimer_.reset();
     LOG_DEBUG("MediaPipeline release resources finished");
 }

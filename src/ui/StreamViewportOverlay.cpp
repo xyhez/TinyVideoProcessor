@@ -8,6 +8,7 @@
 #include <QPaintEvent>
 #include <QPainter>
 #include <QPalette>
+#include <QStringList>
 #include <QVector>
 #include <QtGlobal>
 
@@ -22,6 +23,8 @@ constexpr int kBadgeSpacing = 4;
 constexpr int kMinimumViewportWidth = 72;
 constexpr int kMinimumViewportHeight = 44;
 constexpr int kMinimumTitleWidth = 24;
+constexpr int kMinimumMetricsViewportWidth = 160;
+constexpr int kMinimumMetricsViewportHeight = 96;
 
 struct StatusBadge {
     QString text;
@@ -70,6 +73,20 @@ int BadgeWidth(const QFontMetrics& metrics, const QString& text) {
     return metrics.horizontalAdvance(text) + kBadgeHorizontalPadding * 2;
 }
 
+QString RuntimeMetricText(const StreamPresentationState& state) {
+    QStringList parts;
+    if (state.runtimeMetrics.hasFrameSize) {
+        parts.append(QStringLiteral("%1×%2")
+                         .arg(state.runtimeMetrics.frameWidth)
+                         .arg(state.runtimeMetrics.frameHeight));
+    }
+    if (state.runtimeMetrics.hasPreviewFps) {
+        parts.append(QStringLiteral("%1 FPS")
+                         .arg(state.runtimeMetrics.previewFps, 0, 'f', 1));
+    }
+    return parts.join(QStringLiteral(" · "));
+}
+
 void DrawBadge(QPainter& painter,
                const QRect& rect,
                const QString& text,
@@ -81,15 +98,40 @@ void DrawBadge(QPainter& painter,
     painter.drawText(rect, Qt::AlignCenter, text);
 }
 
-void DrawTitlePanel(QPainter& painter,
-                    const QRect& viewportRect,
-                    const StreamPresentationState& state,
-                    const QPalette& palette) {
-    QFont titleFont = painter.font();
+int DrawTitlePanel(QPainter& painter,
+                   const QRect& viewportRect,
+                   const StreamPresentationState& state,
+                   const QPalette& palette) {
+    const QFont bodyFont = painter.font();
+    QFont titleFont = bodyFont;
     titleFont.setBold(true);
     painter.setFont(titleFont);
     const QFontMetrics titleMetrics(titleFont);
-    const int panelHeight = titleMetrics.height() + kPanelVerticalPadding * 2;
+    const QFontMetrics bodyMetrics(bodyFont);
+    const QString metricText = RuntimeMetricText(state);
+    QFont statusFont = bodyFont;
+    statusFont.setBold(true);
+    const QFontMetrics statusMetrics(statusFont);
+    const bool hasStatusBadges = !BuildStatusBadges(state, palette).isEmpty();
+    const int metricsPanelHeight = titleMetrics.height()
+        + kPanelSpacing
+        + bodyMetrics.height()
+        + kPanelVerticalPadding * 2;
+    const int metricsAndStatusRequiredHeight = kViewportInset
+        + metricsPanelHeight
+        + (hasStatusBadges
+            ? kPanelSpacing + statusMetrics.height() + kPanelVerticalPadding * 2
+            : 0)
+        + kViewportInset;
+    const bool showMetrics = !metricText.isEmpty()
+        && viewportRect.width() >= kMinimumMetricsViewportWidth
+        && viewportRect.height() >= kMinimumMetricsViewportHeight
+        && viewportRect.height() >= metricsAndStatusRequiredHeight;
+    const int metricHeight = showMetrics
+        ? kPanelSpacing + bodyMetrics.height()
+        : 0;
+    const int panelHeight =
+        titleMetrics.height() + metricHeight + kPanelVerticalPadding * 2;
     const QRect panelRect(
         viewportRect.left() + kViewportInset,
         viewportRect.top() + kViewportInset,
@@ -97,7 +139,7 @@ void DrawTitlePanel(QPainter& painter,
         panelHeight);
     if (panelRect.width() <= kPanelHorizontalPadding * 2
         || panelRect.bottom() > viewportRect.bottom() - kViewportInset) {
-        return;
+        return viewportRect.top();
     }
 
     const QColor background = WithAlpha(palette.color(QPalette::Window), 210);
@@ -144,12 +186,32 @@ void DrawTitlePanel(QPainter& painter,
             state.displayName,
             Qt::ElideRight,
             titleRect.width()));
+
+    if (showMetrics) {
+        painter.setFont(bodyFont);
+        painter.setPen(palette.color(QPalette::Link));
+        const QRect metricRect(
+            contentRect.left(),
+            contentRect.bottom() + kPanelSpacing + 1,
+            contentRect.width(),
+            bodyMetrics.height());
+        painter.drawText(
+            metricRect,
+            Qt::AlignLeft | Qt::AlignVCenter,
+            bodyMetrics.elidedText(
+                metricText,
+                Qt::ElideRight,
+                metricRect.width()));
+    }
+
+    return panelRect.bottom();
 }
 
 void DrawStatusPanel(QPainter& painter,
                      const QRect& viewportRect,
                      const StreamPresentationState& state,
-                     const QPalette& palette) {
+                     const QPalette& palette,
+                     int titlePanelBottom) {
     const QVector<StatusBadge> badges = BuildStatusBadges(state, palette);
     if (badges.isEmpty()) {
         return;
@@ -184,8 +246,6 @@ void DrawStatusPanel(QPainter& painter,
 
     int x = viewportRect.left() + kViewportInset;
     const int y = viewportRect.bottom() - kViewportInset - badgeHeight + 1;
-    const int titlePanelBottom =
-        viewportRect.top() + kViewportInset + badgeHeight;
     if (y <= titlePanelBottom + kPanelSpacing) {
         return;
     }
@@ -267,8 +327,14 @@ void StreamViewportOverlay::paintEvent(QPaintEvent* event) {
 
         painter.save();
         painter.setClipRect(viewport.qtRect.adjusted(1, 1, -1, -1));
-        DrawTitlePanel(painter, viewport.qtRect, stateIt.value(), palette());
-        DrawStatusPanel(painter, viewport.qtRect, stateIt.value(), palette());
+        const int titlePanelBottom =
+            DrawTitlePanel(painter, viewport.qtRect, stateIt.value(), palette());
+        DrawStatusPanel(
+            painter,
+            viewport.qtRect,
+            stateIt.value(),
+            palette(),
+            titlePanelBottom);
         painter.restore();
     }
 }

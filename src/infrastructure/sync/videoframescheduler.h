@@ -27,6 +27,18 @@ class VideoFrameScheduler : public QObject
 
 public:
     /**
+     * @brief RuntimeMetricsSnapshot 视频调度器累计运行指标快照
+     * @details 只包含按值复制的原子统计，不持有帧、队列或输出 sink。
+     */
+    struct RuntimeMetricsSnapshot {
+        std::uint64_t submittedFrames = 0;        ///< 已提交给预览输出链的累计帧数
+        std::uint64_t schedulerDroppedFrames = 0; ///< 同步追帧和预览限帧累计丢弃数
+        int frameWidth = 0;                       ///< 最近一次提交帧宽度
+        int frameHeight = 0;                      ///< 最近一次提交帧高度
+        bool running = false;                     ///< 调度循环是否处于运行状态
+    };
+
+    /**
      * @brief VideoFrameScheduler 构造函数
      * @param parent Qt 父对象
      */
@@ -89,6 +101,12 @@ public:
      * @details 只清理当前显示帧，不清空队列、不 flush decoder、不重置同步时钟。
      */
     void ClearOutputFrame();
+
+    /**
+     * @brief RuntimeMetrics 获取当前累计运行指标
+     * @return 无锁、按值返回的只读快照
+     */
+    RuntimeMetricsSnapshot RuntimeMetrics() const;
 
 private slots:
     /**
@@ -216,8 +234,10 @@ private:
     bool hasPreviewPresentedPts_ = false;	///< 是否已有预览显示时间戳
     double lastPreviewPresentedPtsMs_ = 0.0;	///< 最近一次预览显示帧 PTS
     std::atomic<bool> running_{false};	///< 是否正在调度
-    std::atomic<int> dropped_{0};	///< 丢帧计数
-    std::atomic<int> rendered_{0};	///< 显示帧计数
+    std::atomic<std::uint64_t> schedulerDroppedFrames_{0};	///< 调度累计丢帧数
+    std::atomic<std::uint64_t> submittedFrames_{0};	///< 提交给预览输出链的累计帧数
+    std::atomic<int> submittedFrameWidth_{0};	///< 最近一次提交帧宽度
+    std::atomic<int> submittedFrameHeight_{0};	///< 最近一次提交帧高度
 };
 
 #endif // VIDEOFRAMESCHEDULER_H

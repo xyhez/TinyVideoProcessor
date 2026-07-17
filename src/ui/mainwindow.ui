@@ -548,7 +548,7 @@
           </property>
           <widget class="QWidget" name="tab_preview">
            <attribute name="title">
-            <string>预览</string>
+            <string>基本</string>
            </attribute>
            <layout class="QVBoxLayout" name="verticalLayout_previewTab">
             <property name="spacing">
@@ -566,6 +566,26 @@
             <property name="bottomMargin">
              <number>12</number>
             </property>
+            <item>
+             <widget class="QLabel" name="label_runtimeMetricsTitle">
+              <property name="text">
+               <string>活动视频运行指标</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="label_runtimeDetails">
+              <property name="text">
+               <string>等待运行指标采样</string>
+              </property>
+              <property name="alignment">
+               <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+              </property>
+              <property name="wordWrap">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
             <item>
              <widget class="QLabel" name="label_previewFrameRate">
               <property name="text">

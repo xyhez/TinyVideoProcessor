@@ -31,6 +31,14 @@ public:
     using FrameSinkFactory = std::function<std::unique_ptr<IVideoFrameSink>(StreamId)>;
 
     /**
+     * @brief StreamRuntimeMetricsSnapshot 带逻辑流身份的管线运行指标
+     */
+    struct StreamRuntimeMetricsSnapshot {
+        StreamId streamId = InvalidStreamId;
+        MediaPipeline::RuntimeMetricsSnapshot pipeline;
+    };
+
+    /**
      * @brief MultiStreamManager 构造函数
      * @param parent Qt 父对象
      */
@@ -93,6 +101,13 @@ public:
      * @return StreamId 列表
      */
     QList<StreamId> StreamIds() const;
+
+    /**
+     * @brief StreamRuntimeMetricsSnapshots 获取当前全部流的运行指标整表
+     * @details 必须在 MultiStreamManager 所属线程调用，避免与流表生命周期并发。
+     * @return 按 StreamId 排列的只读值快照；已移除流不会出现在结果中
+     */
+    QList<StreamRuntimeMetricsSnapshot> StreamRuntimeMetricsSnapshots() const;
 
     /**
      * @brief ActiveStream 获取当前活动显示流

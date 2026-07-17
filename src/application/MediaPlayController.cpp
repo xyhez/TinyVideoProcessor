@@ -44,6 +44,16 @@ bool IsValidImageProcessingMode(MediaPlayController::ImageProcessingMode mode)
 
     return false;
 }
+
+QString VideoCodecName(AVCodecID codecId)
+{
+    if (codecId == AV_CODEC_ID_NONE) {
+        return {};
+    }
+
+    const char* codecName = avcodec_get_name(codecId);
+    return codecName ? QString::fromLatin1(codecName) : QString();
+}
 }
 
 MediaPlayController::MediaPlayController(QObject *parent)
@@ -209,6 +219,38 @@ bool MediaPlayController::RemoveStream(StreamId id)
 QList<MediaPlayController::StreamId> MediaPlayController::StreamIds() const
 {
     return multiStreamManager_ ? multiStreamManager_->StreamIds() : QList<StreamId>();
+}
+
+QList<MediaPlayController::StreamRuntimeMetricsSnapshot>
+MediaPlayController::StreamRuntimeMetricsSnapshots() const
+{
+    QList<StreamRuntimeMetricsSnapshot> snapshots;
+    if (!multiStreamManager_) {
+        return snapshots;
+    }
+
+    const QString activeVisionPipelineId = ActiveVisionPipelineId();
+    const QList<MultiStreamManager::StreamRuntimeMetricsSnapshot> managerSnapshots =
+        multiStreamManager_->StreamRuntimeMetricsSnapshots();
+    for (const MultiStreamManager::StreamRuntimeMetricsSnapshot& managerSnapshot
+         : managerSnapshots) {
+        StreamRuntimeMetricsSnapshot snapshot;
+        snapshot.streamId = managerSnapshot.streamId;
+        snapshot.frameWidth = managerSnapshot.pipeline.frameWidth;
+        snapshot.frameHeight = managerSnapshot.pipeline.frameHeight;
+        snapshot.videoCodecName = VideoCodecName(managerSnapshot.pipeline.videoCodecId);
+        snapshot.submittedFrames = managerSnapshot.pipeline.submittedFrames;
+        snapshot.schedulerDroppedFrames =
+            managerSnapshot.pipeline.schedulerDroppedFrames;
+        snapshot.schedulerRunning = managerSnapshot.pipeline.schedulerRunning;
+        snapshot.imageProcessingEnabled =
+            managerSnapshot.pipeline.imageProcessingEnabled;
+        snapshot.visionAnalysisActive =
+            managerSnapshot.pipeline.visionAnalysisActive
+            && !activeVisionPipelineId.isEmpty();
+        snapshots.append(snapshot);
+    }
+    return snapshots;
 }
 
 MediaPlayController::StreamId MediaPlayController::ActiveStream() const

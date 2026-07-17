@@ -28,6 +28,24 @@ struct StreamPresentationMetadata {
 };
 
 /**
+ * @brief StreamRuntimePresentationMetrics UI 低频采样后的单路运行指标
+ * @details 有效性与数值分离，确保 0 FPS 和 0% 丢帧仍可被正确展示。
+ */
+struct StreamRuntimePresentationMetrics {
+    bool hasFrameSize = false;
+    int frameWidth = 0;
+    int frameHeight = 0;
+    bool hasPreviewFps = false;
+    double previewFps = 0.0;
+    bool hasSchedulerDropRate = false;
+    double schedulerDropRate = 0.0;
+    QString videoCodecName;
+    bool schedulerRunning = false;
+    bool imageProcessingEnabled = false;
+    bool visionAnalysisActive = false;
+};
+
+/**
  * @brief StreamPresentationState 单次列表刷新使用的只读展示快照
  */
 struct StreamPresentationState {
@@ -40,6 +58,7 @@ struct StreamPresentationState {
     bool isActiveAudio = false;
     bool isRealtime = false;
     QString lastError;
+    StreamRuntimePresentationMetrics runtimeMetrics;
 };
 
 inline constexpr int kStreamPresentationStateRole = Qt::UserRole + 1;

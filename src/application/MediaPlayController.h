@@ -5,6 +5,7 @@
 #include <QList>
 #include <QObject>
 #include <QString>
+#include <cstdint>
 #include <functional>
 #include <memory>
 
@@ -42,6 +43,22 @@ public:
     using StreamId = int;
     static constexpr StreamId InvalidStreamId = -1;	///< 无效流 ID
     using FrameSinkFactory = std::function<std::unique_ptr<IVideoFrameSink>(StreamId)>;
+
+    /**
+     * @brief StreamRuntimeMetricsSnapshot UI 可读取的单路运行指标 DTO
+     * @details 只包含值类型，不暴露领域层和基础设施层对象。
+     */
+    struct StreamRuntimeMetricsSnapshot {
+        StreamId streamId = InvalidStreamId;
+        int frameWidth = 0;
+        int frameHeight = 0;
+        QString videoCodecName;
+        std::uint64_t submittedFrames = 0;
+        std::uint64_t schedulerDroppedFrames = 0;
+        bool schedulerRunning = false;
+        bool imageProcessingEnabled = false;
+        bool visionAnalysisActive = false;
+    };
 
     /**
      * @brief MediaPlayController 构造函数
@@ -142,6 +159,13 @@ public:
      * @return 流 ID 列表
      */
     QList<StreamId> StreamIds() const;
+
+    /**
+     * @brief StreamRuntimeMetricsSnapshots 获取当前全部流的运行指标整表
+     * @details 必须在 Controller 所属线程调用；当前由 MainWindow 低频定时器读取。
+     * @return 应用层只读值快照；已移除流不会出现在结果中
+     */
+    QList<StreamRuntimeMetricsSnapshot> StreamRuntimeMetricsSnapshots() const;
 
     /**
      * @brief ActiveStream 获取当前活动显示流

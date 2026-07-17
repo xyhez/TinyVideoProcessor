@@ -5,10 +5,10 @@
 - 开发分支：`dev_ui_refactor`
 - 基准分支：`dev`
 - 架构文档：`doc/UI重构架构指导.md`
-- 已完成：Phase 0～Phase 4 已完成静态验收，包括文档基线、全局主题、五区布局、紧凑视频源状态条目和多视口视觉融合。
-- 当前阶段：Phase 4 已静态完成；下一阶段为 Phase 5 真实运行指标，进入前需确认只读指标边界。
-- 本轮范围：只修改 `MultiViewRenderer` 的直接视觉常量及 `MainWindow` 到 UI 覆盖层的只读展示数据同步，未修改解码、同步、Controller、流生命周期和点击语义。
-- 未完成：真实运行指标、关联对话框和最终运行验收。
+- 已完成：Phase 0～Phase 5 已完成静态验收，包括真实运行指标所有权、只读数据链路、低频采样和分区展示。
+- 当前阶段：Phase 5 已静态完成；下一阶段为 Phase 6 关联对话框与细节收口。
+- 本轮范围：按 `VideoFrameScheduler -> MediaPipeline -> MultiStreamManager -> MediaPlayController -> MainWindow` 建立累计计数整表快照，并接入顶部、浮层、右侧和状态栏；不修改 `MultiViewRenderer`、解码、解复用、队列、视觉算法和播放语义。
+- 未完成：Phase 6 关联对话框、Phase 7 最终验收，以及 Phase 5 多路动态运行验证。
 - 默认验证方式：静态检查；不编译、不运行，除非用户明确要求。
 
 ## 2. 已知风险
@@ -21,6 +21,8 @@
 - `MultiViewRenderer` 使用原生 OpenGL 绘制，普通 QSS 只能影响其外围容器，画面内浮层必须放到独立 Phase。
 - 当前 CMake 使用递归源码收集，新增 `src/ui/theme/*.h/.cpp` 无需修改 `CMakeLists.txt`。
 - 设计稿中的 FPS、分辨率、编码和丢包率必须来自真实状态；Phase 5 前禁止写死。
+- 现有调度器丢帧只表示同步追帧和预览限帧，不是网络丢包；Phase 5 必须使用“调度丢帧”文案。
+- `Fileinfo::FrameRate` 默认值可能保留为 30 FPS，不能作为真实运行 FPS；Phase 5 使用累计提交帧数按采样窗口计算。
 
 ---
 
@@ -465,32 +467,48 @@
 
 ## 9. Phase 5：真实运行指标
 
-### [ ] Phase 5.1：梳理指标所有权
+### [x] Phase 5.1：梳理指标所有权
 
 - 目标：明确 FPS、分辨率、编码格式、丢包率和推理状态的真实来源。
 - 修改文件：
-  - 新建独立运行指标设计文档
+  - `doc/UI重构架构指导.md`
+  - `doc/TODO-Fincept风格UI重构.md`
+  - `doc/视频运行指标只读数据链路.md`，新增
 - 验收标准：
   - 每个字段都有唯一所有者、采样频率和生命周期。
   - 列出跨层修改文件、风险和替代方案。
-- 测试流程：设计评审；用户确认后进入代码实现。
+- 测试流程：已完成 Controller/管线/调度器、渲染器统计和 UI 生命周期三路静态设计审查；用户已确认进入 Phase 5。
+- 设计结论：
+  - 累计提交帧、调度丢帧和最近帧尺寸由 `VideoFrameScheduler` 唯一拥有。
+  - 源尺寸、编码和处理状态由 `MediaPipeline` 按值合并，Manager 按 `StreamId` 整表汇总，Controller 映射为 UI DTO。
+  - `MainWindow` 使用唯一 1 Hz 粗粒度定时器求采样窗口差值；状态切换可即时拉取，短于 500 ms 的窗口保留原基线，首样本和生命周期重建显示 `--`。
+  - FPS 的准确语义为预览输出链提交速率；调度丢帧不得冒充网络丢包。
+  - 网络丢包率、推理吞吐和逐流播放状态当前没有可靠数据源，明确显示不可用或不展示。
+  - 本阶段不修改 `MultiViewRenderer`，不把指标采样放入 `paintGL()` 或渲染锁。
 - Commit message：
   ```text
   docs: 设计视频运行指标只读数据链路
   ```
 
-### [ ] Phase 5.2：建立应用层只读状态边界
+### [x] Phase 5.2：建立应用层只读状态边界
 
 - 目标：让 UI 不接触基础设施对象即可获得低频指标。
 - 修改文件：
   - `src/application/MediaPlayController.h/.cpp`
-  - 经 Phase 5.1 确认的最小底层文件
+  - `src/domain/MultiStreamManager.h/.cpp`
+  - `src/domain/MediaPipeline.h/.cpp`
+  - `src/infrastructure/sync/videoframescheduler.h/.cpp`
 - 验收标准：
   - 指标为只读快照或低频信号。
   - 流移除和窗口关闭后没有悬空更新。
 - 测试流程：
   1. 静态检查信号生命周期和线程边界。
   2. 用户要求时执行多路运行压力测试。
+- 实现结果：
+  - 调度器使用管线生命周期内单调的原子累计计数，记录预览提交帧、调度丢帧和最近真实帧尺寸；暂停恢复不清零。
+  - `MediaPipeline` 在初始化时复制源尺寸和编码，并合并处理链状态；Manager 按 `StreamId` 整表汇总。
+  - Controller 将 FFmpeg codec id 映射为只读字符串 DTO；UI 未获得媒体源、管线、调度器或渲染器指针。
+  - Manager 与 Controller 接口注释明确 owner-thread 调用约束；流移除后整表自然不再包含对应 ID。
 - Commit message：
   ```text
   feat(ui): 接入真实视频运行指标
@@ -500,17 +518,33 @@
   - 避免 UI 直接访问播放基础设施
   ```
 
-### [ ] Phase 5.3：将真实指标接入 UI
+### [x] Phase 5.3：将真实指标接入 UI
 
 - 目标：在顶部、浮层、右侧基本信息和状态栏中按层级展示真实数据。
 - 修改文件：
+  - `src/ui/mainwindow.ui`
   - `src/ui/mainwindow.h/.cpp`
-  - 经 Phase 4 确认的浮层文件
+  - `src/ui/StreamPresentationState.h`
+  - `src/ui/StreamViewportOverlay.cpp`
 - 验收标准：
   - 不重复展示同一信息。
   - 不写死数据。
   - 刷新不会阻塞 UI 或渲染线程。
-- 测试流程：验证多路添加、移除、断流、切换和关闭生命周期。
+- 测试流程：默认执行多路添加、移除、断流、切换和关闭生命周期静态检查；用户要求时再编译运行。
+- 实现结果：
+  - 顶部复用工作区标签展示流数、出帧路数和已采样流的合计预览提交 FPS。
+  - 浮层按空间展示真实/源分辨率和单路预览提交 FPS；字体或状态徽章空间不足时优先保留名称与徽章。
+  - 右侧展示活动流 codec、调度丢帧率、图像处理和视觉分析；网络丢包与推理吞吐明确显示“不可用”。
+  - 状态栏永久摘要只展示活动视频、音频和视觉管线上下文，不重复技术指标。
+  - 唯一 1 Hz `Qt::CoarseTimer` 拉取整表；状态切换即时刷新，小于 500 ms 的窗口保留原速率基线。
+  - 流移除时同步删除展示与采样基线；关闭和析构均先停止指标定时器，再执行 Controller `Shutdown()`。
+- 静态验收：
+  - Qt 5.15.2 `uic` 成功解析 `mainwindow.ui` 并生成 728 行界面代码。
+  - `.ui` 共 98 个 widget/layout/spacer 对象且名称唯一；`mainwindow.cpp` 的 UI 对象引用除 `setupUi` 方法外均可解析到对象名。
+  - 相关 C++ 头文件/实现的花括号与圆括号数量平衡，全部 16 个本阶段文件无行尾空白。
+  - 三路交叉复核确认 API/线程边界、字段真实性、采样数学、生命周期和浮层空间降级无新增阻断问题。
+  - `git diff --check` 无错误，仅报告工作区既有的 LF 到 CRLF 提示。
+  - 按默认开发规范未编译、未运行；真实多路 FPS、暂停恢复、断流、跨 DPI 和性能影响仍需后续人工验收。
 - Commit message：与 Phase 5.2 合并提交。
 
 ---

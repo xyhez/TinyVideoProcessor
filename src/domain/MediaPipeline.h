@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QThread>
 #include <QTimer>
+#include <cstdint>
 #include <memory>
 
 #include "core/ffmpeg_raii.h"
@@ -32,6 +33,22 @@ class VisionProcessingFrameSink;
 class MediaPipeline : public QObject {
     Q_OBJECT
 public:
+    /**
+     * @brief RuntimeMetricsSnapshot 单路管线运行指标值快照
+     * @details 不暴露媒体源、调度器或输出 sink 的所有权与指针。
+     */
+    struct RuntimeMetricsSnapshot {
+        bool initialized = false;
+        int frameWidth = 0;
+        int frameHeight = 0;
+        AVCodecID videoCodecId = AV_CODEC_ID_NONE;
+        std::uint64_t submittedFrames = 0;
+        std::uint64_t schedulerDroppedFrames = 0;
+        bool schedulerRunning = false;
+        bool imageProcessingEnabled = false;
+        bool visionAnalysisActive = false;
+    };
+
     /**
      * @brief MediaPipeline 构造函数
      * @param visionPipelineManager 视觉管线管理器指针，nullptr 表示禁用视觉分析
@@ -111,6 +128,12 @@ public:
      * @return false 未初始化
      */
     bool IsInitialized() const;
+
+    /**
+     * @brief RuntimeMetrics 获取单路管线运行指标
+     * @return 初始化源信息、累计调度统计和处理链状态的只读值快照
+     */
+    RuntimeMetricsSnapshot RuntimeMetrics() const;
 
     /**
      * @brief SetPlaybackSpeed 设置播放速度
@@ -287,6 +310,9 @@ private:
 
     std::shared_ptr<IMediaSource> mediaSource_;	///< 当前媒体源
     std::shared_ptr<SyncManager> syncManager_;	///< 同步时钟管理器
+    int sourceVideoWidth_ = 0;	///< 初始化时复制的源视频宽度
+    int sourceVideoHeight_ = 0;	///< 初始化时复制的源视频高度
+    AVCodecID sourceVideoCodecId_ = AV_CODEC_ID_NONE;	///< 初始化时复制的源视频编码
 
     std::unique_ptr<Demuxer> demuxer_;	///< 解复用器
     std::unique_ptr<Decoder> Adecoder_;	///< 音频解码器

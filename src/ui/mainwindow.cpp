@@ -22,6 +22,7 @@
 #include <QRadioButton>
 #include <QSignalBlocker>
 #include <QSpinBox>
+#include <QStatusBar>
 #include <QStringList>
 #include <QTimer>
 #include <QUrl>
@@ -84,6 +85,14 @@ QString StreamPresentationAccessibleText(const StreamPresentationState& state) {
         .arg(StreamStatusLabels(state).join(QStringLiteral("，")));
 }
 
+QString CompactStatusName(const QString& name) {
+    constexpr int kMaximumStatusNameLength = 18;
+    if (name.size() <= kMaximumStatusNameLength) {
+        return name;
+    }
+    return name.left(kMaximumStatusNameLength - 1) + QStringLiteral("…");
+}
+
 } // namespace
 
 MainWindow::MainWindow(QWidget *parent)
@@ -115,6 +124,7 @@ MainWindow::MainWindow(QWidget *parent)
     InitializeCursorHideTimer();
     InitializeMultiViewRenderer();
     InitializeMultiViewLayout();
+    InitializeRuntimeMetrics();
 
     ui->centralwidget->setMouseTracking(true);
     ui->centralwidget->installEventFilter(this);
@@ -185,6 +195,7 @@ void MainWindow::CreateConnects() {
                 QSignalBlocker blocker(ui->checkBox_imageProcessingEnabled);
                 ui->checkBox_imageProcessingEnabled->setChecked(enabled);
                 UpdateImageProcessingControls();
+                RefreshRuntimeMetrics();
             });
 
     connect(mediaPlayController_.get(), &MediaPlayController::ImageProcessingModeChanged,
@@ -226,6 +237,8 @@ void MainWindow::CreateConnects() {
     connect(mediaPlayController_.get(), &MediaPlayController::StreamRemoved,
             this, [this](MediaPlayController::StreamId id) {
                 streamPresentationMetadata_.remove(id);
+                streamRuntimeMetrics_.remove(id);
+                streamRuntimeMetricBaselines_.remove(id);
                 if (multiViewRenderer_) {
                     multiViewRenderer_->DetachStream(id);
                 }
@@ -235,6 +248,7 @@ void MainWindow::CreateConnects() {
 
     connect(mediaPlayController_.get(), &MediaPlayController::ActiveStreamChanged,
             this, [this](MediaPlayController::StreamId) {
+                RefreshRuntimeMetrics();
                 RefreshStreamView();
             });
 
@@ -395,6 +409,7 @@ void MainWindow::CreateConnects() {
             this, [this](const QString& id) {
                 UpdateVisionPipelineComboBox(id);
                 UpdateVisionControls();
+                RefreshRuntimeMetrics();
             });
 
     connect(mediaPlayController_.get(), &MediaPlayController::VisionPipelineStartupFailed,
@@ -488,6 +503,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
     if (cursorHideTimer_) {
         cursorHideTimer_->stop();
     }
+    StopRuntimeMetrics();
     mediaPlayController_->Shutdown();
 
 }
@@ -557,6 +573,10 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event) {
 
 MainWindow::~MainWindow()
 {
+    StopRuntimeMetrics();
+    if (mediaPlayController_) {
+        mediaPlayController_->Shutdown();
+    }
     mediaPlayController_.reset();
     delete ui;
 }
@@ -721,6 +741,246 @@ void MainWindow::InitializeCursorHideTimer() {
     cursorHideTimer_->setSingleShot(true);
     connect(cursorHideTimer_.get(), &QTimer::timeout,
             this, &MainWindow::HideCursorIfFullScreen);
+}
+
+void MainWindow::InitializeRuntimeMetrics() {
+    runtimeContextLabel_ = new QLabel(ui->statusbar);
+    runtimeContextLabel_->setObjectName(QStringLiteral("label_runtimeContext"));
+    runtimeContextLabel_->setMaximumWidth(520);
+    ui->statusbar->addPermanentWidget(runtimeContextLabel_);
+
+    ui->label_runtimeDetails->setToolTip(
+        QStringLiteral("预览 FPS 表示提交给输出链的采样速率；调度丢帧不等于网络丢包。"));
+
+    runtimeMetricsTimer_ = std::make_unique<QTimer>(this);
+    runtimeMetricsTimer_->setInterval(kRuntimeMetricsIntervalMs);
+    runtimeMetricsTimer_->setTimerType(Qt::CoarseTimer);
+    connect(runtimeMetricsTimer_.get(), &QTimer::timeout,
+            this, &MainWindow::RefreshRuntimeMetrics);
+
+    runtimeMetricsElapsed_.start();
+    UpdateRuntimeMetricLabels();
+    runtimeMetricsTimer_->start();
+}
+
+void MainWindow::RefreshRuntimeMetrics() {
+    if (!mediaPlayController_
+        || !runtimeMetricsTimer_
+        || !runtimeMetricsTimer_->isActive()) {
+        return;
+    }
+    if (!runtimeMetricsElapsed_.isValid()) {
+        runtimeMetricsElapsed_.start();
+    }
+
+    const qint64 capturedElapsedMs = runtimeMetricsElapsed_.elapsed();
+    QMap<MediaPlayController::StreamId, StreamRuntimePresentationMetrics>
+        nextPresentationMetrics;
+    QMap<MediaPlayController::StreamId, StreamRuntimeMetricBaseline>
+        nextBaselines;
+
+    const QList<MediaPlayController::StreamRuntimeMetricsSnapshot> snapshots =
+        mediaPlayController_->StreamRuntimeMetricsSnapshots();
+    for (const MediaPlayController::StreamRuntimeMetricsSnapshot& snapshot : snapshots) {
+        if (snapshot.streamId == MediaPlayController::InvalidStreamId) {
+            continue;
+        }
+
+        StreamRuntimePresentationMetrics presentation;
+        presentation.hasFrameSize = snapshot.frameWidth > 0 && snapshot.frameHeight > 0;
+        presentation.frameWidth = snapshot.frameWidth;
+        presentation.frameHeight = snapshot.frameHeight;
+        presentation.videoCodecName = snapshot.videoCodecName;
+        presentation.schedulerRunning = snapshot.schedulerRunning;
+        presentation.imageProcessingEnabled = snapshot.imageProcessingEnabled;
+        presentation.visionAnalysisActive = snapshot.visionAnalysisActive;
+
+        const auto previousIt = streamRuntimeMetricBaselines_.constFind(snapshot.streamId);
+        bool keepPreviousBaseline = false;
+        if (previousIt != streamRuntimeMetricBaselines_.cend()
+            && capturedElapsedMs >= previousIt->capturedElapsedMs
+            && snapshot.submittedFrames >= previousIt->submittedFrames
+            && snapshot.schedulerDroppedFrames >= previousIt->schedulerDroppedFrames) {
+            const qint64 elapsedMs = capturedElapsedMs - previousIt->capturedElapsedMs;
+            if (elapsedMs >= kMinimumRuntimeMetricsSampleMs) {
+                const std::uint64_t submittedDelta =
+                    snapshot.submittedFrames - previousIt->submittedFrames;
+                const std::uint64_t droppedDelta =
+                    snapshot.schedulerDroppedFrames - previousIt->schedulerDroppedFrames;
+
+                presentation.hasPreviewFps = true;
+                presentation.previewFps =
+                    static_cast<double>(submittedDelta) * 1000.0
+                    / static_cast<double>(elapsedMs);
+
+                const std::uint64_t scheduledFrameDelta = submittedDelta + droppedDelta;
+                if (scheduledFrameDelta > 0) {
+                    presentation.hasSchedulerDropRate = true;
+                    presentation.schedulerDropRate =
+                        static_cast<double>(droppedDelta) * 100.0
+                        / static_cast<double>(scheduledFrameDelta);
+                }
+            } else {
+                const auto previousPresentationIt =
+                    streamRuntimeMetrics_.constFind(snapshot.streamId);
+                if (previousPresentationIt != streamRuntimeMetrics_.cend()) {
+                    presentation.hasPreviewFps = previousPresentationIt->hasPreviewFps;
+                    presentation.previewFps = previousPresentationIt->previewFps;
+                    presentation.hasSchedulerDropRate =
+                        previousPresentationIt->hasSchedulerDropRate;
+                    presentation.schedulerDropRate =
+                        previousPresentationIt->schedulerDropRate;
+                }
+                keepPreviousBaseline = true;
+            }
+        }
+
+        nextPresentationMetrics.insert(snapshot.streamId, presentation);
+        if (keepPreviousBaseline) {
+            nextBaselines.insert(snapshot.streamId, previousIt.value());
+        } else {
+            StreamRuntimeMetricBaseline baseline;
+            baseline.submittedFrames = snapshot.submittedFrames;
+            baseline.schedulerDroppedFrames = snapshot.schedulerDroppedFrames;
+            baseline.capturedElapsedMs = capturedElapsedMs;
+            nextBaselines.insert(snapshot.streamId, baseline);
+        }
+    }
+
+    streamRuntimeMetrics_.swap(nextPresentationMetrics);
+    streamRuntimeMetricBaselines_.swap(nextBaselines);
+    UpdateRuntimeMetricLabels();
+    RefreshStreamViewportOverlay();
+}
+
+void MainWindow::UpdateRuntimeMetricLabels() {
+    if (!mediaPlayController_) {
+        return;
+    }
+
+    const QList<MediaPlayController::StreamId> streamIds =
+        mediaPlayController_->StreamIds();
+    const int totalStreamCount = static_cast<int>(streamIds.size());
+    int sampledStreamCount = 0;
+    int producingStreamCount = 0;
+    double totalPreviewFps = 0.0;
+    for (MediaPlayController::StreamId streamId : streamIds) {
+        const auto metricsIt = streamRuntimeMetrics_.constFind(streamId);
+        if (metricsIt == streamRuntimeMetrics_.cend()
+            || !metricsIt->hasPreviewFps) {
+            continue;
+        }
+
+        sampledStreamCount += 1;
+        totalPreviewFps += metricsIt->previewFps;
+        if (metricsIt->previewFps > 0.0) {
+            producingStreamCount += 1;
+        }
+    }
+
+    if (streamIds.isEmpty()) {
+        ui->label_workspaceMode->setText(QStringLiteral("等待视频源 · 运行指标 --"));
+    } else if (sampledStreamCount == 0) {
+        ui->label_workspaceMode->setText(
+            QStringLiteral("%1 路 · 运行指标采样中").arg(totalStreamCount));
+    } else if (sampledStreamCount < totalStreamCount) {
+        ui->label_workspaceMode->setText(
+            QStringLiteral("%1 路 · 采样 %2/%1 · 预览 Σ %3 FPS")
+                .arg(totalStreamCount)
+                .arg(sampledStreamCount)
+                .arg(totalPreviewFps, 0, 'f', 1));
+    } else {
+        ui->label_workspaceMode->setText(
+            QStringLiteral("%1 路 · %2 路出帧 · 预览 Σ %3 FPS")
+                .arg(totalStreamCount)
+                .arg(producingStreamCount)
+                .arg(totalPreviewFps, 0, 'f', 1));
+    }
+
+    const MediaPlayController::StreamId activeStreamId =
+        mediaPlayController_->ActiveStream();
+    const auto activeMetricsIt = streamRuntimeMetrics_.constFind(activeStreamId);
+    const bool hasActiveMetrics = activeMetricsIt != streamRuntimeMetrics_.cend();
+    const QString codecName = hasActiveMetrics
+        && !activeMetricsIt->videoCodecName.isEmpty()
+            ? activeMetricsIt->videoCodecName.toUpper()
+            : QStringLiteral("--");
+    const QString schedulerDropRate = hasActiveMetrics
+        && activeMetricsIt->hasSchedulerDropRate
+            ? QStringLiteral("%1%").arg(activeMetricsIt->schedulerDropRate, 0, 'f', 1)
+            : QStringLiteral("--");
+    const QString imageProcessingState = hasActiveMetrics
+        ? (activeMetricsIt->imageProcessingEnabled
+            ? QStringLiteral("已启用")
+            : QStringLiteral("关闭"))
+        : QStringLiteral("--");
+
+    QString visionAnalysisState = QStringLiteral("--");
+    if (hasActiveMetrics) {
+        visionAnalysisState = QStringLiteral("关闭");
+        if (activeMetricsIt->visionAnalysisActive) {
+            const QString pipelineId = mediaPlayController_->ActiveVisionPipelineId();
+            visionAnalysisState = pipelineId.isEmpty()
+                ? QStringLiteral("已启用")
+                : mediaPlayController_->VisionPipelineDisplayName(pipelineId);
+        }
+    }
+
+    ui->label_runtimeDetails->setText(
+        QStringLiteral(
+            "编码格式　%1\n"
+            "调度丢帧　%2\n"
+            "图像处理　%3\n"
+            "视觉分析　%4\n"
+            "网络丢包　不可用\n"
+            "推理吞吐　不可用")
+            .arg(codecName)
+            .arg(schedulerDropRate)
+            .arg(imageProcessingState)
+            .arg(visionAnalysisState));
+
+    if (!runtimeContextLabel_) {
+        return;
+    }
+
+    const auto streamDisplayName = [this](MediaPlayController::StreamId streamId) {
+        if (streamId == MediaPlayController::InvalidStreamId) {
+            return QStringLiteral("无");
+        }
+        const StreamPresentationMetadata metadata =
+            streamPresentationMetadata_.value(streamId);
+        return metadata.displayName.isEmpty()
+            ? QStringLiteral("Stream %1").arg(streamId)
+            : metadata.displayName;
+    };
+
+    const QString activeVideoName = streamDisplayName(activeStreamId);
+    const QString activeAudioName =
+        streamDisplayName(mediaPlayController_->ActiveAudioStream());
+    const QString activeVisionPipelineId =
+        mediaPlayController_->ActiveVisionPipelineId();
+    const QString activeVisionName = activeVisionPipelineId.isEmpty()
+        ? QStringLiteral("关闭")
+        : mediaPlayController_->VisionPipelineDisplayName(activeVisionPipelineId);
+    runtimeContextLabel_->setText(
+        QStringLiteral("主：%1 · 音：%2 · 视觉：%3")
+            .arg(CompactStatusName(activeVideoName))
+            .arg(CompactStatusName(activeAudioName))
+            .arg(CompactStatusName(activeVisionName)));
+    runtimeContextLabel_->setToolTip(
+        QStringLiteral("活动视频：%1\n活动音频：%2\n视觉管线：%3")
+            .arg(activeVideoName)
+            .arg(activeAudioName)
+            .arg(activeVisionName));
+}
+
+void MainWindow::StopRuntimeMetrics() {
+    if (runtimeMetricsTimer_) {
+        runtimeMetricsTimer_->stop();
+    }
+    runtimeMetricsElapsed_.invalidate();
+    streamRuntimeMetricBaselines_.clear();
+    streamRuntimeMetrics_.clear();
 }
 
 void MainWindow::InitializeVideoArea() {
@@ -1229,6 +1489,7 @@ StreamPresentationState MainWindow::BuildStreamPresentationState(
     state.isActiveAudio = id == mediaPlayController_->ActiveAudioStream();
     state.isRealtime = metadata.isRealtime;
     state.lastError = metadata.lastError;
+    state.runtimeMetrics = streamRuntimeMetrics_.value(id);
     return state;
 }
 
@@ -1299,6 +1560,7 @@ void MainWindow::RefreshStreamView() {
     }
 
     UpdateStreamControls();
+    UpdateRuntimeMetricLabels();
     RefreshMultiViewLayout();
 }
 
