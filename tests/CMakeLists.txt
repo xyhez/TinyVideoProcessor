@@ -19,6 +19,18 @@ add_tiny_video_test(test_sync_queue
     ${PROJECT_SOURCE_DIR}/src/core/queue.h
 )
 
+add_tiny_video_test(test_video_frame_scheduler
+    test_video_frame_scheduler.cpp
+    ${PROJECT_SOURCE_DIR}/src/infrastructure/sync/videoframescheduler.cpp
+    ${PROJECT_SOURCE_DIR}/src/infrastructure/sync/videoframescheduler.h
+    ${PROJECT_SOURCE_DIR}/src/infrastructure/sync/syncmanager.cpp
+    ${PROJECT_SOURCE_DIR}/src/infrastructure/sync/syncmanager.h
+)
+target_link_libraries(test_video_frame_scheduler PRIVATE
+    tiny_log
+    ${FFMPEG_LIB_DIR}/avutil.lib
+)
+
 add_tiny_video_test(test_playlist_manager
     test_playlist_manager.cpp
     ${PROJECT_SOURCE_DIR}/src/domain/PlaylistManager.cpp
