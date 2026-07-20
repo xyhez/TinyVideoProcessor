@@ -4,6 +4,24 @@
 
 #include "infrastructure/sync/videoframescheduler.h"
 
+namespace {
+class CountingVideoFrameSink final : public IVideoFrameSink {
+public:
+    void PresentFrame(AVFramePtr frame) override
+    {
+        if (frame) {
+            ++presentedFrameCount;
+        }
+    }
+
+    void ClearFrame() override
+    {
+    }
+
+    int presentedFrameCount = 0;
+};
+}
+
 class VideoFrameSchedulerTest : public QObject {
     Q_OBJECT
 
@@ -14,6 +32,8 @@ private slots:
     void compensatesTimerOvershootWithAbsoluteDeadline();
     void reanchorsAfterSevereDelay();
     void resetsCadenceWhenPlaybackParametersChange();
+    void restartCancelsPendingTick();
+    void emitsPlaybackDrainedOnceForEmptyEndOfStream();
 };
 
 void VideoFrameSchedulerTest::initializesKnownFrameRates()
@@ -125,6 +145,66 @@ void VideoFrameSchedulerTest::resetsCadenceWhenPlaybackParametersChange()
     QCOMPARE(scheduler.nextFrameDeadlineNs_, qint64{0});
 }
 
-QTEST_APPLESS_MAIN(VideoFrameSchedulerTest)
+void VideoFrameSchedulerTest::restartCancelsPendingTick()
+{
+    auto frameQueue = std::make_shared<SyncQueue<AVFramePtr>>(2);
+    auto syncManager = std::make_shared<SyncManager>();
+    syncManager->SetSyncType(SYNCTYPE::VIDEO);
+
+    AVFramePtr firstFrame = MakeAVFrame();
+    AVFramePtr secondFrame = MakeAVFrame();
+    QVERIFY(firstFrame);
+    QVERIFY(secondFrame);
+    firstFrame->pts = 0;
+    secondFrame->pts = 1;
+    QVERIFY(frameQueue->Push(std::move(firstFrame)));
+    QVERIFY(frameQueue->Push(std::move(secondFrame)));
+
+    CountingVideoFrameSink frameSink;
+    VideoFrameScheduler scheduler;
+    scheduler.Initialize(frameQueue, syncManager, 1.0, 1.0 / 1000.0);
+    scheduler.SetFrameSink(&frameSink);
+
+    scheduler.Start();
+    scheduler.Stop();
+    scheduler.Start();
+
+    QTRY_VERIFY_WITH_TIMEOUT(frameSink.presentedFrameCount > 0, 200);
+    QTest::qWait(50);
+    QCOMPARE(frameSink.presentedFrameCount, 1);
+    QCOMPARE(frameQueue->Size(), size_t{1});
+
+    scheduler.Stop();
+}
+
+void VideoFrameSchedulerTest::emitsPlaybackDrainedOnceForEmptyEndOfStream()
+{
+    auto frameQueue = std::make_shared<SyncQueue<AVFramePtr>>(1);
+    auto syncManager = std::make_shared<SyncManager>();
+    CountingVideoFrameSink frameSink;
+    VideoFrameScheduler scheduler;
+    scheduler.Initialize(frameQueue, syncManager, 30.0, 1.0 / 1000.0);
+    scheduler.SetFrameSink(&frameSink);
+
+    QSignalSpy drainedSpy(&scheduler, &VideoFrameScheduler::VideoPlaybackDrained);
+
+    scheduler.Start();
+    scheduler.Stop();
+    QCoreApplication::processEvents();
+    QCOMPARE(drainedSpy.count(), 0);
+
+    frameQueue->SignalEndOfStream();
+    scheduler.Start();
+    QTRY_COMPARE_WITH_TIMEOUT(drainedSpy.count(), 1, 200);
+    QVERIFY(!scheduler.running_.load());
+    QVERIFY(!scheduler.tickTimer_.isActive());
+
+    QTest::qWait(50);
+    QCOMPARE(drainedSpy.count(), 1);
+    scheduler.Stop();
+    QCOMPARE(drainedSpy.count(), 1);
+}
+
+QTEST_GUILESS_MAIN(VideoFrameSchedulerTest)
 
 #include "test_video_frame_scheduler.moc"

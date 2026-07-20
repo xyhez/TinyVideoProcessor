@@ -13,6 +13,7 @@
 #include <QVector>
 #include <memory>
 #include <QWaitCondition>
+#include <QString>
 #include <atomic>
 
 #include "core/ffmpeg_raii.h"
@@ -136,6 +137,17 @@ signals:
      */
     void MuteChanged(bool muted);
 
+    /**
+     * @brief AudioPlaybackDrained 音频帧、重采样尾部和设备缓冲已完成尽力排空
+     */
+    void AudioPlaybackDrained();
+
+    /**
+     * @brief AudioPlaybackError 音频播放链发生不可恢复错误
+     * @param message 错误说明
+     */
+    void AudioPlaybackError(QString message);
+
 private:
     std::shared_ptr<SyncQueue<AVFramePtr>> m_audioFrameQueue;	///< 音频帧队列
     std::shared_ptr<SyncManager> m_syncManager;	///< 同步时钟管理器
@@ -159,7 +171,6 @@ private:
     QElapsedTimer m_latencyUpdateTimer;	///< 延迟更新计时器
     static constexpr double LATENCY_SMOOTH_ALPHA = 0.1;	///< 延迟平滑系数
 
-    AVFrame* m_frame = nullptr;	///< 当前音频帧
     QByteArray m_pcmBuffer;	///< PCM 缓冲区
     QByteArray m_speedPcmBuffer;	///< 变速 PCM 缓冲区
 
@@ -220,6 +231,8 @@ private:
      * @param bytesPerSampleFrame 单个采样帧字节数
      * @param speed 当前播放速度
      * @param frameStartClockMs 当前音频帧起始时钟，单位毫秒
+     * @param timeoutMs 写入超时，负数表示不限制
+     * @param stopOnPause 是否在暂停时立即中止本次写入
      * @return true 写入完成
      * @return false 写入被停止或失败
      */
@@ -227,14 +240,21 @@ private:
                         int bytes,
                         int bytesPerSampleFrame,
                         double speed,
-                        double frameStartClockMs);
+                        double frameStartClockMs,
+                        qint64 timeoutMs = -1,
+                        bool stopOnPause = true);
+
+    /**
+     * @brief DrainEndOfStream 尽力排空重采样尾部和音频设备缓冲
+     * @return true 排空流程完成或到达安全超时
+     * @return false 排空被暂停或停止打断
+     */
+    bool DrainEndOfStream();
 
     /**
      * @brief Run 音频播放主循环
      */
     void Run();
-
-signals:
 };
 
 #endif // AUDIOPLAYER_H

@@ -14,13 +14,24 @@ Decoder::Decoder(QObject *parent)
 }
 
 Decoder::~Decoder() {
+    ResetDecoderResources();
+    LOG_DEBUG_STREAM() << decoder_type << "decoder resources released";
+}
+
+void Decoder::ResetDecoderResources()
+{
     if(Ctx) {
         avcodec_free_context(&Ctx);
     }
     if (m_hwDeviceCtx) {
         av_buffer_unref(&m_hwDeviceCtx);
     }
-    LOG_DEBUG_STREAM() << decoder_type << "decoder resources released";
+    codec = nullptr;
+    par = nullptr;
+    m_isHWDecoder = false;
+    m_hwPixFmt = AV_PIX_FMT_NONE;
+    m_swPixFmt = AV_PIX_FMT_NONE;
+    m_lastLoggedTransferPixFmt = AV_PIX_FMT_NONE;
 }
 
 void Decoder::CreateConnect() {
@@ -82,7 +93,14 @@ bool Decoder::InitHWDecoder()
                 }
 
 
-                Ctx->hw_device_ctx = av_buffer_ref(m_hwDeviceCtx);
+                AVBufferRef* codecDeviceContext = av_buffer_ref(m_hwDeviceCtx);
+                if (!codecDeviceContext) {
+                    LOG_DEBUG_STREAM() << "Reference hardware device context failed:" << hwDevices[i];
+                    av_buffer_unref(&m_hwDeviceCtx);
+                    continue;
+                }
+
+                Ctx->hw_device_ctx = codecDeviceContext;
                 m_hwPixFmt = config->pix_fmt;
 
                 m_swPixFmt = AV_PIX_FMT_NONE;
@@ -96,7 +114,9 @@ bool Decoder::InitHWDecoder()
     }
 
     m_isHWDecoder = false;
-    m_hwDeviceCtx = nullptr;
+    if (m_hwDeviceCtx) {
+        av_buffer_unref(&m_hwDeviceCtx);
+    }
     m_hwPixFmt = AV_PIX_FMT_NONE;
     m_swPixFmt = AV_PIX_FMT_NONE;
     LOG_DEBUG_STREAM() << "Video uses software decoder";
@@ -148,6 +168,9 @@ int Decoder::InitDecoder(std::shared_ptr<SyncQueue<AVPacketPtr>> packetVec
                          ,std::shared_ptr<SyncQueue<AVFramePtr>> framevec
                          , AVCodecParameters *coderPar
                          , AVRational time_base) {
+    ResetDecoderResources();
+    decoder_type.clear();
+
     if (!coderPar) {
         LOG_WARN_STREAM() << "decoder init failed: codec parameters are null";
         return -1;
@@ -164,15 +187,32 @@ int Decoder::InitDecoder(std::shared_ptr<SyncQueue<AVPacketPtr>> packetVec
     m_PacketVec = packetVec;
     m_FrameVec = framevec;
     m_time_base = time_base;
-    m_lastLoggedTransferPixFmt = AV_PIX_FMT_NONE;
 
     par = coderPar;
 
     codec = avcodec_find_decoder(par->codec_id);
-    if (!codec) return -1;
+    if (!codec) {
+        LOG_WARN_STREAM() << "decoder init failed: decoder was not found for codec"
+                          << avcodec_get_name(par->codec_id);
+        ResetDecoderResources();
+        return -1;
+    }
 
     Ctx = avcodec_alloc_context3(codec);
-    avcodec_parameters_to_context(Ctx, par);
+    if (!Ctx) {
+        LOG_WARN_STREAM() << "decoder init failed: allocate codec context failed";
+        ResetDecoderResources();
+        return -1;
+    }
+
+    int ret = avcodec_parameters_to_context(Ctx, par);
+    if (ret < 0) {
+        char errBuf[256];
+        av_strerror(ret, errBuf, sizeof(errBuf));
+        LOG_WARN_STREAM() << "decoder init failed: copy codec parameters failed:" << errBuf;
+        ResetDecoderResources();
+        return -1;
+    }
 
     // 鍏堢‘瀹氳В鐮佸櫒绫诲瀷
     if (par->codec_type == AVMEDIA_TYPE_VIDEO) {
@@ -187,11 +227,12 @@ int Decoder::InitDecoder(std::shared_ptr<SyncQueue<AVPacketPtr>> packetVec
         m_hwPixFmt = AV_PIX_FMT_NONE;
     }
 
-    int ret = avcodec_open2(Ctx, codec, nullptr);
+    ret = avcodec_open2(Ctx, codec, nullptr);
     if (ret < 0) {
         char errBuf[256];
         av_strerror(ret, errBuf, sizeof(errBuf));
-        LOG_DEBUG_STREAM() << "avcodec_open2 failed:" << errBuf;
+        LOG_WARN_STREAM() << "decoder init failed: avcodec_open2 failed:" << errBuf;
+        ResetDecoderResources();
         return -1;
     }
 
@@ -201,28 +242,56 @@ int Decoder::InitDecoder(std::shared_ptr<SyncQueue<AVPacketPtr>> packetVec
 }
 
 int Decoder::StartDecoder() {
+    if (!Ctx || !m_PacketVec || !m_FrameVec) {
+        LOG_WARN_STREAM() << decoder_type << "decoder start failed: decoder is not initialized";
+        emit DecoderErrorOccurred(QString("%1 decoder is not initialized").arg(decoder_type));
+        return -1;
+    }
+
     LOG_DEBUG_STREAM() << decoder_type << "decoder thread started"
              << (m_isHWDecoder ? "[hardware]" : "[software]");
 
-    frame = av_frame_alloc();
-    if (!frame) {
+    SetWorkerActive(true);
+
+    AVFramePtr decodeFrame = MakeAVFrame();
+    if (!decodeFrame) {
         LOG_DEBUG_STREAM() << "Allocate frame failed";
+        SetWorkerActive(false);
+        emit DecoderErrorOccurred(QString("%1 decoder frame allocation failed").arg(decoder_type));
         return -1;
     }
 
     bool exitRequested = false;
     while (!exitRequested) {
-        // ========== 鍙栧寘閮ㄥ垎 ==========
         if (!WaitIfSuspended()) {
             break;
         }
 
         AVPacketPtr packet;
-        if (!m_PacketVec->Pop(packet)) {
-            if (m_PacketVec->IsStopRequested()) {
-                break;
-            }
+        const SyncQueuePopResult popResult = m_PacketVec->PopWithStatus(packet);
+        if (popResult == SyncQueuePopResult::Interrupted) {
             continue;
+        }
+        if (popResult == SyncQueuePopResult::Stopped) {
+            break;
+        }
+        if (popResult == SyncQueuePopResult::EndOfStream) {
+            const bool drained = DrainDecoder(decodeFrame.get());
+            if (!drained) {
+                if (m_PacketVec->IsStopRequested() || m_FrameVec->IsStopRequested()) {
+                    break;
+                }
+                LOG_WARN_STREAM() << decoder_type << "decoder drain failed";
+                SetWorkerActive(false);
+                emit DecoderErrorOccurred(QString("%1 decoder drain failed").arg(decoder_type));
+                return -1;
+            }
+
+            m_FrameVec->SignalEndOfStream();
+            SetWorkerActive(false);
+            emit DecoderFinished();
+            LOG_DEBUG_STREAM() << decoder_type << "decoder reached end of stream";
+            return 0;
         }
 
         if (!packet) continue;
@@ -244,89 +313,175 @@ int Decoder::StartDecoder() {
             continue;
         }
 
-        // ========== 鎺ユ敹甯ч儴鍒?==========
-        while (true) {
-            if (!WaitIfSuspended()) {
-                exitRequested = true;
-                break;
-            }
-
-            {
-                QMutexLocker locker(&mutex);
-                ret = avcodec_receive_frame(Ctx, frame);
-            }
-            if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) break;
-            if (ret < 0) {
-                char errBuf[256];
-                av_strerror(ret, errBuf, sizeof(errBuf));
-                LOG_DEBUG_STREAM() << "Receive decoded frame failed:" << errBuf;
-                break;
-            }
-
-            // 纭繚 time_base 鏈夋晥
-            if (frame->time_base.den <= 0) {
-                frame->time_base = m_time_base;
-            }
-
-            // 澶勭悊甯э紙鍖哄垎瑙嗛纭В/瑙嗛杞В/闊抽锛?
-            AVFramePtr outFrame;
-
-            if (decoder_type == "Video" && m_isHWDecoder &&
-                frame->format == m_hwPixFmt) {
-                // 瑙嗛纭В甯э細闇€瑕佽浆鎹?
-                outFrame = TransferHWFrame(frame);
-                if (!outFrame) {
-                    LOG_DEBUG_STREAM() << "Hardware frame transfer failed, skipping frame";
-                    continue;
-                }
-            } else {
-                // 视频软解或音频：只引用解码输出帧，格式适配交给后续渲染边界
-                outFrame = MakeAVFrame();
-                if (!outFrame) {
-                    LOG_DEBUG_STREAM() << "Allocate output frame failed";
-                    continue;
-                }
-
-                if (av_frame_ref(outFrame.get(), frame) < 0) {
-                    LOG_DEBUG_STREAM() << "Reference frame failed";
-                    continue;
-                }
-
-                if (outFrame->time_base.den <= 0) {
-                    outFrame->time_base = m_time_base;
-                }
-            }
-
-            // 楠岃瘉杈撳嚭甯?
-            if (decoder_type == "Video" && (outFrame->width <= 0 || outFrame->height <= 0)) {
-                LOG_DEBUG_STREAM() << "Invalid video frame size, dropping";
-                continue;
-            }
-
-            if (ShouldDiscardFrame(outFrame.get())) {
-                av_frame_unref(frame);
-                continue;
-            }
-
-            // ========== 鍏ラ槦 ==========
-            if (!m_FrameVec->Push(std::move(outFrame))) {
-                av_frame_unref(frame);
-                if (m_FrameVec->IsStopRequested()) {
-                    exitRequested = true;
-                    break;
-                }
-                if (IsSuspendRequested()) {
-                    break;
-                }
-                continue;
-            }
-
-            av_frame_unref(frame);  // 閲婃斁 codec 鐨勫紩鐢紝澶嶇敤 frame
+        const ReceiveFramesResult receiveResult = ReceiveAvailableFrames(decodeFrame.get());
+        if (receiveResult == ReceiveFramesResult::Stopped) {
+            exitRequested = true;
+        } else if (receiveResult == ReceiveFramesResult::Failed) {
+            LOG_WARN_STREAM() << decoder_type << "decoder receive failed";
+            SetWorkerActive(false);
+            emit DecoderErrorOccurred(QString("%1 decoder receive failed").arg(decoder_type));
+            return -1;
+        } else if (receiveResult == ReceiveFramesResult::EndOfStream) {
+            m_FrameVec->SignalEndOfStream();
+            SetWorkerActive(false);
+            emit DecoderFinished();
+            return 0;
         }
     }
 
+    SetWorkerActive(false);
     LOG_DEBUG_STREAM() << decoder_type << "decoder thread finished";
     return 0;
+}
+
+void Decoder::SetWorkerActive(bool active)
+{
+    QMutexLocker locker(&mutex);
+    worker_active_ = active;
+    if (!active) {
+        suspended_ = false;
+        suspendCondition_.wakeAll();
+    }
+}
+
+Decoder::ReceiveFramesResult Decoder::ReceiveAvailableFrames(AVFrame* decodeFrame)
+{
+    if (!decodeFrame) {
+        return ReceiveFramesResult::Failed;
+    }
+
+    while (true) {
+        if (!WaitIfSuspended()) {
+            return ReceiveFramesResult::Stopped;
+        }
+
+        int ret = 0;
+        {
+            QMutexLocker locker(&mutex);
+            ret = avcodec_receive_frame(Ctx, decodeFrame);
+        }
+
+        if (ret == AVERROR(EAGAIN)) {
+            return ReceiveFramesResult::NeedMoreInput;
+        }
+        if (ret == AVERROR_EOF) {
+            return ReceiveFramesResult::EndOfStream;
+        }
+        if (ret < 0) {
+            char errBuf[256];
+            av_strerror(ret, errBuf, sizeof(errBuf));
+            LOG_DEBUG_STREAM() << "Receive decoded frame failed:" << errBuf;
+            av_frame_unref(decodeFrame);
+            return ReceiveFramesResult::Failed;
+        }
+
+        if (!ProcessDecodedFrame(decodeFrame)) {
+            return ReceiveFramesResult::Stopped;
+        }
+    }
+}
+
+bool Decoder::ProcessDecodedFrame(AVFrame* decodeFrame)
+{
+    if (!decodeFrame) {
+        return true;
+    }
+
+    if (decodeFrame->time_base.den <= 0) {
+        decodeFrame->time_base = m_time_base;
+    }
+
+    AVFramePtr outFrame;
+    if (decoder_type == "Video" && m_isHWDecoder &&
+        decodeFrame->format == m_hwPixFmt) {
+        outFrame = TransferHWFrame(decodeFrame);
+        if (!outFrame) {
+            LOG_DEBUG_STREAM() << "Hardware frame transfer failed, skipping frame";
+        }
+    } else {
+        outFrame = MakeAVFrame();
+        if (!outFrame) {
+            LOG_DEBUG_STREAM() << "Allocate output frame failed";
+        } else if (av_frame_ref(outFrame.get(), decodeFrame) < 0) {
+            LOG_DEBUG_STREAM() << "Reference frame failed";
+            outFrame.reset();
+        } else if (outFrame->time_base.den <= 0) {
+            outFrame->time_base = m_time_base;
+        }
+    }
+
+    bool shouldSubmit = static_cast<bool>(outFrame);
+    if (shouldSubmit && decoder_type == "Video" &&
+        (outFrame->width <= 0 || outFrame->height <= 0)) {
+        LOG_DEBUG_STREAM() << "Invalid video frame size, dropping";
+        shouldSubmit = false;
+    }
+    if (shouldSubmit && ShouldDiscardFrame(outFrame.get())) {
+        shouldSubmit = false;
+    }
+
+    av_frame_unref(decodeFrame);
+
+    if (!shouldSubmit) {
+        return true;
+    }
+
+    if (!m_FrameVec->Push(std::move(outFrame))) {
+        return !m_FrameVec->IsStopRequested();
+    }
+
+    return true;
+}
+
+bool Decoder::DrainDecoder(AVFrame* decodeFrame)
+{
+    bool drainPacketAccepted = false;
+    while (true) {
+        if (!WaitIfSuspended()) {
+            return false;
+        }
+
+        if (!drainPacketAccepted) {
+            int sendRet = 0;
+            {
+                QMutexLocker locker(&mutex);
+                sendRet = avcodec_send_packet(Ctx, nullptr);
+            }
+
+            if (sendRet == AVERROR_EOF) {
+                return true;
+            }
+            if (sendRet == AVERROR(EAGAIN)) {
+                const ReceiveFramesResult receiveResult = ReceiveAvailableFrames(decodeFrame);
+                if (receiveResult == ReceiveFramesResult::Stopped ||
+                    receiveResult == ReceiveFramesResult::Failed) {
+                    return false;
+                }
+                if (receiveResult == ReceiveFramesResult::EndOfStream) {
+                    return true;
+                }
+                continue;
+            }
+            if (sendRet < 0) {
+                char errBuf[256];
+                av_strerror(sendRet, errBuf, sizeof(errBuf));
+                LOG_WARN_STREAM() << "Send decoder drain packet failed:" << errBuf;
+                return false;
+            }
+
+            drainPacketAccepted = true;
+        }
+
+        const ReceiveFramesResult receiveResult = ReceiveAvailableFrames(decodeFrame);
+        if (receiveResult == ReceiveFramesResult::EndOfStream) {
+            return true;
+        }
+        if (receiveResult == ReceiveFramesResult::NeedMoreInput) {
+            LOG_WARN_STREAM() << decoder_type
+                              << "decoder requested more input after accepting drain packet";
+        }
+        return false;
+    }
 }
 
 int Decoder::Flush() {
@@ -352,6 +507,9 @@ int Decoder::SuspendAndWait() {
         }
         pause_flag = true;
         suspend_requested_ = true;
+        if (!worker_active_) {
+            return 0;
+        }
         if (suspended_) {
             return 0;
         }
@@ -366,7 +524,7 @@ int Decoder::SuspendAndWait() {
     }
 
     QMutexLocker locker(&mutex);
-    while (!suspended_ && !stop_flag) {
+    while (worker_active_ && !suspended_ && !stop_flag) {
         suspendCondition_.wait(&mutex);
     }
 
@@ -442,12 +600,20 @@ int Decoder::Stop() {
 }
 
 int Decoder::Pause(){
-    mutex.lock();
-    pause_flag = true;
-    suspend_requested_ = true;
-    LOG_DEBUG_STREAM() << decoder_type << "decoder thread paused";
-    suspendCondition_.wakeAll();
-    mutex.unlock();
+    {
+        QMutexLocker locker(&mutex);
+        pause_flag = true;
+        suspend_requested_ = true;
+        LOG_DEBUG_STREAM() << decoder_type << "decoder thread paused";
+        suspendCondition_.wakeAll();
+    }
+
+    if (m_PacketVec) {
+        m_PacketVec->InterruptWait();
+    }
+    if (m_FrameVec) {
+        m_FrameVec->InterruptWait();
+    }
 
     return 0;
 }

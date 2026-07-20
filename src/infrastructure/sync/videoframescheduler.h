@@ -3,6 +3,7 @@
 
 #include <QElapsedTimer>
 #include <QObject>
+#include <QTimer>
 #include <atomic>
 #include <cstdint>
 #include <memory>
@@ -110,6 +111,12 @@ public:
      * @return 无锁、按值返回的只读快照
      */
     RuntimeMetricsSnapshot RuntimeMetrics() const;
+
+signals:
+    /**
+     * @brief VideoPlaybackDrained 视频帧队列已到达流尾且全部消费完成
+     */
+    void VideoPlaybackDrained();
 
 private slots:
     /**
@@ -262,11 +269,13 @@ private:
     bool hasPreviewPresentedPts_ = false;	///< 是否已有预览显示时间戳
     double lastPreviewPresentedPtsMs_ = 0.0;	///< 最近一次预览显示帧 PTS
     std::atomic<bool> running_{false};	///< 是否正在调度
+    bool playbackDrainedEmitted_ = false; ///< 当前启动周期是否已经发出播放耗尽信号
     std::atomic<std::uint64_t> schedulerDroppedFrames_{0};	///< 调度累计丢帧数
     std::atomic<std::uint64_t> submittedFrames_{0};	///< 提交给预览输出链的累计帧数
     std::atomic<int> submittedFrameWidth_{0};	///< 最近一次提交帧宽度
     std::atomic<int> submittedFrameHeight_{0};	///< 最近一次提交帧高度
 
+    QTimer tickTimer_; ///< 唯一的单次 Tick 定时器，Stop 时可取消待执行调度
     QElapsedTimer cadenceTimer_; ///< 基础帧率节奏使用的单调时钟
     qint64 nextFrameDeadlineNs_ = 0; ///< 下一次调度的绝对截止时间，单位纳秒
     bool hasCadenceDeadline_ = false; ///< 是否已经建立绝对截止时间

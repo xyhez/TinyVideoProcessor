@@ -271,6 +271,26 @@ private:
     void HandleDemuxFinished();
 
     /**
+     * @brief HandleAudioPlaybackDrained 记录音频消费者已排空自然结束数据
+     */
+    void HandleAudioPlaybackDrained();
+
+    /**
+     * @brief HandleVideoPlaybackDrained 记录视频消费者已排空自然结束数据
+     */
+    void HandleVideoPlaybackDrained();
+
+    /**
+     * @brief TryFinalizePlayback 在全部自然结束条件满足后广播播放完成
+     */
+    void TryFinalizePlayback();
+
+    /**
+     * @brief ResetPlaybackCompletionState 重置本轮播放的自然结束汇合状态
+     */
+    void ResetPlaybackCompletionState();
+
+    /**
      * @brief HandleDemuxError 处理解复用运行期错误
      * @param message 错误信息
      */
@@ -303,6 +323,11 @@ private:
      */
     void FlushDecoders();
 
+    /**
+     * @brief ResumeQueues 清除队列的停止、中断和 EOS 状态
+     */
+    void ResumeQueues();
+
     std::shared_ptr<SyncQueue<AVPacketPtr>> APacket_ = nullptr;	///< 音频包队列
     std::shared_ptr<SyncQueue<AVPacketPtr>> VPacket_ = nullptr;	///< 视频包队列
     std::shared_ptr<SyncQueue<AVFramePtr>> AFrame_ = nullptr;	///< 音频帧队列
@@ -332,6 +357,10 @@ private:
 
     std::unique_ptr<QTimer> positionTimer_;	///< 播放位置刷新定时器
     bool playbackFinished_ = false;	///< 当前管线是否已自然播放结束
+    bool demuxEndOfStream_ = false;	///< 解复用器是否已自然读到 EOS
+    bool audioPlaybackDrained_ = true;	///< 音频消费者是否已排空，无码流时恒为 true
+    bool videoPlaybackDrained_ = false;	///< 视频消费者是否已排空
+    bool shuttingDown_ = false;	///< 资源释放期间抑制迟到的自然结束信号
 };
 
 #endif // TINYVIDEOPROCESSOR_MEDIAPIPELINE_H

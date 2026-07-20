@@ -5,6 +5,7 @@
 #include <QMutex>
 #include <QThread>
 #include <QWaitCondition>
+#include <QString>
 #include <memory>
 
 #include "core/ffmpeg_raii.h"
@@ -110,8 +111,56 @@ public:
 
 
 signals:
+    /**
+     * @brief DecoderFinished 输入结束且解码器缓存已排空
+     */
+    void DecoderFinished();
+
+    /**
+     * @brief DecoderErrorOccurred 解码工作循环发生不可恢复错误
+     * @param message 错误说明
+     */
+    void DecoderErrorOccurred(QString message);
 
 private:
+    enum class ReceiveFramesResult {
+        NeedMoreInput,
+        EndOfStream,
+        Stopped,
+        Failed
+    };
+
+    /**
+     * @brief ResetDecoderResources 释放解码器和硬件设备上下文并重置状态
+     */
+    void ResetDecoderResources();
+
+    /**
+     * @brief ReceiveAvailableFrames 接收并提交当前解码器可用的全部输出帧
+     * @param decodeFrame 可复用的解码输出帧
+     * @return 接收终止原因
+     */
+    ReceiveFramesResult ReceiveAvailableFrames(AVFrame* decodeFrame);
+
+    /**
+     * @brief ProcessDecodedFrame 转换、过滤并提交一帧解码输出
+     * @param decodeFrame 解码器输出帧
+     * @return true 可继续解码，false 已请求停止
+     */
+    bool ProcessDecodedFrame(AVFrame* decodeFrame);
+
+    /**
+     * @brief DrainDecoder 发送空 packet 并排空解码器缓存
+     * @param decodeFrame 可复用的解码输出帧
+     * @return true 排空完成，false 失败或停止
+     */
+    bool DrainDecoder(AVFrame* decodeFrame);
+
+    /**
+     * @brief SetWorkerActive 更新解码工作循环状态并唤醒挂起等待者
+     */
+    void SetWorkerActive(bool active);
+
     /**
      * @brief InitHWDecoder 初始化硬件解码器
      * @return true 成功
@@ -166,13 +215,12 @@ private:
 
     bool suspend_requested_ = false;	///< 管线挂起请求
     bool suspended_ = false;	///< 已到达管线挂起安全点
+    bool worker_active_ = false;	///< 解码工作循环是否仍在执行
     QWaitCondition suspendCondition_;	///< 管线挂起条件变量
 
     mutable QMutex mutex;	///< 互斥锁
 
     QString decoder_type = "";	///< 解码器类型
-
-    AVFrame *frame = nullptr;	///< 当前解码帧
 
     AVRational m_time_base;	///< 流时间基
 

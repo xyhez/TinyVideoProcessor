@@ -9,6 +9,16 @@
 #include <utility>
 
 /**
+ * @brief SyncQueue 阻塞出队结果
+ */
+enum class SyncQueuePopResult {
+    Item,          ///< 成功取得一个队列元素
+    Interrupted,   ///< 等待被可恢复地中断
+    Stopped,       ///< 队列已被终止
+    EndOfStream    ///< 队列已到流末尾且没有剩余元素
+};
+
+/**
  * @brief 线程同步队列
  * 使用方法:
  * std::shared_ptr<SyncQueue<T>>
@@ -25,6 +35,7 @@ private:
     size_t max_size_;	///< 队列最大容量
     std::atomic<bool> stop_flag_;	///< 停止标志
     std::atomic<bool> wait_interrupted_;	///< 等待中断标志
+    std::atomic<bool> end_of_stream_;	///< 流末尾标志
 
     /**
      * @brief RawPointer 获取裸指针观察视图
@@ -47,7 +58,8 @@ public:
     explicit SyncQueue(size_t max_size)
     : max_size_(max_size)
     , stop_flag_(false)
-    , wait_interrupted_(false) {
+    , wait_interrupted_(false)
+    , end_of_stream_(false) {
 
     }
 
@@ -62,15 +74,16 @@ public:
      * @brief 阻塞入队，队列满则等待
      * @param item 待入队元素
      * @return true 入队成功
-     * @return false 队列停止或等待被中断
+     * @return false 队列停止、等待被中断或已到流末尾
      */
     bool Push(T item) {
         {
             std::unique_lock<std::mutex> lock(mutex_);
             cv_not_full_.wait(lock, [this]{ return
-                    raw_queue_.size() < max_size_ || stop_flag_ || wait_interrupted_;
+                    raw_queue_.size() < max_size_ || stop_flag_ ||
+                    wait_interrupted_ || end_of_stream_;
             });
-            if (stop_flag_ || wait_interrupted_) {
+            if (stop_flag_ || wait_interrupted_ || end_of_stream_) {
                 return false;
             }
             raw_queue_.push_back(std::move(item));
@@ -80,24 +93,42 @@ public:
     }
 
     /**
-     * @brief 阻塞出队，队列为空则等待
+     * @brief 阻塞出队并返回明确的队列状态
      * @param item 输出的队首元素
-     * @return true 出队成功
-     * @return false 队列停止、等待被中断或队列为空
+     * @return 按 Stopped、Interrupted、Item、EndOfStream 优先级返回结果
      */
-    bool Pop(T& item) {
+    SyncQueuePopResult PopWithStatus(T& item) {
         {
             std::unique_lock<std::mutex> lock(mutex_);
             cv_not_empty_.wait(lock, [this]{ return
-                !raw_queue_.empty() || stop_flag_ || wait_interrupted_;
+                !raw_queue_.empty() || stop_flag_ || wait_interrupted_ || end_of_stream_;
             });
 
-            if (raw_queue_.empty()) return false;
+            if (stop_flag_) {
+                return SyncQueuePopResult::Stopped;
+            }
+            if (wait_interrupted_) {
+                return SyncQueuePopResult::Interrupted;
+            }
+            if (raw_queue_.empty()) {
+                return SyncQueuePopResult::EndOfStream;
+            }
+
             item = std::move(raw_queue_.front());
             raw_queue_.pop_front();
         }
         cv_not_full_.notify_one();
-        return item != nullptr;
+        return SyncQueuePopResult::Item;
+    }
+
+    /**
+     * @brief 阻塞出队，队列为空则等待
+     * @param item 输出的队首元素
+     * @return true 出队成功
+     * @return false 队列停止、等待被中断、到达流末尾或元素为空
+     */
+    bool Pop(T& item) {
+        return PopWithStatus(item) == SyncQueuePopResult::Item && item != nullptr;
     }
 
     /**
@@ -226,6 +257,7 @@ public:
      * @param flag 是否请求停止
      */
     void SetStopFlag(bool flag) {
+        std::lock_guard<std::mutex> lock(mutex_);
         stop_flag_ = flag;
     }
 
@@ -248,6 +280,15 @@ public:
     }
 
     /**
+     * @brief IsEndOfStream 判断队列是否已收到流末尾信号
+     * @return true 已到流末尾
+     * @return false 尚未到流末尾
+     */
+    bool IsEndOfStream() const {
+        return end_of_stream_;
+    }
+
+    /**
      * @brief RequestStop 请求停止队列并唤醒等待线程
      */
     void RequestStop() {
@@ -256,18 +297,37 @@ public:
     }
 
     /**
+     * @brief SignalEndOfStream 标记流末尾并唤醒等待线程
+     */
+    void SignalEndOfStream() {
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            end_of_stream_ = true;
+        }
+        WakeAll();
+    }
+
+    /**
      * @brief Resume 恢复队列运行并恢复等待
      */
     void Resume() {
-        SetStopFlag(false);
-        ResumeWait();
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            stop_flag_ = false;
+            wait_interrupted_ = false;
+            end_of_stream_ = false;
+        }
+        WakeAll();
     }
 
     /**
      * @brief InterruptWait 非终止式中断当前等待
      */
     void InterruptWait() {
-        wait_interrupted_ = true;
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            wait_interrupted_ = true;
+        }
         WakeAll();
     }
 
@@ -275,7 +335,10 @@ public:
      * @brief ResumeWait 恢复被中断的等待状态
      */
     void ResumeWait() {
-        wait_interrupted_ = false;
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            wait_interrupted_ = false;
+        }
         WakeAll();
     }
 };

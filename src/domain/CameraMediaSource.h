@@ -6,6 +6,8 @@
 #include "IMediaSource.h"
 #include "CameraTypes.h"
 
+#include <atomic>
+
 /**
  * @brief CameraMediaSource 摄像头媒体源实现
  *
@@ -112,6 +114,16 @@ public:
     bool AllowsDuplicateOpen() const override;
 
     /**
+     * @brief RequestInterrupt 请求中断当前摄像头阻塞操作
+     */
+    void RequestInterrupt() override;
+
+    /**
+     * @brief ClearInterrupt 清除摄像头阻塞操作中断请求
+     */
+    void ClearInterrupt() override;
+
+    /**
      * @brief IsSeekable 摄像头不支持 seek
      * @return false
      */
@@ -136,6 +148,13 @@ private:
      */
     void SetLastError(const QString& message);
 
+    /**
+     * @brief InterruptCallback FFmpeg 阻塞操作中断回调
+     * @param opaque CameraMediaSource 实例指针
+     * @return 1 请求中断，0 继续等待
+     */
+    static int InterruptCallback(void* opaque);
+
     AVFormatContext* formatContext_ = nullptr;	///< FFmpeg 格式上下文
     Fileinfo sourceInfo_;	///< 摄像头媒体信息
     QString lastError_;	///< 最近一次错误信息
@@ -146,6 +165,7 @@ private:
     int rtbufsize_ = 100;	///< 实时缓冲区大小，单位 MB
     QString pixelFormat_;	///< 像素格式
     QString codec_;	///< 编码格式
+    std::atomic<bool> interruptRequested_ = false;	///< 是否请求中断 FFmpeg 阻塞操作
 };
 
 #endif // TINYVIDEOPROCESSOR_CAMERAMEDIASOURCE_H

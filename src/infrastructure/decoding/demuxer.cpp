@@ -146,6 +146,11 @@ int Demuxer::StartDemuxer()
         return -1;
     }
 
+    {
+        QMutexLocker locker(&mutex);
+        worker_active_ = true;
+    }
+
     bool reachedEof = false;
     bool failed = false;
     QString errorMessage;
@@ -168,8 +173,11 @@ int Demuxer::StartDemuxer()
             if (stop_flag) {
                 break;
             }
-            ret = av_read_frame(ic, packet.get());
         }
+
+        // 阻塞 I/O 期间不能持有状态锁。Stop/Suspend 需要立即写入状态，
+        // 实时源再通过 IMediaSource 的 interrupt callback 打断底层读取。
+        ret = av_read_frame(ic, packet.get());
 
         if (ret < 0) {
             {
@@ -251,10 +259,10 @@ int Demuxer::StartDemuxer()
 
     if (reachedEof) {
         if (m_APacket) {
-            m_APacket->RequestStop();
+            m_APacket->SignalEndOfStream();
         }
         if (m_VPacket) {
-            m_VPacket->RequestStop();
+            m_VPacket->SignalEndOfStream();
         }
         emit DemuxFinished();
     }
@@ -267,6 +275,13 @@ int Demuxer::StartDemuxer()
             m_VPacket->RequestStop();
         }
         emit DemuxErrorOccurred(errorMessage);
+    }
+
+    {
+        QMutexLocker locker(&mutex);
+        worker_active_ = false;
+        suspended_ = false;
+        suspendCondition_.wakeAll();
     }
 
     return 0;
@@ -338,6 +353,9 @@ int Demuxer::SuspendAndWait()
         }
         pause_flag = true;
         suspend_requested_ = true;
+        if (!worker_active_) {
+            return 0;
+        }
         if (suspended_) {
             return 0;
         }
@@ -352,7 +370,7 @@ int Demuxer::SuspendAndWait()
     }
 
     QMutexLocker locker(&mutex);
-    while (!suspended_ && !stop_flag) {
+    while (worker_active_ && !suspended_ && !stop_flag) {
         suspendCondition_.wait(&mutex);
     }
 
@@ -418,6 +436,13 @@ int Demuxer::Pause()
     LOG_DEBUG("Demuxer thread paused");
     suspendCondition_.wakeAll();
     mutex.unlock();
+
+    if (m_APacket) {
+        m_APacket->InterruptWait();
+    }
+    if (m_VPacket) {
+        m_VPacket->InterruptWait();
+    }
 
     return 0;
 }

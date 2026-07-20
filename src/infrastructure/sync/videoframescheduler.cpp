@@ -2,7 +2,6 @@
 
 #include "tiny_log/Logging.h"
 
-#include <QTimer>
 #include <QtGlobal>
 #include <cmath>
 #include <utility>
@@ -32,7 +31,10 @@ bool IsSupportedSpeed(double speed)
 
 VideoFrameScheduler::VideoFrameScheduler(QObject* parent)
     : QObject(parent)
+    , tickTimer_(this)
 {
+    tickTimer_.setSingleShot(true);
+    connect(&tickTimer_, &QTimer::timeout, this, &VideoFrameScheduler::Tick);
 }
 
 VideoFrameScheduler::~VideoFrameScheduler()
@@ -68,14 +70,16 @@ void VideoFrameScheduler::Start()
     }
 
     running_.store(true);
+    playbackDrainedEmitted_ = false;
     hasPreviewPresentedPts_ = false;
     ResetCadenceTiming();
-    QTimer::singleShot(0, this, &VideoFrameScheduler::Tick);
+    tickTimer_.start(0);
 }
 
 void VideoFrameScheduler::Stop()
 {
     running_.store(false);
+    tickTimer_.stop();
     ResetCadenceTiming();
     if (frameQueue_) {
         frameQueue_->WakeAll();
@@ -144,6 +148,15 @@ void VideoFrameScheduler::Tick()
 
     FrameTimingSnapshot nextFrame;
     if (!PeekNextFrameTiming(nextFrame)) {
+        if (frameQueue_->IsEndOfStream() && frameQueue_->Empty()) {
+            if (!playbackDrainedEmitted_) {
+                playbackDrainedEmitted_ = true;
+                Stop();
+                emit VideoPlaybackDrained();
+            }
+            return;
+        }
+
         ScheduleNextFrame(scaledInterval);
         return;
     }
@@ -377,5 +390,5 @@ void VideoFrameScheduler::ScheduleNextFrameAfterProcessing(int scaledIntervalMs,
 
 void VideoFrameScheduler::ScheduleNextFrame(int delayMs)
 {
-    QTimer::singleShot(delayMs, this, &VideoFrameScheduler::Tick);
+    tickTimer_.start(delayMs);
 }

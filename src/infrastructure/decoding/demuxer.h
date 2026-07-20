@@ -181,6 +181,7 @@ private:
 
     bool suspend_requested_ = false;	///< 管线挂起请求
     bool suspended_ = false;	///< 已到达管线挂起安全点
+    bool worker_active_ = false;	///< 解复用工作循环是否仍在执行
     QWaitCondition suspendCondition_;	///< 管线挂起条件变量
 
     mutable QMutex mutex;	///< 互斥锁
