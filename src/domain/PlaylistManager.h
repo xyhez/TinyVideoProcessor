@@ -18,10 +18,10 @@ class PlaylistManager : public QObject {
 
 public:
     enum class PlayMode {
-        Sequential,
-        ListLoop,
-        SingleLoop,
-        Random
+        Sequential, ///< 顺序播放
+        ListLoop,   ///< 列表循环
+        SingleLoop, ///< 单个循环
+        Random      ///< 随机播放
     };
 
     /**

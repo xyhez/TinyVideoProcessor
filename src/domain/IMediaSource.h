@@ -8,10 +8,11 @@ extern "C" {
 #include <libavutil/frame.h>
 }
 
+// 媒体源类型
 enum class MediaSourceType {
-    File,
-    Camera,
-    Network
+    File,   ///< 文件
+    Camera, ///< 相机
+    Network ///< 网络
 };
 
 struct Fileinfo {
