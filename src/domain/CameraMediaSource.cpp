@@ -25,10 +25,7 @@ CameraMediaSource::CameraMediaSource(const CameraOpenOptions& options)
 
 CameraMediaSource::~CameraMediaSource()
 {
-    if (formatContext_) {
-        avformat_close_input(&formatContext_);
-        formatContext_ = nullptr;
-    }
+    Close();
 }
 
 bool CameraMediaSource::Open()
@@ -37,6 +34,7 @@ bool CameraMediaSource::Open()
     if (formatContext_) {
         Close();
     }
+    ClearInterrupt();
 
     if (deviceName_.trimmed().isEmpty()) {
         SetLastError("Camera device name is empty");
@@ -79,6 +77,15 @@ bool CameraMediaSource::Open()
     if (!codec_.isEmpty()) {
         av_dict_set(&options, "vcodec", codec_.toUtf8().constData(), 0);
     }
+
+    formatContext_ = avformat_alloc_context();
+    if (!formatContext_) {
+        av_dict_free(&options);
+        SetLastError("Failed to create camera input context");
+        return false;
+    }
+    formatContext_->interrupt_callback.callback = &CameraMediaSource::InterruptCallback;
+    formatContext_->interrupt_callback.opaque = this;
 
     // 打开摄像头设备
     int ret = avformat_open_input(&formatContext_,
@@ -153,6 +160,7 @@ bool CameraMediaSource::Open()
 
 bool CameraMediaSource::Close()
 {
+    RequestInterrupt();
     if (formatContext_) {
         LOG_DEBUG("CameraMediaSource::Close() - close camera");
         avformat_close_input(&formatContext_);
@@ -221,6 +229,16 @@ bool CameraMediaSource::AllowsDuplicateOpen() const
     return false;
 }
 
+void CameraMediaSource::RequestInterrupt()
+{
+    interruptRequested_.store(true);
+}
+
+void CameraMediaSource::ClearInterrupt()
+{
+    interruptRequested_.store(false);
+}
+
 bool CameraMediaSource::IsSeekable() const {
     return false; // 摄像头不支持 seek
 }
@@ -237,4 +255,14 @@ void CameraMediaSource::SetLastError(const QString& message)
 {
     lastError_ = message;
     LOG_WARN("CameraMediaSource:", lastError_);
+}
+
+int CameraMediaSource::InterruptCallback(void* opaque)
+{
+    auto* source = static_cast<CameraMediaSource*>(opaque);
+    if (!source) {
+        return 0;
+    }
+
+    return source->interruptRequested_.load() ? 1 : 0;
 }

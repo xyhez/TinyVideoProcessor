@@ -16,6 +16,10 @@ private slots:
     void fullQueueBlocksProducerUntilPop();
     void interruptUnblocksWaitingConsumer();
     void stopAndResumeControlsQueueLifecycle();
+    void popWithStatusPreservesPriorityAndItems();
+    void endOfStreamDrainsItemsAndRejectsPush();
+    void endOfStreamUnblocksWaitingOperations();
+    void resumeWaitOnlyClearsInterrupt();
 };
 
 void SyncQueueTest::pushPopMaintainsOrder()
@@ -96,6 +100,90 @@ void SyncQueueTest::stopAndResumeControlsQueueLifecycle()
     std::unique_ptr<int> item;
     QVERIFY(queue.Pop(item));
     QCOMPARE(*item, 2);
+}
+
+void SyncQueueTest::popWithStatusPreservesPriorityAndItems()
+{
+    SyncQueue<std::unique_ptr<int>> queue(2);
+    QVERIFY(queue.Push(std::make_unique<int>(7)));
+    queue.SignalEndOfStream();
+    queue.InterruptWait();
+    queue.RequestStop();
+
+    std::unique_ptr<int> item;
+    QVERIFY(queue.PopWithStatus(item) == SyncQueuePopResult::Stopped);
+    QCOMPARE(queue.Size(), size_t(1));
+
+    queue.SetStopFlag(false);
+    QVERIFY(queue.PopWithStatus(item) == SyncQueuePopResult::Interrupted);
+    QCOMPARE(queue.Size(), size_t(1));
+
+    queue.ResumeWait();
+    QVERIFY(queue.PopWithStatus(item) == SyncQueuePopResult::Item);
+    QCOMPARE(*item, 7);
+    QVERIFY(queue.PopWithStatus(item) == SyncQueuePopResult::EndOfStream);
+}
+
+void SyncQueueTest::endOfStreamDrainsItemsAndRejectsPush()
+{
+    SyncQueue<std::unique_ptr<int>> queue(2);
+    QVERIFY(queue.Push(std::make_unique<int>(11)));
+
+    queue.SignalEndOfStream();
+    QVERIFY(queue.IsEndOfStream());
+    QVERIFY(!queue.Push(std::make_unique<int>(22)));
+
+    std::unique_ptr<int> item;
+    QVERIFY(queue.PopWithStatus(item) == SyncQueuePopResult::Item);
+    QCOMPARE(*item, 11);
+    QVERIFY(queue.PopWithStatus(item) == SyncQueuePopResult::EndOfStream);
+
+    queue.Resume();
+    QVERIFY(!queue.IsStopRequested());
+    QVERIFY(!queue.IsWaitInterrupted());
+    QVERIFY(!queue.IsEndOfStream());
+    QVERIFY(queue.Push(std::make_unique<int>(33)));
+}
+
+void SyncQueueTest::endOfStreamUnblocksWaitingOperations()
+{
+    SyncQueue<std::unique_ptr<int>> consumerQueue(1);
+    std::promise<void> consumerStarted;
+    auto consumer = std::async(std::launch::async, [&consumerQueue, &consumerStarted]() {
+        consumerStarted.set_value();
+        std::unique_ptr<int> item;
+        return consumerQueue.PopWithStatus(item);
+    });
+
+    consumerStarted.get_future().wait();
+    consumerQueue.SignalEndOfStream();
+    QVERIFY(consumer.wait_for(1s) == std::future_status::ready);
+    QVERIFY(consumer.get() == SyncQueuePopResult::EndOfStream);
+
+    SyncQueue<std::unique_ptr<int>> producerQueue(1);
+    QVERIFY(producerQueue.Push(std::make_unique<int>(1)));
+    auto producer = std::async(std::launch::async, [&producerQueue]() {
+        return producerQueue.Push(std::make_unique<int>(2));
+    });
+
+    QCOMPARE(producer.wait_for(50ms), std::future_status::timeout);
+    producerQueue.SignalEndOfStream();
+    QVERIFY(producer.wait_for(1s) == std::future_status::ready);
+    QVERIFY(!producer.get());
+}
+
+void SyncQueueTest::resumeWaitOnlyClearsInterrupt()
+{
+    SyncQueue<std::unique_ptr<int>> queue(1);
+    queue.SignalEndOfStream();
+    queue.InterruptWait();
+
+    queue.ResumeWait();
+    QVERIFY(!queue.IsWaitInterrupted());
+    QVERIFY(queue.IsEndOfStream());
+
+    std::unique_ptr<int> item;
+    QVERIFY(queue.PopWithStatus(item) == SyncQueuePopResult::EndOfStream);
 }
 
 QTEST_APPLESS_MAIN(SyncQueueTest)

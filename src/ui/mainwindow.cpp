@@ -5,6 +5,8 @@
 #include "infrastructure/rendering/multiviewrenderer.h"
 #include "infrastructure/rendering/singlestreamframesinkadapter.h"
 #include "ui/CameraSettingsDialog.h"
+#include "ui/StreamListItemDelegate.h"
+#include "ui/StreamViewportOverlay.h"
 #include "tiny_log/Logging.h"
 
 #include <QAbstractItemView>
@@ -20,9 +22,78 @@
 #include <QRadioButton>
 #include <QSignalBlocker>
 #include <QSpinBox>
+#include <QStatusBar>
 #include <QStringList>
 #include <QTimer>
 #include <QUrl>
+#include <QVariant>
+
+namespace {
+
+QString StreamSourceKindDisplayName(StreamSourceKind sourceKind) {
+    switch (sourceKind) {
+    case StreamSourceKind::File:
+        return QStringLiteral("本地文件");
+    case StreamSourceKind::Camera:
+        return QStringLiteral("摄像头");
+    case StreamSourceKind::Rtsp:
+        return QStringLiteral("RTSP");
+    case StreamSourceKind::Unknown:
+        return QStringLiteral("未知来源");
+    }
+    return QStringLiteral("未知来源");
+}
+
+QStringList StreamStatusLabels(const StreamPresentationState& state) {
+    QStringList labels;
+    if (!state.lastError.isEmpty()) {
+        labels.append(QStringLiteral("最近错误"));
+    }
+    if (state.isActiveVideo) {
+        labels.append(QStringLiteral("主画面"));
+    }
+    if (state.isActiveAudio) {
+        labels.append(QStringLiteral("音频输出"));
+    }
+    if (state.isRealtime) {
+        labels.append(QStringLiteral("LIVE"));
+    }
+    if (labels.isEmpty()) {
+        labels.append(QStringLiteral("已加载"));
+    }
+    return labels;
+}
+
+QString StreamPresentationToolTip(const StreamPresentationState& state) {
+    return QStringLiteral(
+        "视频流 ID：%1\n名称：%2\n来源：%3\n画面槽位：%4\n状态：%5\n音频轨道：%6\n最近错误：%7")
+        .arg(state.streamId)
+        .arg(state.displayName)
+        .arg(StreamSourceKindDisplayName(state.sourceKind))
+        .arg(state.slotIndex >= 0
+            ? QString::number(state.slotIndex + 1)
+            : QStringLiteral("未绑定"))
+        .arg(StreamStatusLabels(state).join(QStringLiteral("、")))
+        .arg(state.hasAudio ? QStringLiteral("有") : QStringLiteral("无"))
+        .arg(state.lastError.isEmpty() ? QStringLiteral("无") : state.lastError);
+}
+
+QString StreamPresentationAccessibleText(const StreamPresentationState& state) {
+    return QStringLiteral("%1，%2，%3")
+        .arg(state.displayName)
+        .arg(StreamSourceKindDisplayName(state.sourceKind))
+        .arg(StreamStatusLabels(state).join(QStringLiteral("，")));
+}
+
+QString CompactStatusName(const QString& name) {
+    constexpr int kMaximumStatusNameLength = 18;
+    if (name.size() <= kMaximumStatusNameLength) {
+        return name;
+    }
+    return name.left(kMaximumStatusNameLength - 1) + QStringLiteral("…");
+}
+
+} // namespace
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -31,19 +102,18 @@ MainWindow::MainWindow(QWidget *parent)
     , playlistManager_(std::make_unique<PlaylistManager>())
 {
     ui->setupUi(this);
-    this->setWindowTitle("modernFFplay-V2.0");
+    this->setWindowTitle("TinyVideoProcessor");
     ui->listWidget_files->setSelectionMode(QAbstractItemView::SingleSelection);
     ui->listWidget_streams->setSelectionMode(QAbstractItemView::SingleSelection);
     ui->listWidget_streams->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    ui->listWidget_streams->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+    ui->listWidget_streams->setUniformItemSizes(true);
+    ui->listWidget_streams->setItemDelegate(
+        new StreamListItemDelegate(ui->listWidget_streams));
+    ui->splitter_workspace->setStretchFactor(0, 0);
+    ui->splitter_workspace->setStretchFactor(1, 1);
+    ui->splitter_workspace->setStretchFactor(2, 0);
     setMouseTracking(true);
-    ui->centralwidget->setMouseTracking(true);
-    ui->widget_func->setMouseTracking(true);
-    ui->listWidget_files->setMouseTracking(true);
-    ui->listWidget_streams->setMouseTracking(true);
-    ui->centralwidget->installEventFilter(this);
-    ui->widget_func->installEventFilter(this);
-    ui->listWidget_files->installEventFilter(this);
-    ui->listWidget_streams->installEventFilter(this);
     InitializeVideoArea();
     InitializePlayModeComboBox();
     InitializeVolumeControls();
@@ -54,13 +124,26 @@ MainWindow::MainWindow(QWidget *parent)
     InitializeCursorHideTimer();
     InitializeMultiViewRenderer();
     InitializeMultiViewLayout();
+    InitializeRuntimeMetrics();
+
+    ui->centralwidget->setMouseTracking(true);
+    ui->centralwidget->installEventFilter(this);
+    const auto childWidgets = ui->centralwidget->findChildren<QWidget*>();
+    for (QWidget* widget : childWidgets) {
+        widget->setMouseTracking(true);
+        widget->installEventFilter(this);
+    }
 
     CreateConnects();
+    ui->statusbar->showMessage("正在初始化...");
 
     QString filepath = "../../resource/动物发现自己被绿.mp4";
     playlistManager_->AddFile(filepath);
     if (!SwitchToPlaylistIndex(playlistManager_->CurrentIndex(), false)) {
         LOG_CRITICAL_STREAM() << "Controller initialization failed";
+        UpdatePlaybackControls(mediaPlayController_->State());
+        RefreshStreamView();
+        ui->statusbar->showMessage("初始化失败");
         return;
     }
 
@@ -85,14 +168,18 @@ void MainWindow::CreateConnects() {
             && mediaPlayController_->IsActiveStreamRealtime()) {
             ui->slider_progress->setRange(0, 0);
             ui->slider_progress->setEnabled(false);
+            ui->slider_progress->setToolTip("实时视频源不支持拖动进度");
             ui->label_duration->setText("LIVE");
             return;
         }
 
         ui->slider_progress->setRange(0,static_cast<int>(duration));
-        ui->slider_progress->setEnabled(mediaPlayController_->IsActiveStreamSeekable()
-                                        && mediaPlayController_->HasActiveStreamDuration()
-                                        && static_cast<int>(duration) > 0);
+        const bool canSeek = mediaPlayController_->IsActiveStreamSeekable()
+            && mediaPlayController_->HasActiveStreamDuration()
+            && static_cast<int>(duration) > 0;
+        ui->slider_progress->setEnabled(canSeek);
+        ui->slider_progress->setToolTip(
+            canSeek ? "拖动定位当前视频" : "当前视频源暂不支持定位播放");
         ui->label_duration->setText(mediaPlayController_->HasActiveStreamDuration()
                                     ? formatTime(duration)
                                     : formatTime(0.0));
@@ -114,6 +201,7 @@ void MainWindow::CreateConnects() {
                 QSignalBlocker blocker(ui->checkBox_imageProcessingEnabled);
                 ui->checkBox_imageProcessingEnabled->setChecked(enabled);
                 UpdateImageProcessingControls();
+                RefreshRuntimeMetrics();
             });
 
     connect(mediaPlayController_.get(), &MediaPlayController::ImageProcessingModeChanged,
@@ -142,15 +230,21 @@ void MainWindow::CreateConnects() {
 
     connect(mediaPlayController_.get(), &MediaPlayController::StreamAdded,
             this, [this](MediaPlayController::StreamId id) {
-                if (!streamDisplayNames_.contains(id)) {
-                    streamDisplayNames_.insert(id, QString("Stream %1").arg(id));
+                if (!streamPresentationMetadata_.contains(id)) {
+                    RegisterStreamPresentationMetadata(
+                        id,
+                        QString("视频源 %1").arg(id),
+                        StreamSourceKind::Unknown,
+                        false);
                 }
                 RefreshStreamView();
             });
 
     connect(mediaPlayController_.get(), &MediaPlayController::StreamRemoved,
             this, [this](MediaPlayController::StreamId id) {
-                streamDisplayNames_.remove(id);
+                streamPresentationMetadata_.remove(id);
+                streamRuntimeMetrics_.remove(id);
+                streamRuntimeMetricBaselines_.remove(id);
                 if (multiViewRenderer_) {
                     multiViewRenderer_->DetachStream(id);
                 }
@@ -160,6 +254,7 @@ void MainWindow::CreateConnects() {
 
     connect(mediaPlayController_.get(), &MediaPlayController::ActiveStreamChanged,
             this, [this](MediaPlayController::StreamId) {
+                RefreshRuntimeMetrics();
                 RefreshStreamView();
             });
 
@@ -170,12 +265,26 @@ void MainWindow::CreateConnects() {
 
     connect(mediaPlayController_.get(), &MediaPlayController::StreamErrorOccurred,
             this, [this](MediaPlayController::StreamId id, const QString& message) {
-                const QString streamName = id == MediaPlayController::InvalidStreamId
-                    ? QString("媒体源")
-                    : QString("Stream %1").arg(id);
                 const QString errorMessage = message.isEmpty()
                     ? QString("未知错误")
                     : message;
+                if (id != MediaPlayController::InvalidStreamId
+                    && mediaPlayController_->StreamIds().contains(id)) {
+                    StreamPresentationMetadata& metadata =
+                        streamPresentationMetadata_[id];
+                    if (metadata.displayName.isEmpty()) {
+                        metadata.displayName = QString("视频源 %1").arg(id);
+                    }
+                    metadata.lastError = errorMessage;
+                    RefreshStreamView();
+                }
+                const StreamPresentationMetadata metadata =
+                    streamPresentationMetadata_.value(id);
+                const QString streamName = id == MediaPlayController::InvalidStreamId
+                    ? QString("媒体源")
+                    : (metadata.displayName.isEmpty()
+                        ? QString("视频源 %1").arg(id)
+                        : metadata.displayName);
                 LOG_WARN_STREAM() << "Stream error:" << id << errorMessage;
                 QMessageBox::warning(this, "媒体流错误", QString("%1：%2").arg(streamName, errorMessage));
             });
@@ -306,6 +415,7 @@ void MainWindow::CreateConnects() {
             this, [this](const QString& id) {
                 UpdateVisionPipelineComboBox(id);
                 UpdateVisionControls();
+                RefreshRuntimeMetrics();
             });
 
     connect(mediaPlayController_.get(), &MediaPlayController::VisionPipelineStartupFailed,
@@ -399,6 +509,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
     if (cursorHideTimer_) {
         cursorHideTimer_->stop();
     }
+    StopRuntimeMetrics();
     mediaPlayController_->Shutdown();
 
 }
@@ -468,6 +579,10 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event) {
 
 MainWindow::~MainWindow()
 {
+    StopRuntimeMetrics();
+    if (mediaPlayController_) {
+        mediaPlayController_->Shutdown();
+    }
     mediaPlayController_.reset();
     delete ui;
 }
@@ -491,6 +606,26 @@ void MainWindow::UpdatePlaybackControls(MediaPlayController::PlaybackState state
     ui->pushButton_pause->setEnabled(playing);
     ui->pushButton_prev->setEnabled(hasPlaylistItem);
     ui->pushButton_next->setEnabled(hasPlaylistItem);
+    ui->pushButton_play->setToolTip(
+        playing ? "当前正在播放" : "播放当前媒体或恢复已暂停视频");
+    ui->pushButton_pause->setToolTip(
+        playing ? "暂停当前播放" : "当前未播放");
+    ui->pushButton_prev->setToolTip(
+        hasPlaylistItem ? "播放列表上一项" : "播放列表为空");
+    ui->pushButton_next->setToolTip(
+        hasPlaylistItem ? "播放列表下一项" : "播放列表为空");
+
+    switch (state) {
+    case MediaPlayController::PlaybackState::Playing:
+        ui->statusbar->showMessage("播放中");
+        break;
+    case MediaPlayController::PlaybackState::Paused:
+        ui->statusbar->showMessage("已暂停");
+        break;
+    case MediaPlayController::PlaybackState::Stopped:
+        ui->statusbar->showMessage("就绪 · 已停止");
+        break;
+    }
 }
 
 void MainWindow::OpenFile() {
@@ -499,7 +634,7 @@ void MainWindow::OpenFile() {
         this,
         "选择视频文件",
         QString(),
-        "Video Files (*.mp4 *.mkv *.avi *.mov *.flv);;All Files (*.*)");
+        "视频文件 (*.mp4 *.mkv *.avi *.mov *.flv);;所有文件 (*.*)");
 
     if (filePaths.isEmpty()) {
         return;
@@ -559,6 +694,7 @@ void MainWindow::InitializePlayModeComboBox() {
 void MainWindow::InitializeVolumeControls() {
     ui->slider_volume->setRange(0, 100);
     ui->slider_volume->setValue(static_cast<int>(mediaPlayController_->Volume() * 100.0 + 0.5));
+    ui->slider_volume->setToolTip("调整音频输出音量");
     UpdateMuteButton(mediaPlayController_->IsMuted());
 }
 
@@ -568,6 +704,7 @@ void MainWindow::InitializePlaybackSpeedComboBox() {
     ui->comboBox_speed->addItem("1.0x", 1.0);
     ui->comboBox_speed->addItem("1.5x", 1.5);
     ui->comboBox_speed->addItem("2.0x", 2.0);
+    ui->comboBox_speed->setToolTip("调整当前媒体的播放速度");
     UpdatePlaybackSpeedComboBox(mediaPlayController_->PlaybackSpeed());
 }
 
@@ -575,6 +712,9 @@ void MainWindow::InitializePreviewFrameRateControls() {
     const bool enabled = mediaPlayController_->IsPreviewFrameRateReductionEnabled();
     ui->radioButton_originalPreviewFrameRate->setChecked(!enabled);
     ui->radioButton_reducePreviewFrameRate->setChecked(enabled);
+    ui->radioButton_originalPreviewFrameRate->setToolTip("按视频源原始输出节奏预览");
+    ui->radioButton_reducePreviewFrameRate->setToolTip(
+        "降低预览刷新频率，减少渲染负载");
 }
 
 void MainWindow::InitializeImageProcessingControls() {
@@ -622,6 +762,255 @@ void MainWindow::InitializeCursorHideTimer() {
             this, &MainWindow::HideCursorIfFullScreen);
 }
 
+void MainWindow::InitializeRuntimeMetrics() {
+    runtimeContextLabel_ = new QLabel(ui->statusbar);
+    runtimeContextLabel_->setObjectName(QStringLiteral("label_runtimeContext"));
+    runtimeContextLabel_->setMaximumWidth(520);
+    ui->statusbar->addPermanentWidget(runtimeContextLabel_);
+
+    ui->label_runtimeDetails->setToolTip(
+        QStringLiteral("预览 FPS 表示提交给输出链的采样速率；调度丢帧不等于网络丢包。"));
+
+    runtimeMetricsTimer_ = std::make_unique<QTimer>(this);
+    runtimeMetricsTimer_->setInterval(kRuntimeMetricsIntervalMs);
+    runtimeMetricsTimer_->setTimerType(Qt::CoarseTimer);
+    connect(runtimeMetricsTimer_.get(), &QTimer::timeout,
+            this, &MainWindow::RefreshRuntimeMetrics);
+
+    runtimeMetricsElapsed_.start();
+    UpdateRuntimeMetricLabels();
+    runtimeMetricsTimer_->start();
+}
+
+void MainWindow::RefreshRuntimeMetrics() {
+    if (!mediaPlayController_
+        || !runtimeMetricsTimer_
+        || !runtimeMetricsTimer_->isActive()) {
+        return;
+    }
+    if (!runtimeMetricsElapsed_.isValid()) {
+        runtimeMetricsElapsed_.start();
+    }
+
+    const qint64 capturedElapsedMs = runtimeMetricsElapsed_.elapsed();
+    QMap<MediaPlayController::StreamId, StreamRuntimePresentationMetrics>
+        nextPresentationMetrics;
+    QMap<MediaPlayController::StreamId, StreamRuntimeMetricBaseline>
+        nextBaselines;
+
+    const QList<MediaPlayController::StreamRuntimeMetricsSnapshot> snapshots =
+        mediaPlayController_->StreamRuntimeMetricsSnapshots();
+    for (const MediaPlayController::StreamRuntimeMetricsSnapshot& snapshot : snapshots) {
+        if (snapshot.streamId == MediaPlayController::InvalidStreamId) {
+            continue;
+        }
+
+        StreamRuntimePresentationMetrics presentation;
+        presentation.hasFrameSize = snapshot.frameWidth > 0 && snapshot.frameHeight > 0;
+        presentation.frameWidth = snapshot.frameWidth;
+        presentation.frameHeight = snapshot.frameHeight;
+        presentation.videoCodecName = snapshot.videoCodecName;
+        presentation.schedulerRunning = snapshot.schedulerRunning;
+        presentation.imageProcessingEnabled = snapshot.imageProcessingEnabled;
+        presentation.visionAnalysisActive = snapshot.visionAnalysisActive;
+
+        const auto previousIt = streamRuntimeMetricBaselines_.constFind(snapshot.streamId);
+        bool keepPreviousBaseline = false;
+        if (previousIt != streamRuntimeMetricBaselines_.cend()
+            && capturedElapsedMs >= previousIt->capturedElapsedMs
+            && snapshot.submittedFrames >= previousIt->submittedFrames
+            && snapshot.schedulerDroppedFrames >= previousIt->schedulerDroppedFrames) {
+            const qint64 elapsedMs = capturedElapsedMs - previousIt->capturedElapsedMs;
+            if (elapsedMs >= kMinimumRuntimeMetricsSampleMs) {
+                const std::uint64_t submittedDelta =
+                    snapshot.submittedFrames - previousIt->submittedFrames;
+                const std::uint64_t droppedDelta =
+                    snapshot.schedulerDroppedFrames - previousIt->schedulerDroppedFrames;
+
+                presentation.hasPreviewFps = true;
+                presentation.previewFps =
+                    static_cast<double>(submittedDelta) * 1000.0
+                    / static_cast<double>(elapsedMs);
+
+                const std::uint64_t scheduledFrameDelta = submittedDelta + droppedDelta;
+                if (scheduledFrameDelta > 0) {
+                    presentation.hasSchedulerDropRate = true;
+                    presentation.schedulerDropRate =
+                        static_cast<double>(droppedDelta) * 100.0
+                        / static_cast<double>(scheduledFrameDelta);
+                }
+            } else {
+                const auto previousPresentationIt =
+                    streamRuntimeMetrics_.constFind(snapshot.streamId);
+                if (previousPresentationIt != streamRuntimeMetrics_.cend()) {
+                    presentation.hasPreviewFps = previousPresentationIt->hasPreviewFps;
+                    presentation.previewFps = previousPresentationIt->previewFps;
+                    presentation.hasSchedulerDropRate =
+                        previousPresentationIt->hasSchedulerDropRate;
+                    presentation.schedulerDropRate =
+                        previousPresentationIt->schedulerDropRate;
+                }
+                keepPreviousBaseline = true;
+            }
+        }
+
+        nextPresentationMetrics.insert(snapshot.streamId, presentation);
+        if (keepPreviousBaseline) {
+            nextBaselines.insert(snapshot.streamId, previousIt.value());
+        } else {
+            StreamRuntimeMetricBaseline baseline;
+            baseline.submittedFrames = snapshot.submittedFrames;
+            baseline.schedulerDroppedFrames = snapshot.schedulerDroppedFrames;
+            baseline.capturedElapsedMs = capturedElapsedMs;
+            nextBaselines.insert(snapshot.streamId, baseline);
+        }
+    }
+
+    streamRuntimeMetrics_.swap(nextPresentationMetrics);
+    streamRuntimeMetricBaselines_.swap(nextBaselines);
+    UpdateRuntimeMetricLabels();
+    RefreshStreamViewportOverlay();
+}
+
+void MainWindow::UpdateRuntimeMetricLabels() {
+    if (!mediaPlayController_) {
+        return;
+    }
+
+    const QList<MediaPlayController::StreamId> streamIds =
+        mediaPlayController_->StreamIds();
+    const int totalStreamCount = static_cast<int>(streamIds.size());
+    int sampledStreamCount = 0;
+    int producingStreamCount = 0;
+    double totalPreviewFps = 0.0;
+    for (MediaPlayController::StreamId streamId : streamIds) {
+        const auto metricsIt = streamRuntimeMetrics_.constFind(streamId);
+        if (metricsIt == streamRuntimeMetrics_.cend()
+            || !metricsIt->hasPreviewFps) {
+            continue;
+        }
+
+        sampledStreamCount += 1;
+        totalPreviewFps += metricsIt->previewFps;
+        if (metricsIt->previewFps > 0.0) {
+            producingStreamCount += 1;
+        }
+    }
+
+    if (streamIds.isEmpty()) {
+        ui->label_workspaceMode->setText(QStringLiteral("等待视频源 · 运行指标 --"));
+    } else if (sampledStreamCount == 0) {
+        ui->label_workspaceMode->setText(
+            QStringLiteral("%1 路 · 运行指标采样中").arg(totalStreamCount));
+    } else if (sampledStreamCount < totalStreamCount) {
+        ui->label_workspaceMode->setText(
+            QStringLiteral("%1 路 · 采样 %2/%1 · 预览 Σ %3 FPS")
+                .arg(totalStreamCount)
+                .arg(sampledStreamCount)
+                .arg(totalPreviewFps, 0, 'f', 1));
+    } else {
+        ui->label_workspaceMode->setText(
+            QStringLiteral("%1 路 · %2 路出帧 · 预览 Σ %3 FPS")
+                .arg(totalStreamCount)
+                .arg(producingStreamCount)
+                .arg(totalPreviewFps, 0, 'f', 1));
+    }
+
+    const MediaPlayController::StreamId activeStreamId =
+        mediaPlayController_->ActiveStream();
+    const auto activeMetricsIt = streamRuntimeMetrics_.constFind(activeStreamId);
+    const bool hasActiveMetrics = activeMetricsIt != streamRuntimeMetrics_.cend();
+    const QString codecName = hasActiveMetrics
+        && !activeMetricsIt->videoCodecName.isEmpty()
+            ? activeMetricsIt->videoCodecName.toUpper()
+            : QStringLiteral("--");
+    const QString schedulerDropRate = hasActiveMetrics
+        && activeMetricsIt->hasSchedulerDropRate
+            ? QStringLiteral("%1%").arg(activeMetricsIt->schedulerDropRate, 0, 'f', 1)
+            : QStringLiteral("--");
+    const QString imageProcessingState = hasActiveMetrics
+        ? (activeMetricsIt->imageProcessingEnabled
+            ? QStringLiteral("已启用")
+            : QStringLiteral("关闭"))
+        : QStringLiteral("--");
+
+    QString visionAnalysisState = QStringLiteral("--");
+    if (hasActiveMetrics) {
+        visionAnalysisState = QStringLiteral("关闭");
+        if (activeMetricsIt->visionAnalysisActive) {
+            const QString pipelineId = mediaPlayController_->ActiveVisionPipelineId();
+            visionAnalysisState = pipelineId.isEmpty()
+                ? QStringLiteral("已启用")
+                : mediaPlayController_->VisionPipelineDisplayName(pipelineId);
+        }
+    }
+
+    if (activeStreamId == MediaPlayController::InvalidStreamId) {
+        ui->label_runtimeDetails->setText(
+            streamIds.isEmpty()
+                ? QStringLiteral("暂无视频源\n请从顶部添加文件、摄像头或 RTSP")
+                : QStringLiteral("暂无活动视频\n请从左侧选择并设为主画面"));
+    } else if (!hasActiveMetrics) {
+        ui->label_runtimeDetails->setText(QStringLiteral("正在采样运行指标…"));
+    } else {
+        ui->label_runtimeDetails->setText(
+            QStringLiteral(
+                "编码格式　%1\n"
+                "调度丢帧　%2\n"
+                "图像处理　%3\n"
+                "视觉分析　%4\n"
+                "网络丢包　不可用\n"
+                "推理吞吐　不可用")
+                .arg(codecName)
+                .arg(schedulerDropRate)
+                .arg(imageProcessingState)
+                .arg(visionAnalysisState));
+    }
+
+    if (!runtimeContextLabel_) {
+        return;
+    }
+
+    const auto streamDisplayName = [this](MediaPlayController::StreamId streamId) {
+        if (streamId == MediaPlayController::InvalidStreamId) {
+            return QStringLiteral("无");
+        }
+        const StreamPresentationMetadata metadata =
+            streamPresentationMetadata_.value(streamId);
+        return metadata.displayName.isEmpty()
+            ? QStringLiteral("视频源 %1").arg(streamId)
+            : metadata.displayName;
+    };
+
+    const QString activeVideoName = streamDisplayName(activeStreamId);
+    const QString activeAudioName =
+        streamDisplayName(mediaPlayController_->ActiveAudioStream());
+    const QString activeVisionPipelineId =
+        mediaPlayController_->ActiveVisionPipelineId();
+    const QString activeVisionName = activeVisionPipelineId.isEmpty()
+        ? QStringLiteral("关闭")
+        : mediaPlayController_->VisionPipelineDisplayName(activeVisionPipelineId);
+    runtimeContextLabel_->setText(
+        QStringLiteral("主：%1 · 音：%2 · 视觉：%3")
+            .arg(CompactStatusName(activeVideoName))
+            .arg(CompactStatusName(activeAudioName))
+            .arg(CompactStatusName(activeVisionName)));
+    runtimeContextLabel_->setToolTip(
+        QStringLiteral("活动视频：%1\n活动音频：%2\n视觉管线：%3")
+            .arg(activeVideoName)
+            .arg(activeAudioName)
+            .arg(activeVisionName));
+}
+
+void MainWindow::StopRuntimeMetrics() {
+    if (runtimeMetricsTimer_) {
+        runtimeMetricsTimer_->stop();
+    }
+    runtimeMetricsElapsed_.invalidate();
+    streamRuntimeMetricBaselines_.clear();
+    streamRuntimeMetrics_.clear();
+}
+
 void MainWindow::InitializeVideoArea() {
     ui->widget_videoArea->setMouseTracking(true);
     ui->widget_videoArea->installEventFilter(this);
@@ -629,10 +1018,10 @@ void MainWindow::InitializeVideoArea() {
 
 void MainWindow::InitializeMultiViewLayout() {
     ui->comboBox_layout->clear();
-    ui->comboBox_layout->addItem("Single", static_cast<int>(MultiViewLayout::Single));
-    ui->comboBox_layout->addItem("2x2", static_cast<int>(MultiViewLayout::Grid2x2));
-    ui->comboBox_layout->addItem("3x3", static_cast<int>(MultiViewLayout::Grid3x3));
-    ui->comboBox_layout->addItem("4x4", static_cast<int>(MultiViewLayout::Grid4x4));
+    ui->comboBox_layout->addItem("单画面", static_cast<int>(MultiViewLayout::Single));
+    ui->comboBox_layout->addItem("2×2", static_cast<int>(MultiViewLayout::Grid2x2));
+    ui->comboBox_layout->addItem("3×3", static_cast<int>(MultiViewLayout::Grid3x3));
+    ui->comboBox_layout->addItem("4×4", static_cast<int>(MultiViewLayout::Grid4x4));
     UpdateLayoutComboBox(multiViewLayout_);
     RefreshMultiViewLayout();
 }
@@ -646,6 +1035,7 @@ void MainWindow::InitializeMultiViewRenderer() {
     multiViewRenderer_->setObjectName("multiViewRenderer");
     multiViewRenderer_->setMinimumSize(320, 240);
     ui->gridLayout_videoArea->addWidget(multiViewRenderer_, 0, 0, 2, 2);
+    streamViewportOverlay_ = new StreamViewportOverlay(multiViewRenderer_);
 
     connect(multiViewRenderer_, &MultiViewRenderer::StreamClicked,
             this, &MainWindow::ActivateStreamFromView);
@@ -679,6 +1069,21 @@ void MainWindow::RefreshMultiViewRenderer() {
     multiViewRenderer_->SetLayout(rendererLayout);
     multiViewRenderer_->SetViewSlots(MultiViewRendererViewSlots());
     multiViewRenderer_->SetActiveStream(mediaPlayController_->ActiveStream());
+    RefreshStreamViewportOverlay();
+}
+
+void MainWindow::RefreshStreamViewportOverlay() {
+    if (!streamViewportOverlay_) {
+        return;
+    }
+
+    QMap<int, StreamPresentationState> states;
+    const QList<MediaPlayController::StreamId> streamIds =
+        mediaPlayController_->StreamIds();
+    for (MediaPlayController::StreamId streamId : streamIds) {
+        states.insert(streamId, BuildStreamPresentationState(streamId));
+    }
+    streamViewportOverlay_->SetPresentationStates(states);
 }
 
 MediaPlayController::FrameSinkFactory MainWindow::CreateMultiViewFrameSinkFactory() const {
@@ -748,6 +1153,7 @@ void MainWindow::SetMultiViewLayout(MultiViewLayout layout) {
     multiViewLayout_ = layout;
     UpdateLayoutComboBox(multiViewLayout_);
     RefreshMultiViewLayout();
+    UpdateStreamControls();
     ShowGrid4x4CapacityNoticeIfNeeded();
     LOG_INFO_STREAM()
         << "Multi view layout changed, visible slots:" << MaxVisibleStreams()
@@ -764,7 +1170,7 @@ void MainWindow::ShowGrid4x4CapacityNoticeIfNeeded() {
     QMessageBox::information(
         this,
         "16 路实验模式",
-        "4x4 布局允许添加最多 16 路媒体源，但 16 路真实播放受 CPU/GPU、视频分辨率、编码格式和硬解能力影响。"
+        "4×4 布局允许添加最多 16 路媒体源，但 16 路真实播放受 CPU/GPU、视频分辨率、编码格式和硬解能力影响。"
         "建议优先使用低分辨率视频，并在压力较高时启用降帧预览。");
 }
 
@@ -918,6 +1324,30 @@ void MainWindow::UpdateImageProcessingControls() {
         hasActiveStream && processingEnabled && thresholdMode);
     ui->spinBox_imageProcessingThreshold->setEnabled(
         hasActiveStream && processingEnabled && thresholdMode);
+
+    ui->checkBox_imageProcessingEnabled->setToolTip(
+        hasActiveStream
+            ? "为活动视频启用或关闭图像处理"
+            : "请先选择活动视频");
+    ui->comboBox_imageProcessingMode->setToolTip(
+        hasActiveStream
+            ? "选择活动视频的图像处理模式"
+            : "请先选择活动视频");
+    ui->label_imageProcessingMode->setToolTip(
+        ui->comboBox_imageProcessingMode->toolTip());
+
+    QString thresholdToolTip;
+    if (!hasActiveStream) {
+        thresholdToolTip = "请先选择活动视频";
+    } else if (!processingEnabled) {
+        thresholdToolTip = "启用图像处理后可调整阈值";
+    } else if (!thresholdMode) {
+        thresholdToolTip = "仅二值化模式可调整阈值";
+    } else {
+        thresholdToolTip = "设置二值化阈值（0～255）";
+    }
+    ui->label_imageProcessingThreshold->setToolTip(thresholdToolTip);
+    ui->spinBox_imageProcessingThreshold->setToolTip(thresholdToolTip);
 }
 
 void MainWindow::UpdateVisionPipelineComboBox(const QString& activeId) {
@@ -934,6 +1364,15 @@ void MainWindow::UpdateVisionControls() {
         mediaPlayController_->ActiveStream() != MediaPlayController::InvalidStreamId;
     ui->comboBox_visionPipeline->setEnabled(hasActiveStream);
     ui->checkBox_visionOverlay->setEnabled(hasActiveStream);
+    ui->comboBox_visionPipeline->setToolTip(
+        hasActiveStream
+            ? "选择活动视频的视觉分析流水线"
+            : "请先选择活动视频");
+    ui->label_visionPipeline->setToolTip(ui->comboBox_visionPipeline->toolTip());
+    ui->checkBox_visionOverlay->setToolTip(
+        hasActiveStream
+            ? "显示或隐藏活动视频的识别叠加层"
+            : "请先选择活动视频");
 }
 
 void MainWindow::ToggleFullScreen() {
@@ -972,6 +1411,8 @@ void MainWindow::ExitFullScreen() {
 
 void MainWindow::UpdateFullScreenButton() {
     ui->pushButton_fullscreen->setText(isFullScreenMode_ ? "退出全屏" : "全屏");
+    ui->pushButton_fullscreen->setToolTip(
+        isFullScreenMode_ ? "退出全屏工作区" : "进入全屏工作区");
 }
 
 void MainWindow::ShowCursor() {
@@ -1011,6 +1452,8 @@ void MainWindow::HandleFullScreenMouseActivity() {
 
 void MainWindow::UpdateMuteButton(bool muted) {
     ui->pushButton_mute->setText(muted ? "取消静音" : "静音");
+    ui->pushButton_mute->setToolTip(
+        muted ? "恢复当前音频输出" : "静音当前音频输出");
 }
 
 void MainWindow::PlayPrevious() {
@@ -1076,12 +1519,76 @@ void MainWindow::RefreshPlaylistView() {
     const bool hasPlaylistItem = playlistManager_->Count() > 0;
     ui->pushButton_prev->setEnabled(hasPlaylistItem);
     ui->pushButton_next->setEnabled(hasPlaylistItem);
+    ui->pushButton_prev->setToolTip(
+        hasPlaylistItem ? "播放列表上一项" : "播放列表为空");
+    ui->pushButton_next->setToolTip(
+        hasPlaylistItem ? "播放列表下一项" : "播放列表为空");
+    ui->label_mediaHint->setText(
+        hasPlaylistItem
+            ? "Ctrl+O 添加媒体 · 双击列表播放"
+            : "暂无媒体 · Ctrl+O 添加媒体");
+    ui->listWidget_files->setToolTip(
+        hasPlaylistItem
+            ? "双击列表项开始播放"
+            : "暂无媒体，请按 Ctrl+O 添加视频文件");
+}
+
+void MainWindow::RegisterStreamPresentationMetadata(
+    MediaPlayController::StreamId id,
+    const QString& displayName,
+    StreamSourceKind sourceKind,
+    bool isRealtime) {
+    if (id == MediaPlayController::InvalidStreamId) {
+        return;
+    }
+
+    StreamPresentationMetadata& metadata = streamPresentationMetadata_[id];
+    metadata.displayName = displayName.isEmpty()
+        ? QString("视频源 %1").arg(id)
+        : displayName;
+    metadata.sourceKind = sourceKind;
+    metadata.isRealtime = isRealtime;
+}
+
+StreamPresentationState MainWindow::BuildStreamPresentationState(
+    MediaPlayController::StreamId id) const {
+    const StreamPresentationMetadata metadata =
+        streamPresentationMetadata_.value(id);
+
+    StreamPresentationState state;
+    state.streamId = id;
+    state.displayName = metadata.displayName.isEmpty()
+        ? QString("视频源 %1").arg(id)
+        : metadata.displayName;
+    state.sourceKind = metadata.sourceKind;
+    state.slotIndex = SlotIndexForStream(id);
+    state.hasAudio = mediaPlayController_->StreamHasAudio(id);
+    state.isActiveVideo = id == mediaPlayController_->ActiveStream();
+    state.isActiveAudio = id == mediaPlayController_->ActiveAudioStream();
+    state.isRealtime = metadata.isRealtime;
+    state.lastError = metadata.lastError;
+    state.runtimeMetrics = streamRuntimeMetrics_.value(id);
+    return state;
 }
 
 void MainWindow::RefreshStreamView() {
     const MediaPlayController::StreamId previousSelectedStreamId = SelectedStreamId();
     const QList<MediaPlayController::StreamId> streamIds = mediaPlayController_->StreamIds();
+    const bool hasStream = !streamIds.isEmpty();
     MediaPlayController::StreamId selectedStreamId = MediaPlayController::InvalidStreamId;
+
+    ui->label_streams->setText(
+        hasStream
+            ? QString("视频源 · %1 路").arg(static_cast<int>(streamIds.size()))
+            : QString("视频源 · 暂无"));
+    ui->label_viewportHint->setText(
+        hasStream
+            ? "单击激活 · 双击聚焦"
+            : "暂无画面 · 请先添加视频源");
+    ui->listWidget_streams->setToolTip(
+        hasStream
+            ? "单击选择视频源，双击设为主画面"
+            : "暂无视频源，请从顶部添加文件、摄像头或 RTSP");
 
     if (streamIds.contains(previousSelectedStreamId)) {
         selectedStreamId = previousSelectedStreamId;
@@ -1091,73 +1598,130 @@ void MainWindow::RefreshStreamView() {
         selectedStreamId = streamIds.first();
     }
 
-    ui->listWidget_streams->clear();
+    QMap<MediaPlayController::StreamId, QListWidgetItem*> existingItems;
+    for (int row = 0; row < ui->listWidget_streams->count(); ++row) {
+        QListWidgetItem* item = ui->listWidget_streams->item(row);
+        bool ok = false;
+        const MediaPlayController::StreamId id =
+            item->data(Qt::UserRole).toInt(&ok);
+        if (ok) {
+            existingItems.insert(id, item);
+        }
+    }
+
+    for (int row = ui->listWidget_streams->count() - 1; row >= 0; --row) {
+        QListWidgetItem* item = ui->listWidget_streams->item(row);
+        bool ok = false;
+        const MediaPlayController::StreamId id =
+            item->data(Qt::UserRole).toInt(&ok);
+        if (!ok || !streamIds.contains(id)) {
+            if (ok) {
+                existingItems.remove(id);
+            }
+            delete ui->listWidget_streams->takeItem(row);
+        }
+    }
+
     QListWidgetItem* selectedItem = nullptr;
     for (MediaPlayController::StreamId id : streamIds) {
-        const bool isActiveStream = id == mediaPlayController_->ActiveStream();
-        const bool isActiveAudio = id == mediaPlayController_->ActiveAudioStream();
-        const bool hasAudio = mediaPlayController_->StreamHasAudio(id);
-        QStringList marks;
-        if (isActiveStream) {
-            marks.append("View");
-        }
-        if (isActiveAudio) {
-            marks.append("Audio");
+        QListWidgetItem* item = existingItems.value(id, nullptr);
+        if (!item) {
+            item = new QListWidgetItem(ui->listWidget_streams);
         }
 
-        const QString displayName = streamDisplayNames_.value(id, QString("Stream %1").arg(id));
-        QString text = QString("#%1").arg(id);
-        const int slotIndex = SlotIndexForStream(id);
-        if (slotIndex >= 0) {
-            text += QString(" [S%1]").arg(slotIndex + 1);
-        }
-        if (!marks.isEmpty()) {
-            text += QString(" [%1]").arg(marks.join(", "));
-        }
-        text += QString(" %1").arg(displayName);
-
-        auto* item = new QListWidgetItem(text, ui->listWidget_streams);
+        const StreamPresentationState state = BuildStreamPresentationState(id);
+        item->setText(state.displayName);
         item->setData(Qt::UserRole, id);
-        item->setToolTip(QString("StreamId: %1\n名称: %2\nSlot: %3\n音频: %4\n显示: %5\n输出音频: %6")
-            .arg(id)
-            .arg(displayName)
-            .arg(slotIndex >= 0 ? QString::number(slotIndex + 1) : QString("未绑定"))
-            .arg(hasAudio ? QString("有") : QString("无"))
-            .arg(isActiveStream ? QString("是") : QString("否"))
-            .arg(isActiveAudio ? QString("是") : QString("否")));
+        item->setData(
+            kStreamPresentationStateRole,
+            QVariant::fromValue(state));
+        item->setData(
+            Qt::AccessibleTextRole,
+            StreamPresentationAccessibleText(state));
+        item->setToolTip(StreamPresentationToolTip(state));
         if (id == selectedStreamId) {
             selectedItem = item;
         }
     }
 
-    if (selectedItem) {
+    if (selectedItem && ui->listWidget_streams->currentItem() != selectedItem) {
         ui->listWidget_streams->setCurrentItem(selectedItem);
         ui->listWidget_streams->scrollToItem(selectedItem);
+    } else if (!selectedItem) {
+        ui->listWidget_streams->clearSelection();
     }
 
     UpdateStreamControls();
+    UpdateRuntimeMetricLabels();
     RefreshMultiViewLayout();
 }
 
 void MainWindow::UpdateStreamControls() {
     const bool hasStream = !mediaPlayController_->StreamIds().isEmpty();
+    const bool hasActiveStream =
+        mediaPlayController_->ActiveStream() != MediaPlayController::InvalidStreamId;
     const MediaPlayController::StreamId selectedStreamId = SelectedStreamId();
     const bool hasSelectedStream = selectedStreamId != MediaPlayController::InvalidStreamId;
     const bool selectedStreamHasAudio =
         hasSelectedStream && mediaPlayController_->StreamHasAudio(selectedStreamId);
     const bool hasAvailableSlot = FirstAvailableVideoSlotIndex() >= 0;
+    const bool allLogicalSlotsUsed =
+        static_cast<int>(mediaPlayController_->StreamIds().size()) >= MaxVideoSlots();
 
     ui->pushButton_addStream->setEnabled(hasAvailableSlot);
     ui->pushButton_addCamera->setEnabled(hasAvailableSlot);
     ui->pushButton_addNetwork->setEnabled(hasAvailableSlot);
+    const QString unavailableSlotToolTip =
+        allLogicalSlotsUsed
+            ? "视频槽位已满，请先移除视频源"
+            : "当前布局画面已满，请切换布局或移除视频源";
+    ui->pushButton_addStream->setToolTip(
+        hasAvailableSlot
+            ? "向多画面工作区添加一个或多个本地文件"
+            : unavailableSlotToolTip);
+    ui->pushButton_addCamera->setToolTip(
+        hasAvailableSlot
+            ? "枚举并添加本机摄像头"
+            : unavailableSlotToolTip);
+    ui->pushButton_addNetwork->setToolTip(
+        hasAvailableSlot
+            ? "添加 rtsp:// 网络视频源"
+            : unavailableSlotToolTip);
     ui->pushButton_removeStream->setEnabled(hasSelectedStream);
     ui->pushButton_activeStream->setEnabled(hasSelectedStream);
     ui->pushButton_activeAudio->setEnabled(selectedStreamHasAudio);
-    ui->pushButton_activeAudio->setToolTip(
-        selectedStreamHasAudio ? QString() : QString("选中的流没有音频，不能设为音频输出"));
+    ui->pushButton_removeStream->setToolTip(
+        hasSelectedStream ? "移除选中的视频源" : "请先选择视频源");
+    ui->pushButton_activeStream->setToolTip(
+        hasSelectedStream ? "将选中视频源设为主画面" : "请先选择视频源");
+    if (!hasSelectedStream) {
+        ui->pushButton_activeAudio->setToolTip("请先选择视频源");
+    } else if (!selectedStreamHasAudio) {
+        ui->pushButton_activeAudio->setToolTip(
+            "选中的视频源没有音频轨道，不能设为音频输出");
+    } else {
+        ui->pushButton_activeAudio->setToolTip(
+            "将选中视频源设为音频输出");
+    }
     ui->pushButton_startAll->setEnabled(hasStream);
     ui->pushButton_pauseAll->setEnabled(hasStream);
     ui->pushButton_stopAll->setEnabled(hasStream);
+    ui->pushButton_startAll->setToolTip(
+        hasStream ? "启动全部视频源" : "请先添加视频源");
+    ui->pushButton_pauseAll->setToolTip(
+        hasStream ? "暂停全部视频源" : "请先添加视频源");
+    ui->pushButton_stopAll->setToolTip(
+        hasStream ? "停止全部视频源" : "请先添加视频源");
+    if (!hasStream) {
+        ui->label_inspectorHint->setText(
+            "尚无视频源 · 请先从顶部添加文件、摄像头或 RTSP");
+    } else if (!hasActiveStream) {
+        ui->label_inspectorHint->setText(
+            "尚无活动视频 · 请从左侧选择并设为主画面");
+    } else {
+        ui->label_inspectorHint->setText(
+            "配置活动视频的预览、图像处理与视觉分析");
+    }
     UpdateImageProcessingControls();
     UpdateVisionControls();
 }
@@ -1167,7 +1731,7 @@ void MainWindow::AddMultiStreamFiles() {
         this,
         "选择多路视频文件",
         QString(),
-        "Video Files (*.mp4 *.mkv *.avi *.mov *.flv);;All Files (*.*)");
+        "视频文件 (*.mp4 *.mkv *.avi *.mov *.flv);;所有文件 (*.*)");
 
     for (const QString& filePath : filePaths) {
         const int slotIndex = FirstAvailableVideoSlotIndex();
@@ -1200,7 +1764,11 @@ void MainWindow::AddMultiStreamFiles() {
         }
 
         BindStreamToVideoSlot(streamId, slotIndex);
-        streamDisplayNames_.insert(streamId, QFileInfo(filePath).fileName());
+        RegisterStreamPresentationMetadata(
+            streamId,
+            QFileInfo(filePath).fileName(),
+            StreamSourceKind::File,
+            false);
     }
 
     RefreshStreamView();
@@ -1256,11 +1824,15 @@ void MainWindow::AddCameraStream() {
     }
 
     BindStreamToVideoSlot(streamId, slotIndex);
-    streamDisplayNames_.insert(streamId, QString("%1 (%2x%3@%4fps)")
-        .arg(options.deviceName)
-        .arg(options.width)
-        .arg(options.height)
-        .arg(options.frameRate));
+    RegisterStreamPresentationMetadata(
+        streamId,
+        QString("%1（%2×%3 @ %4 FPS）")
+            .arg(options.deviceName)
+            .arg(options.width)
+            .arg(options.height)
+            .arg(options.frameRate),
+        StreamSourceKind::Camera,
+        true);
 
     RefreshStreamView();
 
@@ -1278,7 +1850,7 @@ void MainWindow::AddNetworkStream() {
     const QString url = QInputDialog::getText(
         this,
         "添加 RTSP 网络流",
-        "RTSP URL:",
+        "RTSP 地址：",
         QLineEdit::Normal,
         "rtsp://",
         &accepted).trimmed();
@@ -1287,7 +1859,7 @@ void MainWindow::AddNetworkStream() {
     }
 
     if (url.isEmpty()) {
-        QMessageBox::warning(this, "网络流错误", "RTSP URL 不能为空");
+        QMessageBox::warning(this, "网络流错误", "RTSP 地址不能为空");
         return;
     }
 
@@ -1331,7 +1903,11 @@ void MainWindow::AddNetworkStream() {
         ? url
         : QString("RTSP %1").arg(parsedUrl.host());
     BindStreamToVideoSlot(streamId, slotIndex);
-    streamDisplayNames_.insert(streamId, displayName);
+    RegisterStreamPresentationMetadata(
+        streamId,
+        displayName,
+        StreamSourceKind::Rtsp,
+        true);
     RefreshStreamView();
 }
 
@@ -1417,7 +1993,11 @@ bool MainWindow::SwitchToPlaylistIndex(int index, bool autoStart) {
     const MediaPlayController::StreamId activeStreamId = mediaPlayController_->ActiveStream();
     if (activeStreamId != MediaPlayController::InvalidStreamId) {
         BindStreamToVideoSlot(activeStreamId, 0);
-        streamDisplayNames_.insert(activeStreamId, item.displayName);
+        RegisterStreamPresentationMetadata(
+            activeStreamId,
+            item.displayName,
+            StreamSourceKind::File,
+            false);
         RefreshStreamView();
     }
     return true;

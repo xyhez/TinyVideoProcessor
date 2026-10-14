@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QThread>
 #include <QTimer>
+#include <cstdint>
 #include <memory>
 
 #include "core/ffmpeg_raii.h"
@@ -32,6 +33,22 @@ class VisionProcessingFrameSink;
 class MediaPipeline : public QObject {
     Q_OBJECT
 public:
+    /**
+     * @brief RuntimeMetricsSnapshot 单路管线运行指标值快照
+     * @details 不暴露媒体源、调度器或输出 sink 的所有权与指针。
+     */
+    struct RuntimeMetricsSnapshot {
+        bool initialized = false;
+        int frameWidth = 0;
+        int frameHeight = 0;
+        AVCodecID videoCodecId = AV_CODEC_ID_NONE;
+        std::uint64_t submittedFrames = 0;
+        std::uint64_t schedulerDroppedFrames = 0;
+        bool schedulerRunning = false;
+        bool imageProcessingEnabled = false;
+        bool visionAnalysisActive = false;
+    };
+
     /**
      * @brief MediaPipeline 构造函数
      * @param visionPipelineManager 视觉管线管理器指针，nullptr 表示禁用视觉分析
@@ -111,6 +128,12 @@ public:
      * @return false 未初始化
      */
     bool IsInitialized() const;
+
+    /**
+     * @brief RuntimeMetrics 获取单路管线运行指标
+     * @return 初始化源信息、累计调度统计和处理链状态的只读值快照
+     */
+    RuntimeMetricsSnapshot RuntimeMetrics() const;
 
     /**
      * @brief SetPlaybackSpeed 设置播放速度
@@ -248,6 +271,26 @@ private:
     void HandleDemuxFinished();
 
     /**
+     * @brief HandleAudioPlaybackDrained 记录音频消费者已排空自然结束数据
+     */
+    void HandleAudioPlaybackDrained();
+
+    /**
+     * @brief HandleVideoPlaybackDrained 记录视频消费者已排空自然结束数据
+     */
+    void HandleVideoPlaybackDrained();
+
+    /**
+     * @brief TryFinalizePlayback 在全部自然结束条件满足后广播播放完成
+     */
+    void TryFinalizePlayback();
+
+    /**
+     * @brief ResetPlaybackCompletionState 重置本轮播放的自然结束汇合状态
+     */
+    void ResetPlaybackCompletionState();
+
+    /**
      * @brief HandleDemuxError 处理解复用运行期错误
      * @param message 错误信息
      */
@@ -280,6 +323,11 @@ private:
      */
     void FlushDecoders();
 
+    /**
+     * @brief ResumeQueues 清除队列的停止、中断和 EOS 状态
+     */
+    void ResumeQueues();
+
     std::shared_ptr<SyncQueue<AVPacketPtr>> APacket_ = nullptr;	///< 音频包队列
     std::shared_ptr<SyncQueue<AVPacketPtr>> VPacket_ = nullptr;	///< 视频包队列
     std::shared_ptr<SyncQueue<AVFramePtr>> AFrame_ = nullptr;	///< 音频帧队列
@@ -287,6 +335,9 @@ private:
 
     std::shared_ptr<IMediaSource> mediaSource_;	///< 当前媒体源
     std::shared_ptr<SyncManager> syncManager_;	///< 同步时钟管理器
+    int sourceVideoWidth_ = 0;	///< 初始化时复制的源视频宽度
+    int sourceVideoHeight_ = 0;	///< 初始化时复制的源视频高度
+    AVCodecID sourceVideoCodecId_ = AV_CODEC_ID_NONE;	///< 初始化时复制的源视频编码
 
     std::unique_ptr<Demuxer> demuxer_;	///< 解复用器
     std::unique_ptr<Decoder> Adecoder_;	///< 音频解码器
@@ -306,6 +357,10 @@ private:
 
     std::unique_ptr<QTimer> positionTimer_;	///< 播放位置刷新定时器
     bool playbackFinished_ = false;	///< 当前管线是否已自然播放结束
+    bool demuxEndOfStream_ = false;	///< 解复用器是否已自然读到 EOS
+    bool audioPlaybackDrained_ = true;	///< 音频消费者是否已排空，无码流时恒为 true
+    bool videoPlaybackDrained_ = false;	///< 视频消费者是否已排空
+    bool shuttingDown_ = false;	///< 资源释放期间抑制迟到的自然结束信号
 };
 
 #endif // TINYVIDEOPROCESSOR_MEDIAPIPELINE_H

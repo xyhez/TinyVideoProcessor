@@ -10,6 +10,10 @@ namespace {
 constexpr double kSpeedEpsilon = 0.001;	///< 音频播放速度浮点比较容差，避免档位判断受精度误差影响
 constexpr qreal kVolumeStep = 0.05;	///< 音频音量增减步长，按 0.0-1.0 归一化音量计算
 constexpr qreal kVolumeEpsilon = 0.0001;	///< 音频音量浮点比较容差，避免微小误差触发重复更新
+constexpr int kMaxResamplerDrainIterations = 16;	///< 限制重采样尾部排空轮次，避免异常状态无限循环
+constexpr qint64 kResamplerWriteTimeoutMs = 250;	///< 单轮重采样尾部写入超时
+constexpr qint64 kAudioOutputDrainTimeoutMs = 2000;	///< 音频设备缓冲尽力排空超时
+constexpr unsigned long kAudioOutputDrainPollMs = 5;	///< 音频设备排空状态轮询间隔
 
 bool IsSupportedSpeed(double speed)
 {
@@ -106,9 +110,6 @@ AudioPlayer::AudioPlayer(QObject *p)
 AudioPlayer::~AudioPlayer() {
     if (m_swr) {
         swr_free(&m_swr);
-    }
-    if (m_frame) {
-        av_frame_free(&m_frame);
     }
     ReleaseAudioOutput();
 }
@@ -271,7 +272,9 @@ bool AudioPlayer::WritePcmBuffer(const char* data,
                                  int bytes,
                                  int bytesPerSampleFrame,
                                  double speed,
-                                 double frameStartClockMs)
+                                 double frameStartClockMs,
+                                 qint64 timeoutMs,
+                                 bool stopOnPause)
 {
     if (!data || bytes <= 0 || bytesPerSampleFrame <= 0) {
         return true;
@@ -279,14 +282,22 @@ bool AudioPlayer::WritePcmBuffer(const char* data,
 
     int pcmIndex = 0;
     qint64 outputSampleFramesWritten = 0;
+    QElapsedTimer writeTimer;
+    if (timeoutMs >= 0) {
+        writeTimer.start();
+    }
 
     while (pcmIndex < bytes) {
         if (m_outputVolumeDirty.load()) {
             ApplyOutputVolume();
         }
 
-        if (m_stopFlag.load() || m_pauseFlag.load()) {
-            break;
+        if (m_stopFlag.load() || (stopOnPause && m_pauseFlag.load())) {
+            return false;
+        }
+
+        if (timeoutMs >= 0 && writeTimer.elapsed() >= timeoutMs) {
+            return false;
         }
 
         if (!m_audioSink || m_audioSink->state() == QAudio::StoppedState) {
@@ -329,6 +340,103 @@ bool AudioPlayer::WritePcmBuffer(const char* data,
     return true;
 }
 
+bool AudioPlayer::DrainEndOfStream()
+{
+    if (m_stopFlag.load() || m_pauseFlag.load()) {
+        return false;
+    }
+
+    const int bytesPerSampleFrame = m_dstChannels * m_bytesPerSample;
+    int drainIteration = 0;
+    if (m_swr && bytesPerSampleFrame > 0) {
+        for (; drainIteration < kMaxResamplerDrainIterations; ++drainIteration) {
+            if (m_stopFlag.load() || m_pauseFlag.load()) {
+                return false;
+            }
+
+            const int pendingSamples = swr_get_out_samples(m_swr, 0);
+            if (pendingSamples <= 0) {
+                break;
+            }
+
+            const int drainSamples = std::min(pendingSamples, std::max(1, m_dstRate));
+            const int neededSize = drainSamples * bytesPerSampleFrame;
+            if (m_pcmBuffer.size() < neededSize) {
+                m_pcmBuffer.resize(neededSize);
+            }
+
+            uint8_t* outPtr = reinterpret_cast<uint8_t*>(m_pcmBuffer.data());
+            const int converted = swr_convert(m_swr, &outPtr, drainSamples, nullptr, 0);
+            if (converted < 0) {
+                LOG_WARN("AudioPlayer: Failed to drain resampler tail:", AvErrorString(converted));
+                break;
+            }
+            if (converted == 0) {
+                break;
+            }
+
+            const int pcmBytes = converted * bytesPerSampleFrame;
+            const double speedSnapshot = m_speed.load();
+            const int speedAdjustedBytes =
+                BuildSpeedAdjustedPcm(pcmBytes, bytesPerSampleFrame, speedSnapshot);
+            const double frameStartClockMs = m_syncManager ? m_syncManager->GetClock() : 0.0;
+
+            if (speedAdjustedBytes > 0 &&
+                !WritePcmBuffer(m_speedPcmBuffer.constData(),
+                                speedAdjustedBytes,
+                                bytesPerSampleFrame,
+                                speedSnapshot,
+                                frameStartClockMs,
+                                kResamplerWriteTimeoutMs,
+                                false)) {
+                if (m_stopFlag.load()) {
+                    return false;
+                }
+                LOG_WARN("AudioPlayer: Resampler tail write reached its safety bound");
+                break;
+            }
+        }
+
+        if (drainIteration == kMaxResamplerDrainIterations &&
+            swr_get_out_samples(m_swr, 0) > 0) {
+            LOG_WARN("AudioPlayer: Resampler tail drain reached its iteration bound");
+        }
+    }
+
+    if (m_stopFlag.load() || m_pauseFlag.load()) {
+        return false;
+    }
+    if (!m_audioSink) {
+        return true;
+    }
+
+    QElapsedTimer drainTimer;
+    drainTimer.start();
+    while (drainTimer.elapsed() < kAudioOutputDrainTimeoutMs) {
+        if (m_stopFlag.load() || m_pauseFlag.load()) {
+            return false;
+        }
+
+        const QAudio::State state = m_audioSink->state();
+        if (state == QAudio::IdleState) {
+            return true;
+        }
+        if (state == QAudio::StoppedState) {
+            LOG_WARN("AudioPlayer: Audio sink stopped before drain completed");
+            return true;
+        }
+
+        const qsizetype bufferSize = m_audioSink->bufferSize();
+        if (bufferSize > 0 && m_audioSink->bytesFree() >= bufferSize) {
+            return true;
+        }
+        QThread::msleep(kAudioOutputDrainPollMs);
+    }
+
+    LOG_WARN("AudioPlayer: Audio output drain reached its safety timeout");
+    return true;
+}
+
 void AudioPlayer::StartAudioPlay()
 {
     if (!m_audioSink) {
@@ -340,6 +448,7 @@ void AudioPlayer::StartAudioPlay()
         if (!m_ioDevice) {
             LOG_CRITICAL("AudioPlayer: Failed to start audio sink!");
             ReleaseAudioOutput();
+            emit AudioPlaybackError("Failed to start audio output");
             return;
         }
     }
@@ -350,10 +459,6 @@ void AudioPlayer::StartAudioPlay()
 
 void AudioPlayer::Run()
 {
-    if (!m_frame) {
-        m_frame = av_frame_alloc();
-    }
-
     const int statusInterval = 5000;
 
     while (true) {
@@ -385,8 +490,26 @@ void AudioPlayer::Run()
         if (!m_audioFrameQueue) {
             break;
         }
-        if (!m_audioFrameQueue->Pop(tmp)) {
-            // 队列被停止
+
+        const SyncQueuePopResult popResult = m_audioFrameQueue->PopWithStatus(tmp);
+        if (popResult == SyncQueuePopResult::Stopped) {
+            break;
+        }
+        if (popResult == SyncQueuePopResult::Interrupted) {
+            QThread::msleep(1);
+            continue;
+        }
+        if (popResult == SyncQueuePopResult::EndOfStream) {
+            if (!DrainEndOfStream()) {
+                continue;
+            }
+            if (m_stopFlag.load()) {
+                break;
+            }
+            if (m_pauseFlag.load() || !m_audioFrameQueue->IsEndOfStream()) {
+                continue;
+            }
+            emit AudioPlaybackDrained();
             break;
         }
 
@@ -431,6 +554,7 @@ void AudioPlayer::Run()
                 LOG_WARN("AudioPlayer: Resampler allocation failed:", AvErrorString(ret));
                 av_channel_layout_uninit(&inLayout);
                 av_channel_layout_uninit(&outLayout);
+                emit AudioPlaybackError("Audio resampler allocation failed");
                 break;
             }
 
@@ -440,6 +564,7 @@ void AudioPlayer::Run()
                 swr_free(&m_swr);
                 av_channel_layout_uninit(&inLayout);
                 av_channel_layout_uninit(&outLayout);
+                emit AudioPlaybackError("Audio resampler initialization failed");
                 break;
             }
 
@@ -457,6 +582,7 @@ void AudioPlayer::Run()
 
         if (!m_swr) {
             LOG_WARN("AudioPlayer: Resampler is not initialized, stopping audio playback");
+            emit AudioPlaybackError("Audio resampler is not initialized");
             break;
         }
 
@@ -497,11 +623,16 @@ void AudioPlayer::Run()
             m_syncManager->RefreshClock(frameStartClockMs);
         }
 
-        WritePcmBuffer(m_speedPcmBuffer.constData(),
-                       speedAdjustedBytes,
-                       bytesPerSampleFrame,
-                       speedSnapshot,
-                       frameStartClockMs);
+        if (!WritePcmBuffer(m_speedPcmBuffer.constData(),
+                            speedAdjustedBytes,
+                            bytesPerSampleFrame,
+                            speedSnapshot,
+                            frameStartClockMs)) {
+            if (!m_pauseFlag.load() && !m_stopFlag.load()) {
+                emit AudioPlaybackError("Audio output write failed");
+                break;
+            }
+        }
 
         double latency = CalculateHardwareLatency();
 

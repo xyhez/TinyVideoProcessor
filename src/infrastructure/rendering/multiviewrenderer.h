@@ -26,9 +26,9 @@ class QMouseEvent;
 class QOpenGLTexture;
 
 /**
- * @brief MultiViewRenderer 统一多画面渲染器空壳
+ * @brief MultiViewRenderer 统一多画面视频渲染器
  *
- * 当前阶段只定义统一渲染器的布局、slot 和点击边界，不接真实视频帧。
+ * 负责布局、slot、最新帧合并、显示格式转换与 OpenGL 绘制。
  * 该类不持有 MediaPipeline，不访问 demuxer/decoder/audio player。
  */
 class MultiViewRenderer : public QOpenGLWidget, protected QOpenGLFunctions {
@@ -132,9 +132,9 @@ public:
     Viewport ViewportForSlot(int slotIndex) const;
 
     /**
-     * @brief PresentFrame 接收指定 stream 的可显示视频帧
-     * @details 调用后 frame 所有权转移给 MultiViewRenderer。当前阶段只接管
-     *          和保存 current frame，不做 OpenGL 纹理上传。
+     * @brief PresentFrame 接收指定 stream 的可显示候选视频帧
+     * @details 调用后 frame 所有权转移给 MultiViewRenderer。每路只保留最新
+     *          待显示帧，像素格式转换与纹理上传延迟到实际绘制路径。
      * @param streamId 目标 StreamId
      * @param frame 已经过调度判断、允许显示的视频帧
      */
@@ -174,7 +174,7 @@ protected:
     void initializeGL() override;
 
     /**
-     * @brief paintGL 绘制空壳背景
+     * @brief paintGL 绘制多路视频画面
      */
     void paintGL() override;
 
@@ -195,9 +195,10 @@ private:
      * @brief StreamRenderState 单路渲染状态
      */
     struct StreamRenderState {
+        AVFramePtr pendingFrame;	///< 最新待显示输入帧，绘制前允许被后到帧替换
         AVFramePtr currentFrame;	///< 当前显示帧
         QOpenGLTexture* textureY = nullptr;	///< Y 分量纹理
-        QOpenGLTexture* textureU = nullptr;	///< U 分量纹理
+        QOpenGLTexture* textureU = nullptr;	///< U 分量纹理，NV12 时保存交错 UV 纹理
         QOpenGLTexture* textureV = nullptr;	///< V 分量纹理
         AVPixelFormat texturePixelFormat = AV_PIX_FMT_NONE;	///< 当前纹理对应的像素格式
         int texturePlaneWidths[3] = {0, 0, 0};	///< 当前纹理各平面宽度
@@ -220,6 +221,9 @@ private:
         bool lastLoggedSupported = false;	///< 上次记录的格式支持状态
         bool hasLoggedFrameFormat = false;	///< 是否已记录过帧格式
         qint64 presentedFrames = 0;	///< 接收显示帧次数
+        qint64 coalescedFrames = 0;	///< 绘制前被后到帧替换的次数
+        qint64 preparedFrames = 0;	///< 绘制前成功准备为显示帧的次数
+        qint64 formatConvertedFrames = 0;	///< 实际发生像素格式转换的次数
         qint64 textureUploads = 0;	///< 纹理上传次数
         qint64 textureRebuilds = 0;	///< 纹理重建次数
         qint64 lastPresentedElapsedMs = -1;	///< 最近一次接收帧的计时器毫秒
@@ -228,10 +232,19 @@ private:
     };
 
     /**
-     * @brief ReleaseCurrentFrame 释放单路状态当前帧并重置帧元数据
+     * @brief ReleaseCurrentFrame 释放单路待显示帧和当前帧并重置帧元数据
      * @param state 单路渲染状态
      */
     void ReleaseCurrentFrame(StreamRenderState& state);
+
+    /**
+     * @brief PreparePendingFrameForDisplay 将最新待显示帧准备为渲染格式
+     * @details NV12 优先直接保留，其他格式按需转换；失败时保留上一张成功显示帧。
+     * @param state 单路渲染状态
+     * @return true 当前存在可继续绘制的显示帧
+     * @return false 当前没有可绘制帧
+     */
+    bool PreparePendingFrameForDisplay(StreamRenderState& state);
 
     /**
      * @brief ReleaseStreamResources 释放单路帧和 OpenGL 纹理资源
@@ -246,7 +259,7 @@ private:
     void FreeTextures(StreamRenderState& state);
 
     /**
-     * @brief InitializeFrameShader 初始化 YUV420P 绘制 shader
+     * @brief InitializeFrameShader 初始化 YUV420P 与 NV12 绘制 shader
      */
     void InitializeFrameShader();
 
@@ -260,7 +273,7 @@ private:
     bool DrawStreamFrame(const Viewport& viewport, StreamRenderState& state);
 
     /**
-     * @brief UploadTexturesIfNeeded 必要时上传 YUV420P 数据到 OpenGL 纹理
+     * @brief UploadTexturesIfNeeded 必要时上传 YUV420P 或 NV12 数据到 OpenGL 纹理
      * @param state 单路渲染状态
      * @return true 纹理可用于绘制
      * @return false 当前帧格式不支持或纹理不可用
@@ -395,7 +408,8 @@ private:
     QMap<int, StreamId> viewSlots_;	///< slot 到流 ID 的绑定表
     std::map<StreamId, StreamRenderState> renderStates_;	///< 每路渲染状态
     StreamId activeStreamId_ = InvalidStreamId;	///< 当前活动显示流
-    QOpenGLShaderProgram frameShader_;	///< 视频帧绘制 shader
+    QOpenGLShaderProgram frameShader_;	///< YUV420P 视频帧绘制 shader
+    QOpenGLShaderProgram nv12FrameShader_;	///< NV12 双平面视频帧绘制 shader
     VideoFrameConverter frameConverter_;	///< 可显示帧格式转换器
     QMutex renderStateMutex_;	///< 渲染状态互斥锁
     QMutex renderUpdateMutex_;	///< 渲染刷新请求互斥锁
@@ -403,10 +417,19 @@ private:
     QElapsedTimer performanceTimer_;	///< 性能统计计时器
     qint64 performanceWindowStartMs_ = 0;	///< 当前性能统计窗口起始毫秒
     qint64 paintCount_ = 0;	///< paintGL 调用总次数
+    qint64 totalPresentedFrames_ = 0;	///< 渲染器累计接收帧次数
+    qint64 totalCoalescedFrames_ = 0;	///< 渲染器累计合并帧次数
+    qint64 totalPreparedFrames_ = 0;	///< 渲染器累计显示帧准备次数
+    qint64 totalFormatConvertedFrames_ = 0;	///< 渲染器累计格式转换次数
     qint64 lastLoggedPaintCount_ = 0;	///< 上次日志记录时的 paint 次数
+    qint64 lastLoggedPresentedFrames_ = 0;	///< 上次日志记录时的接收帧次数
+    qint64 lastLoggedCoalescedFrames_ = 0;	///< 上次日志记录时的合并帧次数
+    qint64 lastLoggedPreparedFrames_ = 0;	///< 上次日志记录时的显示帧准备次数
+    qint64 lastLoggedFormatConvertedFrames_ = 0;	///< 上次日志记录时的格式转换次数
     qint64 lastLoggedTextureUploads_ = 0;	///< 上次日志记录时的纹理上传次数
     qint64 lastLoggedTextureRebuilds_ = 0;	///< 上次日志记录时的纹理重建次数
     bool glInitialized_ = false;	///< OpenGL 是否已初始化
+    bool nv12DirectRenderingAvailable_ = false;	///< 当前 OpenGL 上下文是否可直接渲染 NV12
 };
 
 #endif // MULTIVIEWRENDERER_H

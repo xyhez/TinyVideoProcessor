@@ -2,7 +2,6 @@
 
 #include "tiny_log/Logging.h"
 
-#include <QTimer>
 #include <QtGlobal>
 #include <cmath>
 #include <utility>
@@ -15,9 +14,11 @@ static const int SYNC_THRESHOLD_MS = 40;	///< 视频同步阈值，超过该毫�
 
 namespace {
 constexpr double kSpeedEpsilon = 0.001;	///< 播放速度浮点比较容差，避免 1.0 等档位因精度误差判断失败
+constexpr int kDefaultFrameIntervalMs = 33; ///< 源帧率无效时使用的安全默认帧间隔
 constexpr int kMinPreviewFrameRateLimitFps = 1;	///< 预览降帧目标帧率下限，防止目标间隔过大导致画面长期不刷新
 constexpr int kMaxPreviewFrameRateLimitFps = 120;	///< 预览降帧目标帧率上限，防止异常参数让调度间隔过小
 constexpr double kPreviewFrameRateEpsilonMs = 0.5;	///< 预览降帧 PTS 间隔判断容差，降低毫秒级舍入误差导致的误丢帧
+constexpr qint64 kNanosecondsPerMillisecond = 1000000; ///< 毫秒与纳秒换算系数
 
 bool IsSupportedSpeed(double speed)
 {
@@ -30,7 +31,10 @@ bool IsSupportedSpeed(double speed)
 
 VideoFrameScheduler::VideoFrameScheduler(QObject* parent)
     : QObject(parent)
+    , tickTimer_(this)
 {
+    tickTimer_.setSingleShot(true);
+    connect(&tickTimer_, &QTimer::timeout, this, &VideoFrameScheduler::Tick);
 }
 
 VideoFrameScheduler::~VideoFrameScheduler()
@@ -47,9 +51,10 @@ void VideoFrameScheduler::Initialize(std::shared_ptr<SyncQueue<AVFramePtr>> fram
     frameQueue_ = frameQueue;
     syncManager_ = syncManager;
     videoTimeBase_ = videoTimeBase;
+    frameIntervalMs_ = kDefaultFrameIntervalMs;
 
-    if (frameRate > 0.0 && frameRate < 120.0) {
-        frameIntervalMs_ = qRound(1000.0 / frameRate);
+    if (std::isfinite(frameRate) && frameRate > 0.0) {
+        frameIntervalMs_ = qMax(1, qRound(1000.0 / frameRate));
     }
 }
 
@@ -65,15 +70,17 @@ void VideoFrameScheduler::Start()
     }
 
     running_.store(true);
+    playbackDrainedEmitted_ = false;
     hasPreviewPresentedPts_ = false;
-    rendered_.store(0);
-    dropped_.store(0);
-    QTimer::singleShot(0, this, &VideoFrameScheduler::Tick);
+    ResetCadenceTiming();
+    tickTimer_.start(0);
 }
 
 void VideoFrameScheduler::Stop()
 {
     running_.store(false);
+    tickTimer_.stop();
+    ResetCadenceTiming();
     if (frameQueue_) {
         frameQueue_->WakeAll();
     }
@@ -92,6 +99,7 @@ void VideoFrameScheduler::SetSpeed(double speed)
     }
 
     speed_.store(speed);
+    ResetCadenceTiming();
 }
 
 void VideoFrameScheduler::SetPreviewFrameRateReductionEnabled(bool enabled, int targetFps)
@@ -107,9 +115,21 @@ void VideoFrameScheduler::SetPreviewFrameRateReductionEnabled(bool enabled, int 
 void VideoFrameScheduler::ClearOutputFrame()
 {
     hasPreviewPresentedPts_ = false;
+    ResetCadenceTiming();
     if (frameSink_) {
         frameSink_->ClearFrame();
     }
+}
+
+VideoFrameScheduler::RuntimeMetricsSnapshot VideoFrameScheduler::RuntimeMetrics() const
+{
+    RuntimeMetricsSnapshot snapshot;
+    snapshot.submittedFrames = submittedFrames_.load();
+    snapshot.schedulerDroppedFrames = schedulerDroppedFrames_.load();
+    snapshot.frameWidth = submittedFrameWidth_.load();
+    snapshot.frameHeight = submittedFrameHeight_.load();
+    snapshot.running = running_.load();
+    return snapshot;
 }
 
 void VideoFrameScheduler::Tick()
@@ -118,11 +138,25 @@ void VideoFrameScheduler::Tick()
         return;
     }
 
+    if (!cadenceTimer_.isValid()) {
+        cadenceTimer_.start();
+    }
+    const qint64 tickStartedNs = cadenceTimer_.nsecsElapsed();
+
     const double speedSnapshot = speed_.load();
     const int scaledInterval = CalculateScaledFrameInterval(speedSnapshot);
 
     FrameTimingSnapshot nextFrame;
     if (!PeekNextFrameTiming(nextFrame)) {
+        if (frameQueue_->IsEndOfStream() && frameQueue_->Empty()) {
+            if (!playbackDrainedEmitted_) {
+                playbackDrainedEmitted_ = true;
+                Stop();
+                emit VideoPlaybackDrained();
+            }
+            return;
+        }
+
         ScheduleNextFrame(scaledInterval);
         return;
     }
@@ -154,7 +188,7 @@ void VideoFrameScheduler::Tick()
 
     RefreshVideoClockIfNeeded(newFrame.get(), syncType);
     PresentDisplayableFrame(std::move(newFrame));
-    ScheduleNextFrame(scaledInterval);
+    ScheduleNextFrameAfterProcessing(scaledInterval, tickStartedNs);
 }
 
 bool VideoFrameScheduler::CanScheduleFrame() const
@@ -220,7 +254,7 @@ bool VideoFrameScheduler::DropLateFrame()
         return false;
     }
 
-    dropped_.fetch_add(1);
+    schedulerDroppedFrames_.fetch_add(1);
     return true;
 }
 
@@ -250,7 +284,7 @@ bool VideoFrameScheduler::DropPreviewRateLimitedFrame(SYNCTYPE syncType)
     }
 
     RefreshVideoClockIfNeeded(drop.get(), syncType);
-    dropped_.fetch_add(1);
+    schedulerDroppedFrames_.fetch_add(1);
     return true;
 }
 
@@ -292,11 +326,69 @@ void VideoFrameScheduler::PresentDisplayableFrame(AVFramePtr frame)
     }
 
     RememberPreviewPresentedFrame(frame.get());
+    const int frameWidth = frame->width;
+    const int frameHeight = frame->height;
     frameSink_->PresentFrame(std::move(frame));
-    rendered_.fetch_add(1);
+    submittedFrameWidth_.store(frameWidth);
+    submittedFrameHeight_.store(frameHeight);
+    submittedFrames_.fetch_add(1);
+}
+
+void VideoFrameScheduler::ResetCadenceTiming()
+{
+    cadenceTimer_.invalidate();
+    nextFrameDeadlineNs_ = 0;
+    hasCadenceDeadline_ = false;
+
+    if (running_.load()) {
+        cadenceTimer_.start();
+    }
+}
+
+int VideoFrameScheduler::CalculateCadenceDelayMs(int scaledIntervalMs,
+                                                 qint64 tickStartedNs,
+                                                 qint64 nowNs)
+{
+    const qint64 intervalNs = static_cast<qint64>(qMax(1, scaledIntervalMs))
+        * kNanosecondsPerMillisecond;
+    const bool invalidTimeRange = tickStartedNs < 0 || nowNs < tickStartedNs;
+
+    if (!hasCadenceDeadline_ || invalidTimeRange) {
+        nextFrameDeadlineNs_ = qMax<qint64>(0, tickStartedNs) + intervalNs;
+        hasCadenceDeadline_ = true;
+    } else {
+        nextFrameDeadlineNs_ += intervalNs;
+    }
+
+    if (nextFrameDeadlineNs_ + intervalNs < nowNs) {
+        nextFrameDeadlineNs_ = nowNs;
+    }
+
+    const qint64 remainingNs = nextFrameDeadlineNs_ - nowNs;
+    if (remainingNs <= 0) {
+        return 0;
+    }
+
+    return static_cast<int>((remainingNs + kNanosecondsPerMillisecond - 1)
+                            / kNanosecondsPerMillisecond);
+}
+
+void VideoFrameScheduler::ScheduleNextFrameAfterProcessing(int scaledIntervalMs,
+                                                           qint64 tickStartedNs)
+{
+    if (!cadenceTimer_.isValid()) {
+        cadenceTimer_.start();
+        tickStartedNs = 0;
+        hasCadenceDeadline_ = false;
+    }
+
+    const int delayMs = CalculateCadenceDelayMs(scaledIntervalMs,
+                                                tickStartedNs,
+                                                cadenceTimer_.nsecsElapsed());
+    ScheduleNextFrame(delayMs);
 }
 
 void VideoFrameScheduler::ScheduleNextFrame(int delayMs)
 {
-    QTimer::singleShot(delayMs, this, &VideoFrameScheduler::Tick);
+    tickTimer_.start(delayMs);
 }

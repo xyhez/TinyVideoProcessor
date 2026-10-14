@@ -161,6 +161,22 @@ QList<MultiStreamManager::StreamId> MultiStreamManager::StreamIds() const {
     return streamIds;
 }
 
+QList<MultiStreamManager::StreamRuntimeMetricsSnapshot>
+MultiStreamManager::StreamRuntimeMetricsSnapshots() const {
+    QList<StreamRuntimeMetricsSnapshot> snapshots;
+    for (const auto& stream : streams_) {
+        if (!stream.second.pipeline) {
+            continue;
+        }
+
+        StreamRuntimeMetricsSnapshot snapshot;
+        snapshot.streamId = stream.first;
+        snapshot.pipeline = stream.second.pipeline->RuntimeMetrics();
+        snapshots.append(snapshot);
+    }
+    return snapshots;
+}
+
 MultiStreamManager::StreamId MultiStreamManager::ActiveStream() const {
     return activeStreamId_;
 }

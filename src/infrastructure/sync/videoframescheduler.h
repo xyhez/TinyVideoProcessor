@@ -1,7 +1,9 @@
 #ifndef VIDEOFRAMESCHEDULER_H
 #define VIDEOFRAMESCHEDULER_H
 
+#include <QElapsedTimer>
 #include <QObject>
+#include <QTimer>
 #include <atomic>
 #include <cstdint>
 #include <memory>
@@ -16,6 +18,8 @@ extern "C" {
 #include <libavutil/frame.h>
 }
 
+class VideoFrameSchedulerTest;
+
 /**
  * @brief VideoFrameScheduler 单路视频帧调度器
  * @details 负责从视频帧队列取帧、执行同步判断并把可显示帧交给 IVideoFrameSink。
@@ -26,6 +30,18 @@ class VideoFrameScheduler : public QObject
     Q_OBJECT
 
 public:
+    /**
+     * @brief RuntimeMetricsSnapshot 视频调度器累计运行指标快照
+     * @details 只包含按值复制的原子统计，不持有帧、队列或输出 sink。
+     */
+    struct RuntimeMetricsSnapshot {
+        std::uint64_t submittedFrames = 0;        ///< 已提交给预览输出链的累计帧数
+        std::uint64_t schedulerDroppedFrames = 0; ///< 同步追帧和预览限帧累计丢弃数
+        int frameWidth = 0;                       ///< 最近一次提交帧宽度
+        int frameHeight = 0;                      ///< 最近一次提交帧高度
+        bool running = false;                     ///< 调度循环是否处于运行状态
+    };
+
     /**
      * @brief VideoFrameScheduler 构造函数
      * @param parent Qt 父对象
@@ -89,6 +105,18 @@ public:
      * @details 只清理当前显示帧，不清空队列、不 flush decoder、不重置同步时钟。
      */
     void ClearOutputFrame();
+
+    /**
+     * @brief RuntimeMetrics 获取当前累计运行指标
+     * @return 无锁、按值返回的只读快照
+     */
+    RuntimeMetricsSnapshot RuntimeMetrics() const;
+
+signals:
+    /**
+     * @brief VideoPlaybackDrained 视频帧队列已到达流尾且全部消费完成
+     */
+    void VideoPlaybackDrained();
 
 private slots:
     /**
@@ -199,6 +227,31 @@ private:
     void PresentDisplayableFrame(AVFramePtr frame);
 
     /**
+     * @brief ResetCadenceTiming 重置基础帧率节奏的单调时钟和绝对截止时间
+     * @details 运行状态下立即重启单调时钟；停止状态下保持无效，等待下次 Start。
+     */
+    void ResetCadenceTiming();
+
+    /**
+     * @brief CalculateCadenceDelayMs 推进绝对截止时间并计算下一轮剩余等待预算
+     * @param scaledIntervalMs 播放速度修正后的基础帧间隔
+     * @param tickStartedNs 本轮调度开始时间，基于 cadenceTimer_，单位纳秒
+     * @param nowNs 当前时间，基于 cadenceTimer_，单位纳秒
+     * @return 下一轮需要等待的毫秒数，已向上取整且不会为负
+     */
+    int CalculateCadenceDelayMs(int scaledIntervalMs,
+                                qint64 tickStartedNs,
+                                qint64 nowNs);
+
+    /**
+     * @brief ScheduleNextFrameAfterProcessing 在扣除本轮处理耗时后安排下一帧
+     * @param scaledIntervalMs 播放速度修正后的基础帧间隔
+     * @param tickStartedNs 本轮调度开始时间，基于 cadenceTimer_，单位纳秒
+     */
+    void ScheduleNextFrameAfterProcessing(int scaledIntervalMs,
+                                          qint64 tickStartedNs);
+
+    /**
      * @brief ScheduleNextFrame 安排下一次调度
      * @param delayMs 延迟时间，单位毫秒
      */
@@ -216,8 +269,18 @@ private:
     bool hasPreviewPresentedPts_ = false;	///< 是否已有预览显示时间戳
     double lastPreviewPresentedPtsMs_ = 0.0;	///< 最近一次预览显示帧 PTS
     std::atomic<bool> running_{false};	///< 是否正在调度
-    std::atomic<int> dropped_{0};	///< 丢帧计数
-    std::atomic<int> rendered_{0};	///< 显示帧计数
+    bool playbackDrainedEmitted_ = false; ///< 当前启动周期是否已经发出播放耗尽信号
+    std::atomic<std::uint64_t> schedulerDroppedFrames_{0};	///< 调度累计丢帧数
+    std::atomic<std::uint64_t> submittedFrames_{0};	///< 提交给预览输出链的累计帧数
+    std::atomic<int> submittedFrameWidth_{0};	///< 最近一次提交帧宽度
+    std::atomic<int> submittedFrameHeight_{0};	///< 最近一次提交帧高度
+
+    QTimer tickTimer_; ///< 唯一的单次 Tick 定时器，Stop 时可取消待执行调度
+    QElapsedTimer cadenceTimer_; ///< 基础帧率节奏使用的单调时钟
+    qint64 nextFrameDeadlineNs_ = 0; ///< 下一次调度的绝对截止时间，单位纳秒
+    bool hasCadenceDeadline_ = false; ///< 是否已经建立绝对截止时间
+
+    friend class VideoFrameSchedulerTest;
 };
 
 #endif // VIDEOFRAMESCHEDULER_H

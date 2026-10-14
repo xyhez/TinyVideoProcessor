@@ -1,15 +1,12 @@
 #pragma once
 
 #include <QDialog>
-#include <QComboBox>
-#include <QListWidget>
-#include <QPushButton>
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QLabel>
-#include <QGroupBox>
 
 #include "domain/CameraTypes.h"
+
+class QComboBox;
+class QLabel;
+class QPushButton;
 
 /**
  * @brief CameraSettingsDialog 摄像头设置对话框
@@ -73,12 +70,13 @@ private:
      */
     void UpdateFrameRates(int formatIndex);
 
-    QComboBox* deviceComboBox_;	///< 设备下拉框
-    QComboBox* formatComboBox_;	///< 格式下拉框
-    QComboBox* frameRateComboBox_;	///< 帧率下拉框
-    QPushButton* refreshButton_;	///< 刷新按钮
-    QPushButton* okButton_;	///< 确认按钮
-    QPushButton* cancelButton_;	///< 取消按钮
+    QComboBox* deviceComboBox_ = nullptr;	///< 设备下拉框
+    QComboBox* formatComboBox_ = nullptr;	///< 格式下拉框
+    QComboBox* frameRateComboBox_ = nullptr;	///< 帧率下拉框
+    QLabel* statusLabel_ = nullptr;	///< 设备和参数可用状态说明
+    QPushButton* refreshButton_ = nullptr;	///< 刷新按钮
+    QPushButton* okButton_ = nullptr;	///< 确认按钮
+    QPushButton* cancelButton_ = nullptr;	///< 取消按钮
 
     QList<CameraDeviceInfo> devices_;	///< 摄像头设备列表
     QList<CameraFormatOption> currentFormats_;	///< 当前设备格式列表
