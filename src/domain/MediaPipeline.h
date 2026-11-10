@@ -5,6 +5,7 @@
 #include <QThread>
 #include <QTimer>
 #include <cstdint>
+#include <functional>
 #include <memory>
 
 #include "core/ffmpeg_raii.h"
@@ -21,8 +22,10 @@ class QWidget;
 class IVideoFrameSink;
 class ImageProcessingFrameSink;
 class ImageProcessorPipeline;
+class VisionAnalysisService;
 class VisionPipelineManager;
 class VisionProcessingFrameSink;
+class VisionResultStore;
 
 /**
  * @brief MediaPipeline 管理单路媒体源的播放管线资源
@@ -52,9 +55,13 @@ public:
     /**
      * @brief MediaPipeline 构造函数
      * @param visionPipelineManager 视觉管线管理器指针，nullptr 表示禁用视觉分析
+     * @param visionAnalysisService 异步视觉分析服务指针，nullptr 表示禁用异步分析
+     * @param visionResultStore 视觉结果仓库，与渲染器共享
      * @param parent Qt 父对象
      */
     explicit MediaPipeline(VisionPipelineManager* visionPipelineManager = nullptr,
+                           VisionAnalysisService* visionAnalysisService = nullptr,
+                           std::shared_ptr<VisionResultStore> visionResultStore = {},
                            QObject* parent = nullptr);
 
     /**
@@ -73,6 +80,13 @@ public:
     bool Initialize(std::shared_ptr<IMediaSource> mediaSource,
                     QWidget* rendererContainer,
                     IVideoFrameSink* videoFrameSink = nullptr);
+
+    /**
+     * @brief SetStreamId 设置当前管线所属的逻辑流 ID
+     * @details 用于视觉结果按流归属；必须在 Start 之前调用。
+     * @param streamId 逻辑流 ID
+     */
+    void SetStreamId(int streamId);
 
     /**
      * @brief Shutdown 关闭并释放当前播放管线
@@ -328,6 +342,23 @@ private:
      */
     void ResumeQueues();
 
+    /**
+     * @brief StartFrameScheduler 在独立线程启动视频帧调度
+     */
+    void StartFrameScheduler();
+
+    /**
+     * @brief StopFrameScheduler 停止视频帧调度线程并等待退出
+     */
+    void StopFrameScheduler();
+
+    /**
+     * @brief InvokeOnFrameScheduler 把操作投递到调度线程
+     * @param operation 待执行操作
+     * @param blocking 是否阻塞等待执行完成
+     */
+    void InvokeOnFrameScheduler(std::function<void()> operation, bool blocking = false);
+
     std::shared_ptr<SyncQueue<AVPacketPtr>> APacket_ = nullptr;	///< 音频包队列
     std::shared_ptr<SyncQueue<AVPacketPtr>> VPacket_ = nullptr;	///< 视频包队列
     std::shared_ptr<SyncQueue<AVFramePtr>> AFrame_ = nullptr;	///< 音频帧队列
@@ -348,8 +379,12 @@ private:
     IVideoFrameSink* activeVideoFrameSink_ = nullptr;	///< 当前视频帧输出目标
     std::unique_ptr<ImageProcessingFrameSink> imageProcessingFrameSink_;	///< 图像处理帧 sink
     VisionPipelineManager* visionPipelineManager_ = nullptr;	///< 视觉管线管理器，借用不拥有
+    VisionAnalysisService* visionAnalysisService_ = nullptr;	///< 异步视觉分析服务，借用不拥有
+    std::shared_ptr<VisionResultStore> visionResultStore_;	///< 视觉结果仓库
     std::unique_ptr<VisionProcessingFrameSink> visionProcessingFrameSink_;	///< 视觉分析帧 sink
+    int streamId_ = -1;	///< 当前逻辑流 ID
 
+    std::unique_ptr<QThread> frameThread_;	///< 视频帧调度线程
     std::unique_ptr<QThread> demuxerTH_;	///< 解复用线程
     std::unique_ptr<QThread> AdecoderTH_;	///< 音频解码线程
     std::unique_ptr<QThread> VdecoderTH_;	///< 视频解码线程

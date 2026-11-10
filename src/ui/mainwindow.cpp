@@ -580,6 +580,9 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event) {
 MainWindow::~MainWindow()
 {
     StopRuntimeMetrics();
+    if (multiViewRenderer_) {
+        multiViewRenderer_->SetVisionResultStore(nullptr);
+    }
     if (mediaPlayController_) {
         mediaPlayController_->Shutdown();
     }
@@ -1034,6 +1037,7 @@ void MainWindow::InitializeMultiViewRenderer() {
     multiViewRenderer_ = new MultiViewRenderer(ui->widget_videoArea);
     multiViewRenderer_->setObjectName("multiViewRenderer");
     multiViewRenderer_->setMinimumSize(320, 240);
+    multiViewRenderer_->SetVisionResultStore(mediaPlayController_->VisionResultStoreInstance());
     ui->gridLayout_videoArea->addWidget(multiViewRenderer_, 0, 0, 2, 2);
     streamViewportOverlay_ = new StreamViewportOverlay(multiViewRenderer_);
 

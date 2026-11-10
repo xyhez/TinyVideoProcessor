@@ -15,7 +15,9 @@
 
 class QWidget;
 class ImageProcessorPipeline;
+class VisionAnalysisService;
 class VisionPipelineManager;
+class VisionResultStore;
 /**
  * @brief MultiStreamManager 管理多路播放管线的外层身份和状态
  *
@@ -59,6 +61,18 @@ public:
      * @brief VisionManager 获取视觉分析管线管理器（const 版本）
      */
     const VisionPipelineManager* VisionManager() const;
+
+    /**
+     * @brief VisionResultStoreInstance 获取视觉结果仓库
+     * @return 结果仓库共享指针，生命周期由 MultiStreamManager 管理
+     */
+    std::shared_ptr<VisionResultStore> VisionResultStoreInstance() const;
+
+    /**
+     * @brief VisionAnalysisServiceInstance 获取异步视觉分析服务
+     * @return 服务指针，生命周期由 MultiStreamManager 管理
+     */
+    VisionAnalysisService* VisionAnalysisServiceInstance() const;
 
     /**
      * @brief SetVisionOverlayEnabled 设置视觉分析结果是否绘制到画面
@@ -439,6 +453,8 @@ private:
     void UpdateVisionActiveOnAllStreams();
 
     std::unique_ptr<VisionPipelineManager> visionPipelineManager_;	///< 视觉分析管线管理器
+    std::shared_ptr<VisionResultStore> visionResultStore_;	///< 视觉结果仓库
+    std::unique_ptr<VisionAnalysisService> visionAnalysisService_;	///< 异步视觉分析服务
     bool visionOverlayEnabled_ = true;	///< 视觉分析结果是否绘制到画面
     std::map<StreamId, StreamSlot> streams_;	///< 多路流表
     StreamId nextStreamId_ = 1;	///< 下一个可分配流 ID

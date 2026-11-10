@@ -2,14 +2,18 @@
 
 #include <utility>
 
-#include <opencv2/core/mat.hpp>
-
+#include "infrastructure/vision/visionanalysisservice.h"
 #include "infrastructure/vision/visionpipelinemanager.h"
-#include "infrastructure/vision/visiontypes.h"
+#include "infrastructure/vision/visionresultstore.h"
 
-VisionProcessingFrameSink::VisionProcessingFrameSink(VisionPipelineManager* manager,
-                                                     IVideoFrameSink* downstream)
+VisionProcessingFrameSink::VisionProcessingFrameSink(
+    VisionPipelineManager* manager,
+    VisionAnalysisService* analysisService,
+    std::shared_ptr<VisionResultStore> resultStore,
+    IVideoFrameSink* downstream)
     : manager_(manager)
+    , analysisService_(analysisService)
+    , resultStore_(std::move(resultStore))
     , downstreamSink_(downstream)
 {
 }
@@ -20,48 +24,17 @@ void VisionProcessingFrameSink::PresentFrame(AVFramePtr frame)
         return;
     }
 
-    // 视觉分析关闭 / 无 active pipeline → 透传原帧
-    if (!isActive_ || !manager_ || !manager_->ActivePipeline()) {
+    if (!isActive_.load() || !analysisService_ || !manager_
+        || !manager_->HasActivePipeline() || !frame) {
         downstreamSink_->PresentFrame(std::move(frame));
         return;
     }
 
-    cv::Mat image;
-    if (!converter_.ConvertFrameToMat(frame, image)) {
-        downstreamSink_->PresentFrame(std::move(frame));
-        return;
-    }
+    // 只投递引用，不拷贝像素；分析服务忙时会自动丢弃旧分析帧。
+    analysisService_->SubmitFrame(streamId_.load(), frame.get());
 
-    VisionFrame vf;
-    vf.image = image;
-    vf.width = image.cols;
-    vf.height = image.rows;
-    vf.stride = static_cast<int>(image.step);
-    vf.pts = frame ? frame->pts : 0;
-    vf.pixelFormat = VisionPixelFormat::BGR24;
-
-    VisionResultSet results;
-    if (!manager_->RunActive(vf, results)) {
-        downstreamSink_->PresentFrame(std::move(frame));
-        return;
-    }
-
-    // Overlay 关闭时 Run 依然跑（结果集合供未来订阅者消费），
-    // 但不修改画面，直接透传原帧
-    if (!overlayEnabled_) {
-        downstreamSink_->PresentFrame(std::move(frame));
-        return;
-    }
-
-    overlayRenderer_.Draw(image, results);
-
-    AVFramePtr processedFrame = converter_.ConvertMatToFrame(image, frame);
-    if (!processedFrame) {
-        downstreamSink_->PresentFrame(std::move(frame));
-        return;
-    }
-
-    downstreamSink_->PresentFrame(std::move(processedFrame));
+    // 显示帧立即透传，视觉推理/overlay 不再占用显示路径。
+    downstreamSink_->PresentFrame(std::move(frame));
 }
 
 void VisionProcessingFrameSink::ClearFrame()
@@ -71,24 +44,35 @@ void VisionProcessingFrameSink::ClearFrame()
     }
 }
 
+void VisionProcessingFrameSink::SetStreamId(int streamId)
+{
+    streamId_.store(streamId);
+}
+
 void VisionProcessingFrameSink::SetActive(bool active)
 {
-    isActive_ = active;
+    isActive_.store(active);
+    if (!active && resultStore_ && streamId_.load() >= 0) {
+        resultStore_->Clear(streamId_.load());
+    }
 }
 
 bool VisionProcessingFrameSink::IsActive() const
 {
-    return isActive_;
+    return isActive_.load();
 }
 
 void VisionProcessingFrameSink::SetOverlayEnabled(bool enabled)
 {
-    overlayEnabled_ = enabled;
+    overlayEnabled_.store(enabled);
+    if (resultStore_) {
+        resultStore_->SetOverlayEnabled(enabled);
+    }
 }
 
 bool VisionProcessingFrameSink::IsOverlayEnabled() const
 {
-    return overlayEnabled_;
+    return overlayEnabled_.load();
 }
 
 void VisionProcessingFrameSink::SetDownstreamSink(IVideoFrameSink* sink)

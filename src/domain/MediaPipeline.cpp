@@ -1,20 +1,30 @@
 #include "MediaPipeline.h"
 #include "tiny_log/Logging.h"
 #include "infrastructure/vision/imageprocessingframesink.h"
+#include "infrastructure/vision/visionanalysisservice.h"
 #include "infrastructure/vision/visionpipelinemanager.h"
 #include "infrastructure/vision/visionprocessingframesink.h"
+#include "infrastructure/vision/visionresultstore.h"
+
+#include <utility>
 
 #include <algorithm>
+#include <QMetaObject>
 #include <QVBoxLayout>
 
 namespace {
-constexpr size_t kPacketQueueMax = 30;	///< 音视频包队列最大缓存数量，限制解复用端超前读取
-constexpr size_t kFrameQueueMax = 30;	///< 音视频帧队列最大缓存数量，限制解码端超前输出
+constexpr size_t kPacketQueueMax = 16;	///< 音视频包队列最大缓存数量，限制解复用端超前读取
+constexpr size_t kFrameQueueMax = 4;	///< 音视频帧队列最大缓存数量，限制解码端超前输出
 }
 
-MediaPipeline::MediaPipeline(VisionPipelineManager* visionPipelineManager, QObject* parent)
+MediaPipeline::MediaPipeline(VisionPipelineManager* visionPipelineManager,
+                             VisionAnalysisService* visionAnalysisService,
+                             std::shared_ptr<VisionResultStore> visionResultStore,
+                             QObject* parent)
     : QObject(parent)
     , visionPipelineManager_(visionPipelineManager)
+    , visionAnalysisService_(visionAnalysisService)
+    , visionResultStore_(std::move(visionResultStore))
 {
 }
 
@@ -44,6 +54,14 @@ bool MediaPipeline::Initialize(std::shared_ptr<IMediaSource> mediaSource,
     return true;
 }
 
+void MediaPipeline::SetStreamId(int streamId)
+{
+    streamId_ = streamId;
+    if (visionProcessingFrameSink_) {
+        visionProcessingFrameSink_->SetStreamId(streamId);
+    }
+}
+
 void MediaPipeline::Shutdown()
 {
     ReleaseResources();
@@ -56,7 +74,7 @@ void MediaPipeline::Start()
         return;
     }
 
-    if (!demuxer_ || !Vdecoder_ || !videoFrameScheduler_ || !activeVideoFrameSink_ ||
+    if (!demuxer_ || !Vdecoder_ || !videoFrameScheduler_ || !frameThread_ || !activeVideoFrameSink_ ||
         !positionTimer_ || !demuxerTH_ || !VdecoderTH_) {
         LOG_WARN("MediaPipeline start failed: playback pipeline is not initialized");
         emit ErrorOccurred("Playback pipeline is not initialized");
@@ -91,7 +109,7 @@ void MediaPipeline::Start()
         Adecoder_->Start();
         audioplay_->Start();
     }
-    videoFrameScheduler_->Start();
+    StartFrameScheduler();
 }
 
 void MediaPipeline::Pause()
@@ -114,7 +132,11 @@ void MediaPipeline::Pause()
         Adecoder_->Pause();
     }
     Vdecoder_->Pause();
-    videoFrameScheduler_->Pause();
+    InvokeOnFrameScheduler([this]() {
+        if (videoFrameScheduler_) {
+            videoFrameScheduler_->Pause();
+        }
+    }, true);
     positionTimer_->stop();
 }
 
@@ -127,10 +149,12 @@ void MediaPipeline::Stop()
     if (playbackFinished_) {
         emit PositionChanged(0.0);
         positionTimer_->stop();
-        if (videoFrameScheduler_) {
-            videoFrameScheduler_->Stop();
-            videoFrameScheduler_->ClearOutputFrame();
-        }
+        InvokeOnFrameScheduler([this]() {
+            if (videoFrameScheduler_) {
+                videoFrameScheduler_->Stop();
+                videoFrameScheduler_->ClearOutputFrame();
+            }
+        }, true);
         if (audioplay_) {
             audioplay_->Pause();
         }
@@ -203,9 +227,11 @@ bool MediaPipeline::SeekTo(double seconds)
         return false;
     }
 
-    if (videoFrameScheduler_) {
-        videoFrameScheduler_->ClearOutputFrame();
-    }
+    InvokeOnFrameScheduler([this]() {
+        if (videoFrameScheduler_) {
+            videoFrameScheduler_->ClearOutputFrame();
+        }
+    }, true);
 
     ClearQueues();
 
@@ -408,6 +434,11 @@ bool MediaPipeline::CreatePipelineResources(std::shared_ptr<IMediaSource> mediaS
     syncManager_ = std::make_shared<SyncManager>();
     syncManager_->SetSyncType(hasAudio ? SYNCTYPE::AUDIO : SYNCTYPE::VIDEO);
     videoFrameScheduler_ = std::make_unique<VideoFrameScheduler>();
+    frameThread_ = std::make_unique<QThread>();
+    frameThread_->setObjectName("VideoFrameScheduler");
+    videoFrameScheduler_->moveToThread(frameThread_.get());
+    connect(frameThread_.get(), &QThread::started,
+            videoFrameScheduler_.get(), &VideoFrameScheduler::Start);
     positionTimer_ = std::make_unique<QTimer>();
     positionTimer_->setInterval(200);
 
@@ -454,16 +485,19 @@ bool MediaPipeline::CreatePipelineResources(std::shared_ptr<IMediaSource> mediaS
         return false;
     }
 
-    // 视觉分析 sink 插入到最下游 sink 之前
+    // 显示处理链：图像处理先于渲染器；视觉分析作为旁路 tap，不阻塞显示。
+    imageProcessingFrameSink_ = std::make_unique<ImageProcessingFrameSink>();
+    imageProcessingFrameSink_->SetDownstreamSink(downstreamSink);
+    downstreamSink = imageProcessingFrameSink_.get();
+
     if (visionPipelineManager_) {
         visionProcessingFrameSink_ = std::make_unique<VisionProcessingFrameSink>(
-            visionPipelineManager_, downstreamSink);
+            visionPipelineManager_, visionAnalysisService_, visionResultStore_, downstreamSink);
+        visionProcessingFrameSink_->SetStreamId(streamId_);
         downstreamSink = visionProcessingFrameSink_.get();
     }
 
-    imageProcessingFrameSink_ = std::make_unique<ImageProcessingFrameSink>();
-    imageProcessingFrameSink_->SetDownstreamSink(downstreamSink);
-    activeVideoFrameSink_ = imageProcessingFrameSink_.get();
+    activeVideoFrameSink_ = downstreamSink;
 
     videoFrameScheduler_->Initialize(VFrame_, syncManager_, sourceInfo.FrameRate, sourceInfo.V_timeBase);
     videoFrameScheduler_->SetFrameSink(activeVideoFrameSink_);
@@ -593,9 +627,7 @@ void MediaPipeline::ReleaseResources()
     }
     if (videoFrameScheduler_) {
         LOG_DEBUG("MediaPipeline release: stop video frame scheduler");
-        videoFrameScheduler_->Stop();
-        videoFrameScheduler_->ClearOutputFrame();
-        videoFrameScheduler_->SetFrameSink(nullptr);
+        StopFrameScheduler();
     }
     if (imageProcessingFrameSink_) {
         imageProcessingFrameSink_->SetDownstreamSink(nullptr);
@@ -705,6 +737,14 @@ void MediaPipeline::TryFinalizePlayback()
     if (positionTimer_) {
         positionTimer_->stop();
     }
+    if (audioplay_) {
+        audioplay_->Pause();
+    }
+    InvokeOnFrameScheduler([this]() {
+        if (videoFrameScheduler_) {
+            videoFrameScheduler_->Stop();
+        }
+    }, true);
 
     emit PositionChanged(Duration());
     emit PlaybackFinished();
@@ -761,10 +801,12 @@ void MediaPipeline::HandleDemuxError(const QString& message)
     if (audioplay_) {
         audioplay_->Pause();
     }
-    if (videoFrameScheduler_) {
-        videoFrameScheduler_->Pause();
-        videoFrameScheduler_->ClearOutputFrame();
-    }
+    InvokeOnFrameScheduler([this]() {
+        if (videoFrameScheduler_) {
+            videoFrameScheduler_->Pause();
+            videoFrameScheduler_->ClearOutputFrame();
+        }
+    }, true);
 
     emit ErrorOccurred(message.isEmpty() ? QString("Demuxer runtime error") : message);
 }
@@ -775,7 +817,11 @@ bool MediaPipeline::SuspendPipelineAndWait()
 
     if (videoFrameScheduler_) {
         LOG_DEBUG("MediaPipeline suspend: pause video frame scheduler");
-        videoFrameScheduler_->Pause();
+        InvokeOnFrameScheduler([this]() {
+            if (videoFrameScheduler_) {
+                videoFrameScheduler_->Pause();
+            }
+        }, true);
     }
     if (audioplay_) {
         LOG_DEBUG("MediaPipeline suspend: pause audio player");
@@ -805,10 +851,12 @@ bool MediaPipeline::SuspendPipelineAndWait()
 
 void MediaPipeline::ResetPipelineToStart()
 {
-    if (videoFrameScheduler_) {
-        videoFrameScheduler_->Stop();
-        videoFrameScheduler_->ClearOutputFrame();
-    }
+    InvokeOnFrameScheduler([this]() {
+        if (videoFrameScheduler_) {
+            videoFrameScheduler_->Stop();
+            videoFrameScheduler_->ClearOutputFrame();
+        }
+    }, true);
     if (audioplay_) {
         audioplay_->Pause();
     }
@@ -824,10 +872,12 @@ void MediaPipeline::ResetPipelineToStart()
 
 void MediaPipeline::ResetRealtimePipelineStop()
 {
-    if (videoFrameScheduler_) {
-        videoFrameScheduler_->Stop();
-        videoFrameScheduler_->ClearOutputFrame();
-    }
+    InvokeOnFrameScheduler([this]() {
+        if (videoFrameScheduler_) {
+            videoFrameScheduler_->Stop();
+            videoFrameScheduler_->ClearOutputFrame();
+        }
+    }, true);
     if (audioplay_) {
         audioplay_->Pause();
     }
@@ -866,4 +916,71 @@ void MediaPipeline::ResumeQueues()
     if (VPacket_) { VPacket_->Resume(); }
     if (AFrame_)  { AFrame_->Resume();  }
     if (VFrame_)  { VFrame_->Resume();  }
+}
+
+void MediaPipeline::StartFrameScheduler()
+{
+    if (!frameThread_ || !videoFrameScheduler_) {
+        return;
+    }
+
+    if (frameThread_->isRunning()) {
+        QMetaObject::invokeMethod(videoFrameScheduler_.get(), [this]() {
+            if (videoFrameScheduler_) {
+                videoFrameScheduler_->Start();
+            }
+        }, Qt::QueuedConnection);
+    } else {
+        frameThread_->start();
+    }
+}
+
+void MediaPipeline::StopFrameScheduler()
+{
+    if (!videoFrameScheduler_) {
+        return;
+    }
+
+    const bool threadRunning = frameThread_ && frameThread_->isRunning();
+    if (threadRunning && QThread::currentThread() != frameThread_.get()) {
+        QMetaObject::invokeMethod(videoFrameScheduler_.get(), [this]() {
+            if (!videoFrameScheduler_) {
+                return;
+            }
+            videoFrameScheduler_->Stop();
+            videoFrameScheduler_->ClearOutputFrame();
+            videoFrameScheduler_->SetFrameSink(nullptr);
+        }, Qt::BlockingQueuedConnection);
+
+        frameThread_->quit();
+        frameThread_->wait();
+    } else {
+        videoFrameScheduler_->Stop();
+        videoFrameScheduler_->ClearOutputFrame();
+        videoFrameScheduler_->SetFrameSink(nullptr);
+    }
+
+    if (frameThread_ && QThread::currentThread() != frameThread_.get()) {
+        frameThread_->quit();
+        frameThread_->wait();
+        frameThread_.reset();
+    }
+}
+
+void MediaPipeline::InvokeOnFrameScheduler(std::function<void()> operation, bool blocking)
+{
+    if (!operation) {
+        return;
+    }
+
+    if (!videoFrameScheduler_ || !frameThread_
+        || !frameThread_->isRunning()
+        || QThread::currentThread() == frameThread_.get()) {
+        operation();
+        return;
+    }
+
+    QMetaObject::invokeMethod(videoFrameScheduler_.get(),
+                              std::move(operation),
+                              blocking ? Qt::BlockingQueuedConnection : Qt::QueuedConnection);
 }

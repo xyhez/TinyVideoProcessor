@@ -5,9 +5,12 @@
 #include <memory>
 
 #include <QList>
+#include <QMutex>
 #include <QObject>
 #include <QString>
 #include <QVector>
+
+#include <atomic>
 
 #include "infrastructure/vision/ivisionpipeline.h"
 #include "infrastructure/vision/visiontypes.h"
@@ -92,7 +95,15 @@ public:
     IVisionPipeline* ActivePipeline() const;
 
     /**
+     * @brief HasActivePipeline 是否已有启动完成的 active pipeline
+     * @return true 有可执行 pipeline
+     */
+    bool HasActivePipeline() const;
+
+    /**
      * @brief RunActive 转发一帧给当前 active pipeline
+     * @details 该方法可能被分析工作线程调用；Manager 内部用互斥锁串行化
+     *          管线切换和推理，避免 UI 线程切换管线时与推理并发。
      * @param input 输入帧
      * @param out 结果集合
      * @return true 处理成功；false 无 active 或处理失败
@@ -114,6 +125,15 @@ signals:
     void PipelineStartupFailed(QString id, QString error);
 
 private:
+    /**
+     * @brief FindPipelineLocked 在已持锁状态下查找管线
+     * @param id 目标管线 id
+     * @return pipeline 指针
+     */
+    IVisionPipeline* FindPipelineLocked(const QString& id) const;
+
+    mutable QMutex mutex_;	///< 保护注册表、activeId_ 和推理调用
+    std::atomic<bool> hasActivePipeline_{false};	///< 无锁快速判断是否有可执行管线
     std::map<QString, std::unique_ptr<IVisionPipeline>> pipelines_;	///< 注册表，按 id 索引
     QVector<QString> registrationOrder_;	///< 注册顺序，保持 UI 展示稳定
     QString activeId_;	///< 当前激活的管线 id，空字符串表示无激活

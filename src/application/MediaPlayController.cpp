@@ -11,6 +11,7 @@
 #include "infrastructure/vision/imageprocessorpipeline.h"
 #include "infrastructure/vision/thresholdprocessor.h"
 #include "infrastructure/vision/visionpipelinemanager.h"
+#include "infrastructure/vision/visionresultstore.h"
 
 #include <algorithm>
 #include <cmath>
@@ -639,6 +640,10 @@ bool MediaPlayController::SetActiveVisionPipeline(const QString& id) {
         return false;
     }
     return visionManager->SetActivePipeline(id);
+}
+
+std::shared_ptr<VisionResultStore> MediaPlayController::VisionResultStoreInstance() const {
+    return multiStreamManager_ ? multiStreamManager_->VisionResultStoreInstance() : nullptr;
 }
 
 void MediaPlayController::SetVisionOverlayEnabled(bool enabled) {

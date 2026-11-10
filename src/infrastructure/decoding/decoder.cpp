@@ -2,6 +2,7 @@
 #include "tiny_log/Logging.h"
 
 #include <QMutexLocker>
+#include <QtGlobal>
 #include <utility>
 
 namespace {
@@ -61,10 +62,15 @@ bool Decoder::InitHWDecoder()
         return false;
     }
 
-    // 鎸変紭鍏堢骇灏濊瘯纭欢鍔犻€熷櫒
+    // 按平台优先级尝试硬件加速器；不可用的类型会被 av_hwdevice_find_type_by_name 忽略。
     const char *hwDevices[] = {
-        "d3d11va",      // Windows 棣栭€?
-        "dxva2",        // Windows 澶囬€?
+#if defined(Q_OS_WIN)
+        "d3d11va",
+        "dxva2",
+#elif defined(Q_OS_LINUX)
+        "vaapi",
+        "vdpau",
+#endif
         "cuda",         // NVIDIA
         nullptr
     };

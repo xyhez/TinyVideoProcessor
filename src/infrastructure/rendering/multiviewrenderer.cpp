@@ -3,16 +3,27 @@
 #include "tiny_log/Logging.h"
 
 #include <algorithm>
+#include <chrono>
 #include <QMutexLocker>
+#include <QColor>
+#include <QFont>
+#include <QFontMetrics>
 #include <QMouseEvent>
 #include <QOpenGLContext>
 #include <QOpenGLPixelTransferOptions>
 #include <QOpenGLTexture>
 #include <QMetaObject>
+#include <QPainter>
+#include <QPen>
+#include <QPointer>
 #include <QStringList>
 #include <QThread>
 #include <QtGlobal>
 #include <utility>
+
+#include "core/frameprofiler.h"
+#include "infrastructure/vision/visionresultstore.h"
+#include "infrastructure/vision/visiontypes.h"
 
 extern "C" {
 #include <libavutil/pixdesc.h>
@@ -195,15 +206,28 @@ double DisplayAspectRatio(int width, int height, AVRational sampleAspectRatio) {
 
     return static_cast<double>(width) * SampleAspectRatioValue(sampleAspectRatio) / height;
 }
+
+int64_t SteadyNowMs() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+               std::chrono::steady_clock::now().time_since_epoch())
+        .count();
+}
 }
 
 MultiViewRenderer::MultiViewRenderer(QWidget* parent)
     : QOpenGLWidget(parent) {
     setMinimumSize(320, 240);
+    // 只重绘 dirty slot，依赖 QOpenGLWidget 保留上一帧内容。
+    setUpdateBehavior(QOpenGLWidget::PartialUpdate);
     performanceTimer_.start();
 }
 
 MultiViewRenderer::~MultiViewRenderer() {
+    if (visionResultStore_) {
+        visionResultStore_->SetUpdateCallback({});
+        visionResultStore_.reset();
+    }
+
     QMutexLocker locker(&renderStateMutex_);
     if (context()) {
         makeCurrent();
@@ -228,7 +252,12 @@ void MultiViewRenderer::SetLayout(Layout layout) {
         return;
     }
 
-    layout_ = layout;
+    {
+        QMutexLocker locker(&slotStateMutex_);
+        layout_ = layout;
+        slotDirty_.fill(false);
+        fullRedraw_ = true;
+    }
     RequestRenderUpdate();
 }
 
@@ -245,24 +274,35 @@ void MultiViewRenderer::SetViewSlots(const QMap<int, StreamId>& viewSlots) {
         normalizedViewSlots.insert(it.key(), it.value());
     }
 
-    if (viewSlots_ == normalizedViewSlots) {
-        return;
-    }
+    {
+        QMutexLocker locker(&slotStateMutex_);
+        if (viewSlots_ == normalizedViewSlots) {
+            return;
+        }
 
-    viewSlots_ = normalizedViewSlots;
+        viewSlots_ = normalizedViewSlots;
+        slotDirty_.fill(false);
+        fullRedraw_ = true;
+    }
     RequestRenderUpdate();
 }
 
 QMap<int, MultiViewRenderer::StreamId> MultiViewRenderer::ViewSlots() const {
+    QMutexLocker locker(&slotStateMutex_);
     return viewSlots_;
 }
 
 void MultiViewRenderer::SetActiveStream(StreamId streamId) {
-    if (activeStreamId_ == streamId) {
-        return;
-    }
+    {
+        QMutexLocker locker(&slotStateMutex_);
+        if (activeStreamId_ == streamId) {
+            return;
+        }
 
-    activeStreamId_ = streamId;
+        activeStreamId_ = streamId;
+        slotDirty_.fill(false);
+        fullRedraw_ = true;
+    }
     RequestRenderUpdate();
 }
 
@@ -302,9 +342,15 @@ MultiViewRenderer::Viewport MultiViewRenderer::ViewportForSlot(int slotIndex) co
     }
 
     const QRect qtRect = QtRectForSlot(slotIndex);
+    StreamId streamId = InvalidStreamId;
+    {
+        QMutexLocker locker(&slotStateMutex_);
+        streamId = viewSlots_.value(slotIndex, InvalidStreamId);
+    }
+
     return Viewport {
         slotIndex,
-        viewSlots_.value(slotIndex, InvalidStreamId),
+        streamId,
         qtRect,
         ToFramebufferRect(qtRect)
     };
@@ -312,6 +358,11 @@ MultiViewRenderer::Viewport MultiViewRenderer::ViewportForSlot(int slotIndex) co
 
 void MultiViewRenderer::PresentFrame(StreamId streamId, AVFramePtr frame) {
     if (streamId == InvalidStreamId || !frame) {
+        return;
+    }
+
+    // 不可见流不进入渲染队列，避免多路/单画面布局下的纯浪费。
+    if (!IsStreamVisible(streamId)) {
         return;
     }
 
@@ -328,6 +379,7 @@ void MultiViewRenderer::PresentFrame(StreamId streamId, AVFramePtr frame) {
         state.lastPresentedElapsedMs = performanceTimer_.elapsed();
     }
 
+    MarkStreamDirty(streamId);
     RequestRenderUpdate();
 }
 
@@ -342,7 +394,9 @@ void MultiViewRenderer::ClearFrame(StreamId streamId) {
         ReleaseCurrentFrame(it->second);
     }
 
-    RequestRenderUpdate();
+    if (MarkStreamDirty(streamId)) {
+        RequestRenderUpdate();
+    }
 }
 
 void MultiViewRenderer::DetachStream(StreamId streamId) {
@@ -363,7 +417,7 @@ void MultiViewRenderer::DetachStream(StreamId streamId) {
         renderStates_.erase(it);
     }
 
-    RequestRenderUpdate();
+    RequestFullRedraw();
 }
 
 void MultiViewRenderer::initializeGL() {
@@ -375,10 +429,26 @@ void MultiViewRenderer::initializeGL() {
     glInitialized_ = frameShader_.isLinked();
 }
 
+void MultiViewRenderer::resizeGL(int width, int height) {
+    glViewport(0, 0, width, height);
+    RequestFullRedraw();
+}
+
 void MultiViewRenderer::paintGL() {
+    FrameProfiler::Scope paintProfile("renderer.paint");
     {
         QMutexLocker locker(&renderUpdateMutex_);
         renderUpdatePending_ = false;
+    }
+
+    std::array<bool, kMaxSlotCount> dirty{};
+    bool fullRedraw = false;
+    {
+        QMutexLocker locker(&slotStateMutex_);
+        fullRedraw = fullRedraw_;
+        fullRedraw_ = false;
+        dirty = slotDirty_;
+        slotDirty_.fill(false);
     }
 
     paintCount_ += 1;
@@ -387,16 +457,23 @@ void MultiViewRenderer::paintGL() {
     glDisable(GL_SCISSOR_TEST);
     const QSize framebufferSize = FramebufferSize();
     glViewport(0, 0, framebufferSize.width(), framebufferSize.height());
-    glClearColor(kBackgroundRed, kBackgroundGreen, kBackgroundBlue, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
+
+    const int visibleSlotCount = MaxVisibleSlots();
+    if (fullRedraw) {
+        glClearColor(kBackgroundRed, kBackgroundGreen, kBackgroundBlue, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+    }
 
     glEnable(GL_SCISSOR_TEST);
-    const int visibleSlotCount = MaxVisibleSlots();
     for (int slotIndex = 0; slotIndex < visibleSlotCount; ++slotIndex) {
+        if (!fullRedraw && !dirty[slotIndex]) {
+            continue;
+        }
         DrawViewport(ViewportForSlot(slotIndex));
     }
     glDisable(GL_SCISSOR_TEST);
 
+    DrawVisionOverlay();
     LogPerformanceStatsIfNeeded();
 }
 
@@ -463,9 +540,12 @@ bool MultiViewRenderer::PreparePendingFrameForDisplay(StreamRenderState& state) 
     const bool renderNv12Directly = inputPixelFormat == AV_PIX_FMT_NV12
         && nv12DirectRenderingAvailable_
         && BuildNv12UploadPlanes(inputFrame, nv12Planes);
+    if (!renderNv12Directly && !state.frameConverter) {
+        state.frameConverter = std::make_unique<VideoFrameConverter>();
+    }
     AVFramePtr displayFrame = renderNv12Directly
         ? std::move(state.pendingFrame)
-        : frameConverter_.ConvertToDisplayFrame(std::move(state.pendingFrame));
+        : state.frameConverter->ConvertToDisplayFrame(std::move(state.pendingFrame));
     if (!displayFrame) {
         return state.hasFrame && state.currentFrame;
     }
@@ -477,6 +557,8 @@ bool MultiViewRenderer::PreparePendingFrameForDisplay(StreamRenderState& state) 
     state.videoHeight = rawFrame->height;
     state.sampleAspectRatio = rawFrame->sample_aspect_ratio;
     state.pixelFormat = static_cast<AVPixelFormat>(rawFrame->format);
+    state.colorRange = rawFrame->color_range;
+    state.colorSpace = rawFrame->colorspace;
     state.textureDirty = true;
     state.hasFrame = true;
     state.preparedFrames += 1;
@@ -538,6 +620,7 @@ bool BuildUploadPlanes(const AVFrame* frame,
 void MultiViewRenderer::ReleaseStreamResources(StreamRenderState& state) {
     ReleaseCurrentFrame(state);
     FreeTextures(state);
+    state.frameConverter.reset();
 }
 
 void MultiViewRenderer::FreeTextures(StreamRenderState& state) {
@@ -569,15 +652,28 @@ void MultiViewRenderer::InitializeFrameShader() {
         uniform sampler2D tex_y;
         uniform sampler2D tex_u;
         uniform sampler2D tex_v;
+        uniform int bt709;
+        uniform float rangeOffset;
+        uniform float rangeScale;
         void main() {
-            float y = texture2D(tex_y, textureOut).r;
+            float y = (texture2D(tex_y, textureOut).r - rangeOffset) * rangeScale;
             float u = texture2D(tex_u, textureOut).r - 0.5;
             float v = texture2D(tex_v, textureOut).r - 0.5;
-            gl_FragColor = vec4(
-                y + 1.402 * v,
-                y - 0.344 * u - 0.714 * v,
-                y + 1.772 * u,
-                1.0);
+
+            float r;
+            float g;
+            float b;
+            if (bt709 == 1) {
+                r = y + 1.793 * v;
+                g = y - 0.213 * u - 0.533 * v;
+                b = y + 2.112 * u;
+            } else {
+                r = y + 1.596 * v;
+                g = y - 0.391 * u - 0.813 * v;
+                b = y + 2.018 * u;
+            }
+
+            gl_FragColor = vec4(clamp(vec3(r, g, b), 0.0, 1.0), 1.0);
         })";
 
     const char* nv12FragmentShader = R"(
@@ -750,6 +846,13 @@ bool MultiViewRenderer::DrawStreamFrame(const Viewport& viewport, StreamRenderSt
     state.textureU->bind(1);
     if (!isNv12) {
         state.textureV->bind(2);
+        const bool fullRange = state.colorRange == AVCOL_RANGE_JPEG;
+        const bool bt709 = state.colorSpace == AVCOL_SPC_BT709
+            || state.colorSpace == AVCOL_SPC_BT2020_NCL
+            || state.colorSpace == AVCOL_SPC_BT2020_CL;
+        shader.setUniformValue("rangeOffset", fullRange ? 0.0f : 16.0f / 255.0f);
+        shader.setUniformValue("rangeScale", fullRange ? 1.0f : 255.0f / 219.0f);
+        shader.setUniformValue("bt709", bt709 ? 1 : 0);
     } else {
         const Nv12ColorConversion conversion = ResolveNv12ColorConversion(state.currentFrame.get());
         shader.setUniformValue("y_offset", conversion.yOffset);
@@ -1113,6 +1216,196 @@ void MultiViewRenderer::LogPerformanceStatsIfNeeded() {
     lastLoggedFormatConvertedFrames_ = totalFormatConvertedFrames;
     lastLoggedTextureUploads_ = totalTextureUploads;
     lastLoggedTextureRebuilds_ = totalTextureRebuilds;
+}
+
+void MultiViewRenderer::SetVisionResultStore(std::shared_ptr<VisionResultStore> store) {
+    if (visionResultStore_) {
+        visionResultStore_->SetUpdateCallback({});
+    }
+
+    visionResultStore_ = std::move(store);
+
+    if (visionResultStore_) {
+        QPointer<MultiViewRenderer> self(this);
+        visionResultStore_->SetUpdateCallback([self]() {
+            if (!self) {
+                return;
+            }
+
+            QMetaObject::invokeMethod(self.data(), [self]() {
+                if (!self) {
+                    return;
+                }
+
+                {
+                    QMutexLocker locker(&self->slotStateMutex_);
+                    self->fullRedraw_ = true;
+                }
+                self->update();
+            }, Qt::QueuedConnection);
+        });
+    }
+
+    RequestFullRedraw();
+}
+
+void MultiViewRenderer::RequestFullRedraw() {
+    {
+        QMutexLocker locker(&slotStateMutex_);
+        fullRedraw_ = true;
+    }
+    RequestRenderUpdate();
+}
+
+bool MultiViewRenderer::IsStreamVisible(StreamId streamId) const {
+    QMutexLocker locker(&slotStateMutex_);
+
+    for (auto it = viewSlots_.cbegin(); it != viewSlots_.cend(); ++it) {
+        if (it.value() == streamId) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool MultiViewRenderer::MarkStreamDirty(StreamId streamId) {
+    QMutexLocker locker(&slotStateMutex_);
+
+    for (auto it = viewSlots_.cbegin(); it != viewSlots_.cend(); ++it) {
+        if (it.value() == streamId) {
+            slotDirty_[it.key()] = true;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+QRectF MultiViewRenderer::FrameRectForViewport(const Viewport& viewport,
+                                               const StreamRenderState& state) const {
+    QRectF viewportRect = viewport.qtRect;
+    if (state.videoWidth <= 0 || state.videoHeight <= 0
+        || viewportRect.width() <= 0 || viewportRect.height() <= 0) {
+        return viewportRect;
+    }
+
+    const double displayAspectRatio =
+        DisplayAspectRatio(state.videoWidth, state.videoHeight, state.sampleAspectRatio);
+    const double viewportAspectRatio = viewportRect.width() / viewportRect.height();
+
+    QRectF frameRect;
+    if (displayAspectRatio > viewportAspectRatio) {
+        frameRect.setWidth(viewportRect.width());
+        frameRect.setHeight(viewportRect.width() / displayAspectRatio);
+    } else {
+        frameRect.setHeight(viewportRect.height());
+        frameRect.setWidth(viewportRect.height() * displayAspectRatio);
+    }
+
+    frameRect.moveCenter(viewportRect.center());
+    return frameRect;
+}
+
+void MultiViewRenderer::DrawVisionOverlay() {
+    if (!visionResultStore_ || !visionResultStore_->IsOverlayEnabled()) {
+        return;
+    }
+
+    const int visibleSlotCount = MaxVisibleSlots();
+    const int64_t nowMs = SteadyNowMs();
+
+    QPainter painter(this);
+    if (!painter.isActive()) {
+        return;
+    }
+
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    QFont font;
+    font.setPointSize(9);
+    painter.setFont(font);
+    const QFontMetrics metrics(font);
+
+    for (int slotIndex = 0; slotIndex < visibleSlotCount; ++slotIndex) {
+        const Viewport viewport = ViewportForSlot(slotIndex);
+        if (!viewport.IsBound()) {
+            continue;
+        }
+
+        const VisionResultStore::Snapshot snapshot =
+            visionResultStore_->Get(viewport.streamId);
+        if (!snapshot.results || snapshot.results->results.isEmpty()
+            || !snapshot.overlayEnabled) {
+            continue;
+        }
+
+        if (snapshot.producedAtMs > 0 && nowMs - snapshot.producedAtMs > 1000) {
+            continue;
+        }
+
+        QRectF videoRect;
+        int videoWidth = 0;
+        int videoHeight = 0;
+        {
+            QMutexLocker locker(&renderStateMutex_);
+            const auto it = renderStates_.find(viewport.streamId);
+            if (it == renderStates_.end() || !it->second.hasFrame) {
+                continue;
+            }
+            videoWidth = it->second.videoWidth;
+            videoHeight = it->second.videoHeight;
+            videoRect = FrameRectForViewport(viewport, it->second);
+        }
+
+        if (videoWidth <= 0 || videoHeight <= 0 || videoRect.isEmpty()) {
+            continue;
+        }
+
+        const auto mapRect = [&](const QRectF& rect) {
+            return QRectF(videoRect.x() + rect.x() * videoRect.width() / videoWidth,
+                          videoRect.y() + rect.y() * videoRect.height() / videoHeight,
+                          rect.width() * videoRect.width() / videoWidth,
+                          rect.height() * videoRect.height() / videoHeight);
+        };
+
+        for (const VisionResult& result : snapshot.results->results) {
+            for (const DetectionBox& box : result.boxes) {
+                const QRectF target = mapRect(box.box);
+                painter.setPen(QPen(QColor(0, 255, 0), 2));
+                painter.setBrush(Qt::NoBrush);
+                painter.drawRect(target);
+
+                QString label = box.label;
+                if (label.isEmpty() && box.classId >= 0) {
+                    label = QString("id:%1").arg(box.classId);
+                }
+                if (box.confidence > 0.0F) {
+                    const QString confidence =
+                        QString::number(box.confidence * 100.0F, 'f', 1) + "%";
+                    label = label.isEmpty() ? confidence : label + " " + confidence;
+                }
+                if (label.isEmpty()) {
+                    continue;
+                }
+
+                const QRectF labelRect(target.left(),
+                                       qMax(videoRect.top(), target.top() - metrics.height() - 4),
+                                       metrics.horizontalAdvance(label) + 8,
+                                       metrics.height() + 4);
+                painter.fillRect(labelRect, QColor(0, 255, 0, 200));
+                painter.setPen(Qt::black);
+                painter.drawText(labelRect.adjusted(4, 2, -4, -2),
+                                 Qt::AlignLeft | Qt::AlignVCenter, label);
+            }
+
+            for (const TextRegion& region : result.texts) {
+                const QRectF target = mapRect(region.box);
+                painter.setPen(QPen(QColor(255, 128, 0), 2));
+                painter.setBrush(Qt::NoBrush);
+                painter.drawRect(target);
+            }
+        }
+    }
 }
 
 void MultiViewRenderer::RequestRenderUpdate() {

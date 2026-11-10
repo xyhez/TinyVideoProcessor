@@ -66,6 +66,8 @@ void VideoRender::PresentFrame(AVFramePtr frame)
     m_videoW = rawFrame->width;
     m_videoH = rawFrame->height;
     m_sar = rawFrame->sample_aspect_ratio;
+    m_colorRange = rawFrame->color_range;
+    m_colorSpace = rawFrame->colorspace;
     m_hasFrame = true;
     m_frameMutex.unlock();
 
@@ -109,15 +111,28 @@ void VideoRender::initializeGL()
     const char* fs = R"(
         varying vec2 textureOut;
         uniform sampler2D tex_y, tex_u, tex_v;
+        uniform int bt709;
+        uniform float rangeOffset;
+        uniform float rangeScale;
         void main() {
-            float y = texture2D(tex_y, textureOut).r;
+            float y = (texture2D(tex_y, textureOut).r - rangeOffset) * rangeScale;
             float u = texture2D(tex_u, textureOut).r - 0.5;
             float v = texture2D(tex_v, textureOut).r - 0.5;
-            gl_FragColor = vec4(
-                y + 1.402 * v,
-                y - 0.344 * u - 0.714 * v,
-                y + 1.772 * u,
-                1.0);
+
+            float r;
+            float g;
+            float b;
+            if (bt709 == 1) {
+                r = y + 1.793 * v;
+                g = y - 0.213 * u - 0.533 * v;
+                b = y + 2.112 * u;
+            } else {
+                r = y + 1.596 * v;
+                g = y - 0.391 * u - 0.813 * v;
+                b = y + 2.018 * u;
+            }
+
+            gl_FragColor = vec4(clamp(vec3(r, g, b), 0.0, 1.0), 1.0);
         })";
 
     m_shader.addShaderFromSourceCode(QOpenGLShader::Vertex, vs);
@@ -139,30 +154,28 @@ void VideoRender::resizeGL(int w, int h)
 
 void VideoRender::paintGL()
 {
-    if (!m_hasFrame) {
-        glClear(GL_COLOR_BUFFER_BIT);
-        return;
-    }
-
+    // 调度线程与 GUI 线程并发：绘制期间持有显示帧锁，避免 m_displayFrame
+    // 被替换后 UploadTexture 使用悬空指针。单路回退路径允许短暂阻塞提交。
     m_frameMutex.lock();
-    AVFrame* frame = m_displayFrame.get();
-    bool hasFrame = m_hasFrame;
-    m_frameMutex.unlock();
 
-    if (!hasFrame || !frame) {
+    if (!m_hasFrame || !m_displayFrame) {
+        m_frameMutex.unlock();
         glClear(GL_COLOR_BUFFER_BIT);
         return;
     }
 
+    AVFrame* frame = m_displayFrame.get();
     const bool supported = IsSupportedFrameFormat(frame);
     LogFrameFormatIfNeeded(frame, supported);
     if (!supported) {
+        m_frameMutex.unlock();
         glClear(GL_COLOR_BUFFER_BIT);
         return;
     }
 
     UploadTexture(frame);
     DrawFrame();
+    m_frameMutex.unlock();
 }
 
 void VideoRender::UploadTexture(AVFrame* f)
@@ -267,6 +280,14 @@ void VideoRender::DrawFrame()
     m_texY->bind(0);
     m_texU->bind(1);
     m_texV->bind(2);
+
+    const bool fullRange = m_colorRange == AVCOL_RANGE_JPEG;
+    const bool bt709 = m_colorSpace == AVCOL_SPC_BT709
+        || m_colorSpace == AVCOL_SPC_BT2020_NCL
+        || m_colorSpace == AVCOL_SPC_BT2020_CL;
+    m_shader.setUniformValue("rangeOffset", fullRange ? 0.0f : 16.0f / 255.0f);
+    m_shader.setUniformValue("rangeScale", fullRange ? 1.0f : 255.0f / 219.0f);
+    m_shader.setUniformValue("bt709", bt709 ? 1 : 0);
 
     float x, y, w, h;
     CalcRect(x, y, w, h);

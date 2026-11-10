@@ -5,6 +5,8 @@
 #include "infrastructure/rendering/ivideoframesink.h"
 #include "infrastructure/vision/videoframematconverter.h"
 
+#include <atomic>
+
 /**
  * @brief ImageProcessingFrameSink 在视频帧调度器和最终显示 sink 之间执行图像处理
  */
@@ -56,7 +58,7 @@ private:
     IVideoFrameSink* downstreamSink_ = nullptr;	///< 下游视频帧 sink
     ImageProcessorPipeline imageProcessorPipeline_;	///< 图像处理器管线
     VideoFrameMatConverter frameMatConverter_;	///< 视频帧与 OpenCV Mat 转换器
-    bool imageProcessingEnabled_ = false;	///< 是否启用图像处理
+    std::atomic<bool> imageProcessingEnabled_{false};	///< 是否启用图像处理
 };
 
 #endif // TINYVIDEOPROCESSOR_IMAGEPROCESSINGFRAMESINK_H

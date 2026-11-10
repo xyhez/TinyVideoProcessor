@@ -130,6 +130,8 @@ private:
 
     int m_videoW = 0, m_videoH = 0;	///< 当前视频宽高
     AVRational m_sar = {1, 1};	///< 像素宽高比
+    AVColorRange m_colorRange = AVCOL_RANGE_UNSPECIFIED;	///< 当前帧色彩范围
+    AVColorSpace m_colorSpace = AVCOL_SPC_UNSPECIFIED;	///< 当前帧色彩空间
 
     AVPixelFormat m_lastLoggedFormat = AV_PIX_FMT_NONE;	///< 上次记录的像素格式
     int m_lastLoggedWidth = 0;	///< 上次记录的视频宽度

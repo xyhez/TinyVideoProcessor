@@ -1,66 +1,74 @@
 #ifndef TINYVIDEOPROCESSOR_VISIONPROCESSINGFRAMESINK_H
 #define TINYVIDEOPROCESSOR_VISIONPROCESSINGFRAMESINK_H
 
-#include "infrastructure/rendering/ivideoframesink.h"
-#include "infrastructure/vision/videoframematconverter.h"
-#include "infrastructure/vision/visionoverlayrenderer.h"
+#include <atomic>
+#include <memory>
 
+#include "infrastructure/rendering/ivideoframesink.h"
+
+class VisionAnalysisService;
 class VisionPipelineManager;
+class VisionResultStore;
 
 /**
  * @brief VisionProcessingFrameSink 视觉分析帧 sink
  *
- * 位于 sink 链的 ImageProcessingFrameSink 之后：
- *   Scheduler → ImageProcessingFrameSink → VisionProcessingFrameSink → downstream
- *
- * 每路 MediaPipeline 各持有一个，但只有 active stream 那个 isActive_=true
- * 才会真正跑分析和绘制。其他路直接透传原帧。
- *
- * isActive_ 与 overlayEnabled_ 正交：
- * - isActive_=false: 完全透传，不 Run 不 Draw
- * - isActive_=true, overlayEnabled_=true: Run + Draw
- * - isActive_=true, overlayEnabled_=false: Run 但不 Draw（结果集合可供未来订阅者消费）
- *
- * VisionPipelineManager 由上层持有，sink 借用其指针，不管理生命周期。
+ * 当前 sink 不再同步执行 OpenCV/YOLO，而是把帧引用投递给
+ * VisionAnalysisService。显示帧立即透传给下游，overlay 由渲染器读取
+ * VisionResultStore 后绘制。
  */
-class VisionProcessingFrameSink : public IVideoFrameSink {
+class VisionProcessingFrameSink : public IVideoFrameSink
+{
 public:
     /**
      * @brief VisionProcessingFrameSink 构造函数
-     * @param manager 视觉管线管理器，nullptr 则等同关闭视觉分析
-     * @param downstream 下游 sink，可稍后通过 SetDownstreamSink 设置
+     * @param manager 视觉管线管理器，借用不拥有
+     * @param analysisService 异步分析服务，借用不拥有
+     * @param resultStore 结果仓库，服务与渲染器共享
+     * @param downstream 下游 sink
      */
-    VisionProcessingFrameSink(VisionPipelineManager* manager = nullptr,
+    VisionProcessingFrameSink(VisionPipelineManager* manager,
+                              VisionAnalysisService* analysisService,
+                              std::shared_ptr<VisionResultStore> resultStore,
                               IVideoFrameSink* downstream = nullptr);
 
     void PresentFrame(AVFramePtr frame) override;
     void ClearFrame() override;
 
     /**
-     * @brief SetActive 切换本 sink 是否执行视觉分析
-     * @param active true 表示本 sink 属于 active stream
+     * @brief SetStreamId 设置当前 sink 所属流 ID
+     * @param streamId 流 ID
+     */
+    void SetStreamId(int streamId);
+
+    /**
+     * @brief SetActive 切换本 sink 是否提交分析
+     * @param active true 表示 active stream
      */
     void SetActive(bool active);
     bool IsActive() const;
 
     /**
-     * @brief SetOverlayEnabled 切换是否把识别结果绘制到画面
+     * @brief SetOverlayEnabled 设置视觉叠加开关
+     * @param enabled true 允许绘制
      */
     void SetOverlayEnabled(bool enabled);
     bool IsOverlayEnabled() const;
 
     /**
      * @brief SetDownstreamSink 更新下游 sink
+     * @param sink 下游视频帧 sink
      */
     void SetDownstreamSink(IVideoFrameSink* sink);
 
 private:
     VisionPipelineManager* manager_ = nullptr;	///< 视觉管线管理器，借用不拥有
-    IVideoFrameSink* downstreamSink_ = nullptr;	///< 下游 sink，借用不拥有
-    VideoFrameMatConverter converter_;	///< AVFrame ↔ cv::Mat 转换器
-    VisionOverlayRenderer overlayRenderer_;	///< 识别结果绘制器
-    bool isActive_ = false;	///< 是否属于 active stream
-    bool overlayEnabled_ = true;	///< 是否把结果绘制到画面
+    VisionAnalysisService* analysisService_ = nullptr;	///< 异步分析服务，借用不拥有
+    std::shared_ptr<VisionResultStore> resultStore_;	///< 结果仓库
+    IVideoFrameSink* downstreamSink_ = nullptr;	///< 下游视频帧 sink
+    std::atomic<int> streamId_{-1};	///< 当前流 ID
+    std::atomic<bool> isActive_{false};	///< 是否属于 active stream
+    std::atomic<bool> overlayEnabled_{true};	///< 是否允许绘制叠加
 };
 
 #endif // TINYVIDEOPROCESSOR_VISIONPROCESSINGFRAMESINK_H

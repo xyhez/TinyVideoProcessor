@@ -15,6 +15,7 @@
 
 class MultiStreamManager;
 class QWidget;
+class VisionResultStore;
 
 /**
  * @brief
@@ -418,6 +419,12 @@ public:
      * @return true 切换成功
      */
     bool SetActiveVisionPipeline(const QString& id);
+
+    /**
+     * @brief VisionResultStoreInstance 获取视觉结果仓库
+     * @return 结果仓库共享指针，供渲染器读取 overlay 结果
+     */
+    std::shared_ptr<VisionResultStore> VisionResultStoreInstance() const;
 
     /**
      * @brief SetVisionOverlayEnabled 设置视觉分析结果是否绘制到画面

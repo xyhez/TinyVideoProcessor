@@ -266,7 +266,7 @@ private:
     std::atomic<double> speed_{1.0};	///< 当前播放速度
     std::atomic<bool> previewFrameRateReductionEnabled_{false};	///< 是否启用预览降帧
     std::atomic<int> previewFrameIntervalMs_{67};	///< 预览降帧目标帧间隔
-    bool hasPreviewPresentedPts_ = false;	///< 是否已有预览显示时间戳
+    std::atomic<bool> hasPreviewPresentedPts_{false};	///< 是否已有预览显示时间戳
     double lastPreviewPresentedPtsMs_ = 0.0;	///< 最近一次预览显示帧 PTS
     std::atomic<bool> running_{false};	///< 是否正在调度
     bool playbackDrainedEmitted_ = false; ///< 当前启动周期是否已经发出播放耗尽信号

@@ -8,10 +8,13 @@
 #include <QOpenGLShaderProgram>
 #include <QOpenGLWidget>
 #include <QRect>
+#include <QRectF>
 #include <QSize>
 #include <QVector>
 
+#include <array>
 #include <map>
+#include <memory>
 
 #include "core/ffmpeg_raii.h"
 #include "infrastructure/rendering/videoframeconverter.h"
@@ -24,6 +27,7 @@ extern "C" {
 
 class QMouseEvent;
 class QOpenGLTexture;
+class VisionResultStore;
 
 /**
  * @brief MultiViewRenderer 统一多画面视频渲染器
@@ -154,6 +158,13 @@ public:
      */
     void DetachStream(StreamId streamId);
 
+    /**
+     * @brief SetVisionResultStore 设置视觉结果仓库
+     * @details 渲染器只读取最新结果，在 paintGL() 中绘制 overlay。
+     * @param store 结果仓库，允许为空
+     */
+    void SetVisionResultStore(std::shared_ptr<VisionResultStore> store);
+
 signals:
     /**
      * @brief StreamClicked 点击已绑定 view slot 时发出的信号
@@ -172,6 +183,13 @@ protected:
      * @brief initializeGL 初始化 OpenGL 状态
      */
     void initializeGL() override;
+
+    /**
+     * @brief resizeGL 处理 framebuffer 尺寸变化
+     * @param width 宽度
+     * @param height 高度
+     */
+    void resizeGL(int width, int height) override;
 
     /**
      * @brief paintGL 绘制多路视频画面
@@ -197,6 +215,7 @@ private:
     struct StreamRenderState {
         AVFramePtr pendingFrame;	///< 最新待显示输入帧，绘制前允许被后到帧替换
         AVFramePtr currentFrame;	///< 当前显示帧
+        std::unique_ptr<VideoFrameConverter> frameConverter;	///< 每路独立转换器，避免共享 sws context 抖动
         QOpenGLTexture* textureY = nullptr;	///< Y 分量纹理
         QOpenGLTexture* textureU = nullptr;	///< U 分量纹理，NV12 时保存交错 UV 纹理
         QOpenGLTexture* textureV = nullptr;	///< V 分量纹理
@@ -207,6 +226,8 @@ private:
         int videoHeight = 0;	///< 视频高度
         AVRational sampleAspectRatio = {1, 1};	///< 像素宽高比
         AVPixelFormat pixelFormat = AV_PIX_FMT_NONE;	///< 像素格式
+        AVColorRange colorRange = AVCOL_RANGE_UNSPECIFIED;	///< 当前帧色彩范围
+        AVColorSpace colorSpace = AVCOL_SPC_UNSPECIFIED;	///< 当前帧色彩空间
         bool textureDirty = false;	///< 纹理是否需要更新
         bool hasFrame = false;	///< 是否持有显示帧
         AVPixelFormat lastLoggedFormat = AV_PIX_FMT_NONE;	///< 上次记录的像素格式
@@ -346,6 +367,41 @@ private:
     void RequestRenderUpdate();
 
     /**
+     * @brief RequestFullRedraw 请求全量重绘
+     * @details 布局、slot 绑定、active stream 或 overlay 变化时使用。
+     */
+    void RequestFullRedraw();
+
+    /**
+     * @brief IsStreamVisible 判断指定流是否绑定在当前布局的 slot 中
+     * @param streamId 目标流 ID
+     * @return true 可见
+     */
+    bool IsStreamVisible(StreamId streamId) const;
+
+    /**
+     * @brief MarkStreamDirty 标记指定流对应的 slot 为脏
+     * @param streamId 目标流 ID
+     * @return true 该流当前可见
+     */
+    bool MarkStreamDirty(StreamId streamId);
+
+    /**
+     * @brief DrawVisionOverlay 在视频帧上绘制最新视觉结果
+     * @details 使用 QPainter 在 widget 坐标系绘制，不修改视频帧。
+     */
+    void DrawVisionOverlay();
+
+    /**
+     * @brief FrameRectForViewport 计算视频帧在 widget 坐标系中的显示矩形
+     * @param viewport 目标 viewport
+     * @param state 单路渲染状态
+     * @return QRectF widget 坐标显示矩形
+     */
+    QRectF FrameRectForViewport(const Viewport& viewport,
+                                const StreamRenderState& state) const;
+
+    /**
      * @brief IsLogicalSlotIndex 判断是否为合法逻辑 slot
      * @param slotIndex slot 索引
      * @return true 合法
@@ -404,16 +460,21 @@ private:
      */
     void DrawViewportBorder(const QRect& rect, bool active);
 
+    static constexpr int kMaxSlotCount = 16;	///< 最大逻辑 slot 数
+
     Layout layout_ = Layout::Single;	///< 当前布局
     QMap<int, StreamId> viewSlots_;	///< slot 到流 ID 的绑定表
     std::map<StreamId, StreamRenderState> renderStates_;	///< 每路渲染状态
     StreamId activeStreamId_ = InvalidStreamId;	///< 当前活动显示流
     QOpenGLShaderProgram frameShader_;	///< YUV420P 视频帧绘制 shader
     QOpenGLShaderProgram nv12FrameShader_;	///< NV12 双平面视频帧绘制 shader
-    VideoFrameConverter frameConverter_;	///< 可显示帧格式转换器
     QMutex renderStateMutex_;	///< 渲染状态互斥锁
+    mutable QMutex slotStateMutex_;	///< viewSlots/slotDirty/fullRedraw 互斥锁
+    std::array<bool, kMaxSlotCount> slotDirty_{};	///< 每个 slot 是否需要重绘
+    bool fullRedraw_ = true;	///< 是否需要全量重绘
     QMutex renderUpdateMutex_;	///< 渲染刷新请求互斥锁
     bool renderUpdatePending_ = false;	///< 是否已有待处理渲染刷新请求
+    std::shared_ptr<VisionResultStore> visionResultStore_;	///< 视觉结果仓库
     QElapsedTimer performanceTimer_;	///< 性能统计计时器
     qint64 performanceWindowStartMs_ = 0;	///< 当前性能统计窗口起始毫秒
     qint64 paintCount_ = 0;	///< paintGL 调用总次数

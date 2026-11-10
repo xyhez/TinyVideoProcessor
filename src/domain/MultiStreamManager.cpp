@@ -5,9 +5,11 @@
 
 #include "tiny_log/Logging.h"
 
+#include "infrastructure/vision/visionanalysisservice.h"
 #include "infrastructure/vision/visionconfigloader.h"
 #include "infrastructure/vision/visionpipelinemanager.h"
 #include "infrastructure/vision/visionprocessorfactory.h"
+#include "infrastructure/vision/visionresultstore.h"
 
 MultiStreamManager::MultiStreamManager(QObject* parent)
     : QObject(parent)
@@ -19,6 +21,19 @@ MultiStreamManager::MultiStreamManager(QObject* parent)
                        << "usingDefault" << configSet.usingDefault
                        << "pipelineCount" << configSet.pipelines.size();
     VisionProcessorFactory::RegisterConfiguredPipelines(*visionPipelineManager_, configSet);
+
+    visionResultStore_ = std::make_shared<VisionResultStore>();
+    visionAnalysisService_ = std::make_unique<VisionAnalysisService>(
+        visionPipelineManager_.get(), visionResultStore_);
+    visionAnalysisService_->SetTargetFps(10);
+    visionResultStore_->SetOverlayEnabled(visionOverlayEnabled_);
+
+    connect(visionPipelineManager_.get(), &VisionPipelineManager::ActivePipelineChanged,
+            this, [this](const QString&) {
+                if (visionResultStore_) {
+                    visionResultStore_->ClearAll();
+                }
+            });
 }
 
 MultiStreamManager::~MultiStreamManager() = default;
@@ -31,8 +46,19 @@ const VisionPipelineManager* MultiStreamManager::VisionManager() const {
     return visionPipelineManager_.get();
 }
 
+std::shared_ptr<VisionResultStore> MultiStreamManager::VisionResultStoreInstance() const {
+    return visionResultStore_;
+}
+
+VisionAnalysisService* MultiStreamManager::VisionAnalysisServiceInstance() const {
+    return visionAnalysisService_.get();
+}
+
 void MultiStreamManager::SetVisionOverlayEnabled(bool enabled) {
     visionOverlayEnabled_ = enabled;
+    if (visionResultStore_) {
+        visionResultStore_->SetOverlayEnabled(enabled);
+    }
     for (auto& entry : streams_) {
         if (entry.second.pipeline) {
             entry.second.pipeline->SetVisionOverlayEnabled(enabled);
@@ -79,13 +105,15 @@ MultiStreamManager::StreamId MultiStreamManager::AddStream(std::shared_ptr<IMedi
     std::unique_ptr<IVideoFrameSink> videoFrameSink =
         frameSinkFactory ? frameSinkFactory(id) : nullptr;
 
-    auto pipeline = std::make_unique<MediaPipeline>(visionPipelineManager_.get());
+    auto pipeline = std::make_unique<MediaPipeline>(
+        visionPipelineManager_.get(), visionAnalysisService_.get(), visionResultStore_);
     if (!pipeline->Initialize(mediaSource, rendererContainer, videoFrameSink.get())) {
         pipeline->Shutdown();
         mediaSource->Close();
         emit StreamErrorOccurred(InvalidStreamId, "Initialize media pipeline failed");
         return InvalidStreamId;
     }
+    pipeline->SetStreamId(id);
 
     nextStreamId_++;
     StreamSlot slot;
@@ -126,6 +154,9 @@ bool MultiStreamManager::RemoveStream(StreamId id) {
 
     if (it->second.pipeline) {
         it->second.pipeline->Shutdown();
+    }
+    if (visionResultStore_) {
+        visionResultStore_->Clear(id);
     }
     streams_.erase(it);
 
@@ -318,6 +349,9 @@ void MultiStreamManager::ShutdownAll() {
         }
     }
     streams_.clear();
+    if (visionResultStore_) {
+        visionResultStore_->ClearAll();
+    }
 
     for (StreamId id : removedStreamIds) {
         emit StreamRemoved(id);

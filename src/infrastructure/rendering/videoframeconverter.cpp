@@ -128,7 +128,9 @@ AVFramePtr VideoFrameConverter::ConvertToDisplayFrame(AVFramePtr frame)
         return {};
     }
 
-    if (IsDisplayFormat(frame.get()) && HasDisplayColorProfile(frame.get())) {
+    // YUV420P 直接交给 shader，由 shader 处理 range/BT.601/BT.709；
+    // 不再因为色彩元数据与默认值不同而做一次无意义的 YUV→YUV 转换。
+    if (IsDisplayFormat(frame.get())) {
         return std::move(frame);
     }
 

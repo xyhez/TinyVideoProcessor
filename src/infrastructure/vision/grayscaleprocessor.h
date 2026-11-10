@@ -3,6 +3,8 @@
 
 #include "iimageprocessor.h"
 
+#include <atomic>
+
 /**
  * @brief GrayscaleProcessor 灰度化图像处理器
  * @details 输入和输出都保持 CV_8UC3 BGR 格式，避免破坏后续显示链路。
@@ -40,8 +42,21 @@ public:
      */
     bool Process(cv::Mat& image) override;
 
+    /**
+     * @brief SupportsYuvProcessing 支持直接处理 YUV Y 平面
+     * @return true
+     */
+    bool SupportsYuvProcessing() const override;
+
+    /**
+     * @brief Process 直接处理 YUV420P 帧
+     * @param frame 待处理视频帧
+     * @return true 处理成功
+     */
+    bool Process(AVFrame* frame) override;
+
 private:
-    bool enabled_ = true;	///< 是否启用灰度化处理
+    std::atomic<bool> enabled_{true};	///< 是否启用灰度化处理
 };
 
 #endif // GRAYSCALEPROCESSOR_H
